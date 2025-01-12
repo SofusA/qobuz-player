@@ -52,8 +52,8 @@ impl From<StateChangeError> for Error {
     }
 }
 
-impl From<hifirs_qobuz_api::Error> for Error {
-    fn from(value: hifirs_qobuz_api::Error) -> Self {
+impl From<qobuz_api::Error> for Error {
+    fn from(value: qobuz_api::Error) -> Self {
         Error::Client {
             message: value.to_string(),
         }

@@ -1,5 +1,5 @@
 use crate::service::{Album, Artist};
-use hifirs_qobuz_api::client::artist::Artist as QobuzArtist;
+use qobuz_api::client::artist::Artist as QobuzArtist;
 
 impl From<QobuzArtist> for Artist {
     fn from(a: QobuzArtist) -> Self {

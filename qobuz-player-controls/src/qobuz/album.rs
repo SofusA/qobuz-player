@@ -1,4 +1,4 @@
-use hifirs_qobuz_api::client::album::Album as QobuzAlbum;
+use qobuz_api::client::album::Album as QobuzAlbum;
 use std::{collections::BTreeMap, str::FromStr};
 
 use crate::service::{Album, Track};

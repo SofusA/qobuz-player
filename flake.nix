@@ -65,14 +65,14 @@
 
         # Build the actual crate itself, reusing the dependency
         # artifacts from above.
-        hifirs = craneLib.buildPackage (commonArgs // {
+        qobuz-player = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
         });
       in
       {
         checks = {
           # Build the crate as part of `nix flake check` for convenience
-          inherit hifirs;
+          inherit qobuz-player;
 
           # Run clippy (and deny all warnings) on the crate source,
           # again, reusing the dependency artifacts from above.
@@ -80,27 +80,27 @@
           # Note that this is done as a separate derivation so that
           # we can block the CI if there are issues here, but not
           # prevent downstream consumers from building our crate by itself.
-          hifirs-clippy = craneLib.cargoClippy (commonArgs // {
+          qobuz-player-clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
             cargoClippyExtraArgs = "--all-targets -- --deny warnings";
           });
 
-          hifirs-doc = craneLib.cargoDoc (commonArgs // {
+          qobuz-player-doc = craneLib.cargoDoc (commonArgs // {
             inherit cargoArtifacts;
           });
 
           # Check formatting
-          hifirs-fmt = craneLib.cargoFmt {
+          qobuz-player-fmt = craneLib.cargoFmt {
             inherit src;
           };
         };
 
         packages = {
-          default = hifirs;
+          default = qobuz-player;
         }; 
         
         apps.default = flake-utils.lib.mkApp {
-          drv = hifirs;
+          drv = qobuz-player;
         };
 
         devShells.default = craneLib.devShell {

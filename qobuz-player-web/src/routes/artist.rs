@@ -4,8 +4,8 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use hifirs_player::service::{Album, Artist};
 use leptos::prelude::*;
+use qobuz_player_controls::service::{Album, Artist};
 use std::sync::Arc;
 use tokio::join;
 
@@ -28,19 +28,19 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 async fn set_favorite(Path(id): Path<String>) -> impl IntoResponse {
-    hifirs_player::add_favorite_artist(&id).await;
+    qobuz_player_controls::add_favorite_artist(&id).await;
 }
 
 async fn unset_favorite(Path(id): Path<String>) -> impl IntoResponse {
-    hifirs_player::remove_favorite_artist(&id).await;
+    qobuz_player_controls::remove_favorite_artist(&id).await;
 }
 
 async fn index(Path(id): Path<i32>) -> impl IntoResponse {
     let (artist, albums, similar_artists, favorites) = join!(
-        hifirs_player::artist(id),
-        hifirs_player::artist_albums(id),
-        hifirs_player::similar_artists(id),
-        hifirs_player::favorites()
+        qobuz_player_controls::artist(id),
+        qobuz_player_controls::artist_albums(id),
+        qobuz_player_controls::similar_artists(id),
+        qobuz_player_controls::favorites()
     );
 
     let is_favorite = favorites

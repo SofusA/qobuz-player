@@ -53,10 +53,10 @@ install-sqlx:
   cargo install sqlx-cli --force
 
 reset-database:
-  touch $(echo $DATABASE_URL | sed -e "s/sqlite:\/\///g") && cargo sqlx database reset --source {{invocation_directory()}}/hifirs-player/migrations -y
+  touch $(echo $DATABASE_URL | sed -e "s/sqlite:\/\///g") && cargo sqlx database reset --source {{invocation_directory()}}/qobuz-player-player/migrations -y
 
 build-tailwind:
-  cd hifirs-web && npm install && npm run build
+  cd qobuz-player-web && npm install && npm run build
 
 check-deps:
   #!/usr/bin/env sh

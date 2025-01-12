@@ -1,12 +1,13 @@
 [package]
-name = "hifirs-web"
+name = "qobuz-player-web"
+
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
 repository.workspace = true
 
 [dependencies]
-hifirs-player = { version = "*", path = "../hifirs-player" }
+qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
 
 axum = { workspace = true, features = ["ws"] }
 futures = { workspace = true }

@@ -3,8 +3,8 @@ use axum::{
     routing::{get, post, put},
     Router,
 };
-use hifirs_player::queue::{TrackListType, TrackListValue};
 use leptos::{component, prelude::*, IntoView};
+use qobuz_player_controls::queue::{TrackListType, TrackListValue};
 use std::sync::Arc;
 
 use crate::{
@@ -36,7 +36,7 @@ struct VolumeParameters {
 }
 
 async fn volume_slider_partial() -> impl IntoResponse {
-    let current_volume = (hifirs_player::volume() * 100.0) as u32;
+    let current_volume = (qobuz_player_controls::volume() * 100.0) as u32;
     render(html! { <VolumeSlider current_volume=current_volume /> })
 }
 
@@ -77,11 +77,11 @@ async fn set_volume(axum::Form(parameters): axum::Form<VolumeParameters>) -> imp
 
     let formatted_volume = volume as f64 / 100.0;
 
-    hifirs_player::set_volume(formatted_volume);
+    qobuz_player_controls::set_volume(formatted_volume);
 }
 
 async fn status_partial() -> impl IntoResponse {
-    let status = hifirs_player::current_state();
+    let status = qobuz_player_controls::current_state();
 
     if status == gstreamer::State::Playing {
         render(html! { <PlayPause play=true /> })
@@ -108,32 +108,32 @@ fn play_pause(play: bool) -> impl IntoView {
 }
 
 async fn play() -> impl IntoResponse {
-    match hifirs_player::play().await {
+    match qobuz_player_controls::play().await {
         Ok(_) => render(html! { <PlayPause play=true /> }),
         Err(_) => render(html! { <PlayPause play=false /> }),
     }
 }
 
 async fn pause() -> impl IntoResponse {
-    match hifirs_player::pause().await {
+    match qobuz_player_controls::pause().await {
         Ok(_) => render(html! { <PlayPause play=false /> }),
         Err(_) => render(html! { <PlayPause play=true /> }),
     }
 }
 
 async fn previous() -> impl IntoResponse {
-    _ = hifirs_player::previous().await;
+    _ = qobuz_player_controls::previous().await;
 }
 
 async fn next() -> impl IntoResponse {
-    _ = hifirs_player::next().await;
+    _ = qobuz_player_controls::next().await;
 }
 
 async fn index() -> impl IntoResponse {
-    let current_tracklist = hifirs_player::current_tracklist().await;
-    let position_mseconds = hifirs_player::position().map(|position| position.mseconds());
-    let current_status = hifirs_player::current_state();
-    let current_volume = (hifirs_player::volume() * 100.0) as u32;
+    let current_tracklist = qobuz_player_controls::current_tracklist().await;
+    let position_mseconds = qobuz_player_controls::position().map(|position| position.mseconds());
+    let current_status = qobuz_player_controls::current_state();
+    let current_volume = (qobuz_player_controls::volume() * 100.0) as u32;
 
     render(html! {
         <Page active_page=Page::NowPlaying>
@@ -148,10 +148,10 @@ async fn index() -> impl IntoResponse {
 }
 
 async fn now_playing_partial() -> impl IntoResponse {
-    let current_tracklist = hifirs_player::current_tracklist().await;
-    let position_mseconds = hifirs_player::position().map(|position| position.mseconds());
-    let current_status = hifirs_player::current_state();
-    let current_volume = (hifirs_player::volume() * 100.0) as u32;
+    let current_tracklist = qobuz_player_controls::current_tracklist().await;
+    let position_mseconds = qobuz_player_controls::position().map(|position| position.mseconds());
+    let current_status = qobuz_player_controls::current_state();
+    let current_volume = (qobuz_player_controls::volume() * 100.0) as u32;
 
     render(html! {
         <NowPlaying
@@ -164,8 +164,8 @@ async fn now_playing_partial() -> impl IntoResponse {
 }
 
 async fn progress_partial() -> impl IntoResponse {
-    let position_mseconds = hifirs_player::position().map(|position| position.mseconds());
-    let current_track = hifirs_player::current_track().await;
+    let position_mseconds = qobuz_player_controls::position().map(|position| position.mseconds());
+    let current_track = qobuz_player_controls::current_track().await;
     let duration_seconds = current_track.map(|track| track.duration_seconds);
 
     render(
@@ -208,7 +208,7 @@ pub fn now_playing(
     let current_track = current_tracklist
         .queue
         .values()
-        .find(|track| track.status == hifirs_player::service::TrackStatus::Playing);
+        .find(|track| track.status == qobuz_player_controls::service::TrackStatus::Playing);
 
     let album = current_tracklist.get_album();
     let cover_image = album.map(|album| album.cover_art.clone());

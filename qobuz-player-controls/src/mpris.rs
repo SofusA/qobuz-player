@@ -36,7 +36,7 @@ pub async fn init() -> Connection {
         .unwrap()
         .serve_at("/org/mpris/MediaPlayer2", mpris_tracklist)
         .unwrap()
-        .name("org.mpris.MediaPlayer2.hifirs")
+        .name("org.mpris.MediaPlayer2.qobuz-player")
         .unwrap()
         .build()
         .await;
@@ -223,7 +223,7 @@ impl Mpris {
     }
     #[zbus(property)]
     fn identity(&self) -> &str {
-        "hifi-rs"
+        "qobuz-player"
     }
     #[zbus(property)]
     fn has_track_list(&self) -> bool {
@@ -433,7 +433,7 @@ fn track_to_meta<'a>(
     meta.insert(
         "mpris:trackid",
         zvariant::Value::new(format!(
-            "/org/hifirs/Player/TrackList/{}",
+            "/org/qobuz-player/Player/TrackList/{}",
             playlist_track.id
         )),
     );

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use hifirs_qobuz_api::client::playlist::Playlist as QobuzPlaylist;
+use qobuz_api::client::playlist::Playlist as QobuzPlaylist;
 
 use crate::service::{Playlist, Track};
 

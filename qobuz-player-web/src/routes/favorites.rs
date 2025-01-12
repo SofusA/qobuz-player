@@ -1,6 +1,6 @@
 use axum::{extract::Path, response::IntoResponse, routing::get, Router};
-use hifirs_player::service::{Favorites, Playlist};
 use leptos::{component, prelude::*, IntoView};
+use qobuz_player_controls::service::{Favorites, Playlist};
 use std::sync::Arc;
 use tokio::join;
 
@@ -20,8 +20,10 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 async fn index(Path(tab): Path<Tab>) -> impl IntoResponse {
-    let (favorites, favorite_playlists) =
-        join!(hifirs_player::favorites(), hifirs_player::user_playlists());
+    let (favorites, favorite_playlists) = join!(
+        qobuz_player_controls::favorites(),
+        qobuz_player_controls::user_playlists()
+    );
 
     render(html! {
         <Page active_page=Page::Favorites>

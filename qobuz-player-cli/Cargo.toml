@@ -1,18 +1,19 @@
 [package]
-name = "hifi-rs"
-license-file = "../LICENSE"
-repository = "https://github.com/iamdb/hifi.rs"
+name = "qobuz-player"
 
-edition.workspace = true
 version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+repository.workspace = true
 
 [dependencies]
+qobuz-api = { version = "*", path = "../qobuz-api" }
+qobuz-player-controls= { version = "*", path = "../qobuz-player-controls" }
+qobuz-player-tui = { version = "*", path = "../qobuz-player-tui" }
+qobuz-player-web = { version = "*", path = "../qobuz-player-web" }
+
 clap = { workspace = true, features = ["derive", "env"] }
 dialoguer = { workspace = true, features = ["fuzzy-select"] }
-hifirs-player = { version = "*", path = "../hifirs-player" }
-hifirs-qobuz-api = { version = "*", path = "../qobuz-api" }
-hifirs-tui = { version = "*", path = "../hifirs-tui" }
-hifirs-web = { version = "*", path = "../hifirs-web" }
 md5 = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

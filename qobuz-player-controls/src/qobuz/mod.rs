@@ -3,7 +3,7 @@ use crate::{
     sql::db,
 };
 use async_trait::async_trait;
-use hifirs_qobuz_api::client::{
+use qobuz_api::client::{
     album_suggestion::AlbumSuggestion,
     api::{self, Client as QobuzClient},
     favorites::Favorites as QobuzFavorites,
@@ -13,7 +13,7 @@ use hifirs_qobuz_api::client::{
 use std::{collections::BTreeMap, str::FromStr};
 use tracing::{debug, error, info};
 
-pub type Result<T, E = hifirs_qobuz_api::Error> = std::result::Result<T, E>;
+pub type Result<T, E = qobuz_api::Error> = std::result::Result<T, E>;
 
 pub mod album;
 pub mod artist;

@@ -1,21 +1,21 @@
 [workspace]
 members = [
-  "hifirs",
-  "hifirs-player", "hifirs-tui",
-  "hifirs-web",
+  "qobuz-player-cli",
+  "qobuz-player-controls",
+  "qobuz-player-tui",
+  "qobuz-player-web",
   "qobuz-api",
 ]
-exclude = ["www"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.8"
+version = "0.1.0"
 edition = "2021"
 license-file = "LICENSE"
-repository = "https://github.com/iamdb/hifi.rs"
+repository = "https://github.com/sofusa/qobuz-player"
 
 [workspace.metadata.crane]
-name = "hifi-rs"
+name = "qobuz-player"
 
 [workspace.dependencies]
 async-broadcast = "0.7"

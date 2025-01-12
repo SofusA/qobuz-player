@@ -1,12 +1,13 @@
 [package]
-name = "hifirs-player"
+name = "qobuz-player-controls"
+
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
 repository.workspace = true
 
 [dependencies]
-hifirs-qobuz-api = { version = "*", path = "../qobuz-api" }
+qobuz-api = { version = "*", path = "../qobuz-api" }
 
 gstreamer = { workspace = true, features = ["serde", "v1_16"] }
 cached = { workspace = true, features = ["async", "serde", "serde_json"] } 

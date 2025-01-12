@@ -4,8 +4,8 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use hifirs_player::service::{Playlist, Track};
 use leptos::prelude::*;
+use qobuz_player_controls::service::{Playlist, Track};
 use std::sync::Arc;
 use tokio::join;
 
@@ -29,27 +29,27 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 async fn play_track(Path((id, track_position)): Path<(String, u32)>) -> impl IntoResponse {
-    _ = hifirs_player::play_album(&id).await;
-    _ = hifirs_player::skip(track_position, true).await;
+    _ = qobuz_player_controls::play_album(&id).await;
+    _ = qobuz_player_controls::skip(track_position, true).await;
 }
 
 async fn play(Path(id): Path<i64>) -> impl IntoResponse {
-    _ = hifirs_player::play_playlist(id).await;
+    _ = qobuz_player_controls::play_playlist(id).await;
 }
 
 async fn set_favorite(Path(id): Path<String>) -> impl IntoResponse {
-    hifirs_player::add_favorite_playlist(&id).await;
+    qobuz_player_controls::add_favorite_playlist(&id).await;
 }
 
 async fn unset_favorite(Path(id): Path<String>) -> impl IntoResponse {
-    hifirs_player::remove_favorite_playlist(&id).await;
+    qobuz_player_controls::remove_favorite_playlist(&id).await;
 }
 
 async fn index(Path(id): Path<i64>) -> impl IntoResponse {
     let (playlist, now_playing, favorites) = join!(
-        hifirs_player::playlist(id),
-        hifirs_player::current_track(),
-        hifirs_player::user_playlists()
+        qobuz_player_controls::playlist(id),
+        qobuz_player_controls::current_track(),
+        qobuz_player_controls::user_playlists()
     );
 
     let now_playing_id = now_playing.map(|track| track.id);
@@ -63,8 +63,10 @@ async fn index(Path(id): Path<i64>) -> impl IntoResponse {
 }
 
 async fn tracks_partial(Path(id): Path<i64>) -> impl IntoResponse {
-    let (playlist, now_playing) =
-        join!(hifirs_player::playlist(id), hifirs_player::current_track());
+    let (playlist, now_playing) = join!(
+        qobuz_player_controls::playlist(id),
+        qobuz_player_controls::current_track()
+    );
 
     let now_playing_id = now_playing.map(|track| track.id);
     let tracks: Vec<Track> = playlist.tracks.into_iter().map(|x| x.1).collect();

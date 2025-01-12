@@ -23,12 +23,12 @@ use cursive::{
 };
 use futures::executor::block_on;
 use gstreamer::{ClockTime, State as GstState};
-use hifirs_player::{
+use once_cell::sync::OnceCell;
+use qobuz_player_controls::{
     notification::Notification,
     queue::TrackListType,
     service::{Album, Artist, SearchResults, Track, TrackStatus},
 };
-use once_cell::sync::OnceCell;
 use tokio::select;
 use tokio_stream::StreamExt;
 use tracing::debug;
@@ -171,7 +171,7 @@ impl CursiveUI {
 
         track_list.set_on_submit(move |_s, item| {
             let i = item.to_owned();
-            tokio::spawn(async move { hifirs_player::skip(i as u32, true).await });
+            tokio::spawn(async move { qobuz_player_controls::skip(i as u32, true).await });
         });
 
         let mut layout = LinearLayout::new(Orientation::Vertical).child(
@@ -220,23 +220,23 @@ impl CursiveUI {
         });
 
         self.root.add_global_callback(' ', move |_| {
-            block_on(async { hifirs_player::play_pause().await.expect("") });
+            block_on(async { qobuz_player_controls::play_pause().await.expect("") });
         });
 
         self.root.add_global_callback('N', move |_| {
-            block_on(async { hifirs_player::next().await.expect("") });
+            block_on(async { qobuz_player_controls::next().await.expect("") });
         });
 
         self.root.add_global_callback('P', move |_| {
-            block_on(async { hifirs_player::previous().await.expect("") });
+            block_on(async { qobuz_player_controls::previous().await.expect("") });
         });
 
         self.root.add_global_callback('l', move |_| {
-            block_on(async { hifirs_player::jump_forward().await.expect("") });
+            block_on(async { qobuz_player_controls::jump_forward().await.expect("") });
         });
 
         self.root.add_global_callback('h', move |_| {
-            block_on(async { hifirs_player::jump_backward().await.expect("") });
+            block_on(async { qobuz_player_controls::jump_backward().await.expect("") });
         });
     }
 
@@ -246,7 +246,7 @@ impl CursiveUI {
         let mut user_playlists = SelectView::new().popup();
         user_playlists.add_item("Select Playlist", 0);
 
-        let my_playlists = hifirs_player::user_playlists().await;
+        let my_playlists = qobuz_player_controls::user_playlists().await;
         my_playlists.iter().for_each(|p| {
             user_playlists.add_item(p.title.clone(), p.id);
         });
@@ -308,7 +308,7 @@ impl CursiveUI {
                 let item = item.to_string();
 
                 tokio::spawn(async move {
-                    let results = hifirs_player::search(&item).await;
+                    let results = qobuz_player_controls::search(&item).await;
 
                     SINK.get()
                         .unwrap()
@@ -375,7 +375,7 @@ impl CursiveUI {
         let open = Arc::new(move |s: &mut Cursive| {
             let mut panel = CursiveUI::enter_url(move |s, url| {
                 let u = url.to_string();
-                tokio::spawn(async move { hifirs_player::play_uri(&u).await });
+                tokio::spawn(async move { qobuz_player_controls::play_uri(&u).await });
                 s.pop_layer();
                 ENTER_URL_OPEN.store(false, Ordering::Relaxed);
             });
@@ -551,7 +551,9 @@ fn load_search_results(item: &str, s: &mut Cursive) {
                     search_results.set_on_submit(move |_s: &mut Cursive, item: &String| {
                         if item != UNSTREAMABLE {
                             let item = item.clone();
-                            tokio::spawn(async move { hifirs_player::play_album(&item).await });
+                            tokio::spawn(
+                                async move { qobuz_player_controls::play_album(&item).await },
+                            );
                         }
                     });
                 }
@@ -612,7 +614,8 @@ fn load_search_results(item: &str, s: &mut Cursive) {
 fn submit_playlist(_s: &mut Cursive, item: u32) -> LinearLayout {
     let mut layout = LinearLayout::vertical();
 
-    let playlist_tracks = block_on(async { hifirs_player::playlist_tracks(item as i64).await });
+    let playlist_tracks =
+        block_on(async { qobuz_player_controls::playlist_tracks(item as i64).await });
 
     let mut list = CursiveUI::results_list("playlist_items");
     let mut playlist_items = list.get_inner_mut().get_mut();
@@ -645,7 +648,7 @@ fn submit_playlist(_s: &mut Cursive, item: u32) -> LinearLayout {
 
     let meta = LinearLayout::horizontal()
         .child(Button::new("play", move |_s| {
-            tokio::spawn(async move { hifirs_player::play_playlist(item as i64).await });
+            tokio::spawn(async move { qobuz_player_controls::play_playlist(item as i64).await });
         }))
         .child(
             TextView::new(format!("total tracks: {}", playlist_tracks.len()))
@@ -660,7 +663,7 @@ fn submit_playlist(_s: &mut Cursive, item: u32) -> LinearLayout {
 }
 
 fn submit_artist(s: &mut Cursive, item: i32) {
-    let artist_albums = block_on(async { hifirs_player::artist_albums(item).await });
+    let artist_albums = block_on(async { qobuz_player_controls::artist_albums(item).await });
 
     if !artist_albums.is_empty() {
         let mut tree = cursive::menu::Tree::new();
@@ -672,7 +675,7 @@ fn submit_artist(s: &mut Cursive, item: i32) {
 
             tree.add_leaf(a.list_item(), move |s: &mut Cursive| {
                 let id = a.id.clone();
-                tokio::spawn(async move { hifirs_player::play_album(&id).await });
+                tokio::spawn(async move { qobuz_player_controls::play_album(&id).await });
 
                 s.call_on_name(
                     "screens",
@@ -699,7 +702,7 @@ fn submit_track(s: &mut Cursive, item: (i32, Option<String>)) {
     }
 
     if item.1.is_none() {
-        tokio::spawn(async move { hifirs_player::play_track(item.0).await });
+        tokio::spawn(async move { qobuz_player_controls::play_track(item.0).await });
 
         s.call_on_name(
             "screens",
@@ -713,7 +716,7 @@ fn submit_track(s: &mut Cursive, item: (i32, Option<String>)) {
     let track = move |s: &mut Cursive| {
         s.screen_mut().pop_layer();
 
-        tokio::spawn(async move { hifirs_player::play_track(item.0).await });
+        tokio::spawn(async move { qobuz_player_controls::play_track(item.0).await });
 
         s.call_on_name(
             "screens",
@@ -728,7 +731,7 @@ fn submit_track(s: &mut Cursive, item: (i32, Option<String>)) {
 
         if let Some(album_id) = &item.1 {
             let id = album_id.clone();
-            tokio::spawn(async move { hifirs_player::play_album(&id).await });
+            tokio::spawn(async move { qobuz_player_controls::play_album(&id).await });
 
             s.call_on_name(
                 "screens",
@@ -811,7 +814,7 @@ fn get_state_icon(state: GstState) -> String {
 }
 
 pub async fn receive_notifications() {
-    let mut receiver = hifirs_player::notify_receiver();
+    let mut receiver = qobuz_player_controls::notify_receiver();
 
     loop {
         select! {

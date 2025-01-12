@@ -6,9 +6,9 @@ use axum::{
     Router,
 };
 use futures::stream::Stream;
-use hifirs_player::notification::Notification;
 use leptos::html::*;
 use leptos::*;
+use qobuz_player_controls::notification::Notification;
 use routes::{album, artist, favorites, now_playing, playlist, queue, search};
 use std::{convert::Infallible, sync::Arc};
 use tokio::sync::broadcast::{self, Sender};
@@ -32,7 +32,7 @@ pub async fn init(address: String) {
     let listener = tokio::net::TcpListener::bind(address).await.unwrap();
     axum::serve(listener, router)
         .with_graceful_shutdown(async {
-            let mut broadcast_receiver = hifirs_player::notify_receiver();
+            let mut broadcast_receiver = qobuz_player_controls::notify_receiver();
 
             loop {
                 if let Some(message) = broadcast_receiver.next().await {
@@ -66,7 +66,7 @@ async fn create_router() -> Router {
 }
 
 async fn background_task(tx: Sender<ServerSentEvent>) {
-    let mut receiver = hifirs_player::notify_receiver();
+    let mut receiver = qobuz_player_controls::notify_receiver();
 
     loop {
         if let Ok(notification) = receiver.recv().await {

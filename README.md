@@ -1,4 +1,4 @@
-# hifi.rs
+# qobuz-player
 
 ### High resolution audio player backed by Qobuz
 
@@ -6,7 +6,7 @@ Powered by [Qobuz](https://www.qobuz.com). Requires a paid subscription. This do
 
 Qobuz only supports Linux through the browser and has no officially supported API. There are ways of accessing Qobuz in Linux outside of the browser through third-party applications like Squeezelite and Roon. These apps are great, but I wanted something simpler that just focused on being able to quickly find and play an album inside the console.
 
-![TUI Screenshot](/hifi-rs.png?raw=true)
+![TUI Screenshot](/qobuz-player.png?raw=true)
 
 ## Player Features
 
@@ -25,7 +25,7 @@ Qobuz only supports Linux through the browser and has no officially supported AP
 
 ### Download Release
 
-Download the tar.gz file for your supported OS from the releases page, extract the file and execute `hifi-rs` or copy it to the your `$PATH`.
+Download the tar.gz file for your supported OS from the releases page, extract the file and execute `qobuz-player` or copy it to the your `$PATH`.
 
 ### Build from source
 
@@ -33,19 +33,19 @@ On Debian, Arch and Fedora, `just build-player` should make a reasonable effort 
 
 ## Get started
 
-Run `hifi-rs --help` or `hifi-rs <subcommand> --help` to see all available options.
+Run `qobuz-player --help` or `qobuz-player <subcommand> --help` to see all available options.
 
 To get started:
 
 ```shell
-hifi-rs config username # enter username at prompt
-hifi-rs config password # enter password at prompt
+qobuz-player config username # enter username at prompt
+qobuz-player config password # enter password at prompt
 
 # open player
-hifi-rs open
+qobuz-player open
 
 # open player with web ui
-hifi-rs --web open
+qobuz-player --web open
 ```
 
 ## TUI Controls
@@ -74,7 +74,7 @@ The TUI has full mouse support.
 
 ## Web UI
 
-<img src="/hifi-rs-webui-desktop.png?raw=true" width="240">
+<img src="/qobuz-player-webui-desktop.png?raw=true" width="240">
 
 The player can start an embedded web interface. This is disabled by default and must be started with the `--web` argument. It also listens on `0.0.0.0:9888` by default,
 but an inteface can be specified with the `--interface` argument.

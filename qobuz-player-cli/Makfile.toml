@@ -1,4 +1,4 @@
 [tasks.sqlx-check]
 install_crate = { crate_name = "sqlx-cli", binary = "cargo" }
 command = "cargo"
-args = ["sqlx", "prepare", "--check", "--database-url", "'$(pwd)/hifirs/dev.db'"]
+args = ["sqlx", "prepare", "--check", "--database-url", "'$(pwd)/qobuz-player/dev.db'"]

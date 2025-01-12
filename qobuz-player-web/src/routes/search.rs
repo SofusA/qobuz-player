@@ -4,8 +4,8 @@ use axum::{
     routing::get,
     Form, Router,
 };
-use hifirs_player::service::SearchResults;
 use leptos::{component, prelude::*, IntoView};
+use qobuz_player_controls::service::SearchResults;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -37,7 +37,7 @@ async fn index(
     let query = parameters.query;
 
     let search_results = match &query {
-        Some(query) => hifirs_player::search(query).await,
+        Some(query) => qobuz_player_controls::search(query).await,
         None => SearchResults {
             query: query.clone().unwrap_or("".into()),
             albums: vec![],
@@ -60,7 +60,7 @@ async fn search(Path(tab): Path<Tab>, Form(query): Form<SearchParameters>) -> im
     let query = query.query;
 
     let search_results = match &query {
-        Some(query) => hifirs_player::search(query).await,
+        Some(query) => qobuz_player_controls::search(query).await,
         None => SearchResults {
             query: query.clone().unwrap_or("".into()),
             albums: vec![],

@@ -7,9 +7,9 @@ use gst::{
     State as GstState, StateChangeSuccess, Structure,
 };
 use gstreamer as gst;
-use hifirs_qobuz_api::client::{self, UrlType};
 use notification::{BroadcastReceiver, BroadcastSender, Notification};
 use once_cell::sync::{Lazy, OnceCell};
+use qobuz_api::client::{self, UrlType};
 use queue::{
     controls::{PlayerState, SafePlayerState},
     TrackListValue,

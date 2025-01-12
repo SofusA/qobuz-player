@@ -4,11 +4,11 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use hifirs_player::{
+use leptos::{component, prelude::*, IntoView};
+use qobuz_player_controls::{
     queue::{TrackListType, TrackListValue},
     service::TrackStatus,
 };
-use leptos::{component, prelude::*, IntoView};
 use std::sync::Arc;
 
 use crate::{
@@ -30,11 +30,11 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 async fn skip_to(Path(track_number): Path<u32>) -> impl IntoResponse {
-    _ = hifirs_player::skip(track_number, true).await;
+    _ = qobuz_player_controls::skip(track_number, true).await;
 }
 
 async fn index() -> impl IntoResponse {
-    let current_tracklist = hifirs_player::current_tracklist().await;
+    let current_tracklist = qobuz_player_controls::current_tracklist().await;
 
     render(html! {
         <Page active_page=Page::Queue>
@@ -73,7 +73,7 @@ pub fn queue(current_tracklist: TrackListValue) -> impl IntoView {
 }
 
 async fn queue_partial() -> impl IntoResponse {
-    let current_tracklist = hifirs_player::current_tracklist().await;
+    let current_tracklist = qobuz_player_controls::current_tracklist().await;
 
     render(html! { <QueueList current_tracklist=current_tracklist /> })
 }

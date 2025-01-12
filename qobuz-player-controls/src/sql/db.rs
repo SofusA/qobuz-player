@@ -1,5 +1,5 @@
-use hifirs_qobuz_api::client::ApiConfig;
 use once_cell::sync::OnceCell;
+use qobuz_api::client::ApiConfig;
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
 use std::path::PathBuf;
 use tracing::debug;
@@ -13,7 +13,7 @@ pub async fn init() {
         PathBuf::from(url.replace("sqlite://", ""))
     } else {
         let mut url = dirs::data_local_dir().unwrap();
-        url.push("hifi-rs");
+        url.push("qobuz-player");
 
         if !url.exists() {
             std::fs::create_dir_all(&url).expect("failed to create database directory");

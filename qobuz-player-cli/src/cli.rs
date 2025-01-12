@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use dialoguer::{Input, Password};
-use hifirs_player::mpris;
-use hifirs_player::sql::db;
-use hifirs_qobuz_api::client::api::OutputFormat;
+use qobuz_api::client::api::OutputFormat;
+use qobuz_player_controls::mpris;
+use qobuz_player_controls::sql::db;
 use snafu::prelude::*;
 use tokio::task::JoinHandle;
 use tracing_subscriber::EnvFilter;
@@ -122,16 +122,16 @@ pub enum Error {
     TerminalError { error: String },
 }
 
-impl From<hifirs_qobuz_api::Error> for Error {
-    fn from(error: hifirs_qobuz_api::Error) -> Self {
+impl From<qobuz_api::Error> for Error {
+    fn from(error: qobuz_api::Error) -> Self {
         Error::ClientError {
             error: error.to_string(),
         }
     }
 }
 
-impl From<hifirs_player::error::Error> for Error {
-    fn from(error: hifirs_player::error::Error) -> Self {
+impl From<qobuz_player_controls::error::Error> for Error {
+    fn from(error: qobuz_player_controls::error::Error) -> Self {
         Error::PlayerError {
             error: error.to_string(),
         }
@@ -144,7 +144,7 @@ async fn setup_player(
     username: Option<&str>,
     password: Option<&str>,
 ) -> Result<Vec<JoinHandle<()>>, Error> {
-    hifirs_player::init(username, password).await?;
+    qobuz_player_controls::init(username, password).await?;
 
     let mut handles: Vec<JoinHandle<()>> = Vec::new();
 
@@ -158,13 +158,13 @@ async fn setup_player(
     }
 
     if web {
-        handles.push(tokio::spawn(
-            async move { hifirs_web::init(interface).await },
-        ));
+        handles.push(tokio::spawn(async move {
+            qobuz_player_web::init(interface).await
+        }));
     }
 
     handles.push(tokio::spawn(async {
-        match hifirs_player::player_loop().await {
+        match qobuz_player_controls::player_loop().await {
             Ok(_) => debug!("player loop exited successfully"),
             Err(error) => debug!("player loop error {error}"),
         }
@@ -181,7 +181,7 @@ pub async fn run() -> Result<(), Error> {
                 .with_file(false)
                 .with_writer(std::io::stderr),
         )
-        .with(EnvFilter::from_env("HIFIRS_LOG"))
+        .with(EnvFilter::from_env("qobuz_player_LOG"))
         .init();
 
     // PARSE CLI ARGS
@@ -202,13 +202,13 @@ pub async fn run() -> Result<(), Error> {
             .await?;
 
             if !(cli.disable_tui) {
-                let mut tui = hifirs_tui::CursiveUI::new();
+                let mut tui = qobuz_player_tui::CursiveUI::new();
                 handles.push(tokio::spawn(async {
-                    hifirs_tui::receive_notifications().await
+                    qobuz_player_tui::receive_notifications().await
                 }));
                 tui.run().await;
                 debug!("tui exited, quitting");
-                hifirs_player::quit().await?;
+                qobuz_player_controls::quit().await?;
                 for h in handles {
                     match h.await {
                         Ok(_) => debug!("task exited"),
@@ -221,7 +221,7 @@ pub async fn run() -> Result<(), Error> {
                     .await
                     .expect("error waiting for ctrlc");
                 debug!("ctrlc received, quitting");
-                hifirs_player::quit().await?;
+                qobuz_player_controls::quit().await?;
                 for h in handles {
                     match h.await {
                         Ok(_) => debug!("task exited"),

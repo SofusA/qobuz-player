@@ -1,5 +1,5 @@
-use hifirs_player::service::{Album, Artist, Playlist, Track};
 use leptos::{component, prelude::*, IntoView};
+use qobuz_player_controls::service::{Album, Artist, Playlist, Track};
 
 use crate::{components::Info, html, icons::Play};
 

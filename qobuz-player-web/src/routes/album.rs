@@ -4,8 +4,8 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use hifirs_player::service::{Album, Track};
 use leptos::{component, prelude::*, IntoView};
+use qobuz_player_controls::service::{Album, Track};
 use std::sync::Arc;
 use tokio::join;
 
@@ -33,36 +33,36 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 async fn suggestions(Path(id): Path<String>) -> impl IntoResponse {
-    let suggestions = hifirs_player::suggested_albums(&id).await;
+    let suggestions = qobuz_player_controls::suggested_albums(&id).await;
 
     serde_json::to_string(&suggestions).unwrap_or("Error".into())
 }
 
 async fn play_track(Path((id, track_position)): Path<(String, u32)>) -> impl IntoResponse {
-    _ = hifirs_player::play_album(&id).await;
-    _ = hifirs_player::skip(track_position, true).await;
+    _ = qobuz_player_controls::play_album(&id).await;
+    _ = qobuz_player_controls::skip(track_position, true).await;
 }
 
 async fn set_favorite(Path(id): Path<String>) -> impl IntoResponse {
-    hifirs_player::add_favorite_album(&id).await;
+    qobuz_player_controls::add_favorite_album(&id).await;
     render(html! { <ToggleFavorite id=id is_favorite=true /> })
 }
 
 async fn unset_favorite(Path(id): Path<String>) -> impl IntoResponse {
-    hifirs_player::remove_favorite_album(&id).await;
+    qobuz_player_controls::remove_favorite_album(&id).await;
     render(html! { <ToggleFavorite id=id is_favorite=false /> })
 }
 
 async fn play(Path(id): Path<String>) -> impl IntoResponse {
-    _ = hifirs_player::play_album(&id).await;
+    _ = qobuz_player_controls::play_album(&id).await;
 }
 
 async fn index(Path(id): Path<String>) -> impl IntoResponse {
     let (album, suggested_albums, now_playing, favorites) = join!(
-        hifirs_player::album(&id),
-        hifirs_player::suggested_albums(&id),
-        hifirs_player::current_track(),
-        hifirs_player::favorites()
+        qobuz_player_controls::album(&id),
+        qobuz_player_controls::suggested_albums(&id),
+        qobuz_player_controls::current_track(),
+        qobuz_player_controls::favorites()
     );
 
     let now_playing_id = now_playing.map(|track| track.id);
@@ -81,7 +81,10 @@ async fn index(Path(id): Path<String>) -> impl IntoResponse {
 }
 
 async fn album_tracks_partial(Path(id): Path<String>) -> impl IntoResponse {
-    let (album, now_playing) = join!(hifirs_player::album(&id), hifirs_player::current_track(),);
+    let (album, now_playing) = join!(
+        qobuz_player_controls::album(&id),
+        qobuz_player_controls::current_track(),
+    );
 
     let tracks: Vec<Track> = album.tracks.into_iter().map(|x| x.1).collect();
     let now_playing_id = now_playing.map(|track| track.id);

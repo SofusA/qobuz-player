@@ -1,5 +1,5 @@
 use crate::service::{Album, Artist, Track, TrackStatus};
-use hifirs_qobuz_api::client::track::Track as QobuzTrack;
+use qobuz_api::client::track::Track as QobuzTrack;
 
 impl From<QobuzTrack> for Track {
     fn from(value: QobuzTrack) -> Self {

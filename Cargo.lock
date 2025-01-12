@@ -1578,96 +1578,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
-name = "hifi-rs"
-version = "0.3.8"
-dependencies = [
- "clap",
- "dialoguer",
- "hifirs-player",
- "hifirs-qobuz-api",
- "hifirs-tui",
- "hifirs-web",
- "md5",
- "snafu",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "hifirs-player"
-version = "0.3.8"
-dependencies = [
- "async-broadcast",
- "async-trait",
- "cached",
- "chrono",
- "dirs",
- "flume",
- "futures",
- "gstreamer",
- "hifirs-qobuz-api",
- "once_cell",
- "rand",
- "serde",
- "snafu",
- "sqlx",
- "tokio",
- "tracing",
- "zbus",
-]
-
-[[package]]
-name = "hifirs-qobuz-api"
-version = "0.1.2"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "clap",
- "md5",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "snafu",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "hifirs-tui"
-version = "0.3.8"
-dependencies = [
- "cursive",
- "futures",
- "gstreamer",
- "hifirs-player",
- "once_cell",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
-name = "hifirs-web"
-version = "0.3.8"
-dependencies = [
- "axum 0.8.1",
- "futures",
- "gstreamer",
- "hifirs-player",
- "leptos",
- "mime",
- "mime_guess",
- "rust-embed",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
 name = "hkdf"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2889,6 +2799,96 @@ checksum = "6f42ea446cab60335f76979ec15e12619a2165b5ae2c12166bef27d283a9fadf"
 dependencies = [
  "idna",
  "psl-types",
+]
+
+[[package]]
+name = "qobuz-api"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "clap",
+ "md5",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "qobuz-player"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "dialoguer",
+ "md5",
+ "qobuz-api",
+ "qobuz-player-controls",
+ "qobuz-player-tui",
+ "qobuz-player-web",
+ "snafu",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "qobuz-player-controls"
+version = "0.1.0"
+dependencies = [
+ "async-broadcast",
+ "async-trait",
+ "cached",
+ "chrono",
+ "dirs",
+ "flume",
+ "futures",
+ "gstreamer",
+ "once_cell",
+ "qobuz-api",
+ "rand",
+ "serde",
+ "snafu",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "zbus",
+]
+
+[[package]]
+name = "qobuz-player-tui"
+version = "0.1.0"
+dependencies = [
+ "cursive",
+ "futures",
+ "gstreamer",
+ "once_cell",
+ "qobuz-player-controls",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "qobuz-player-web"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.1",
+ "futures",
+ "gstreamer",
+ "leptos",
+ "mime",
+ "mime_guess",
+ "qobuz-player-controls",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]

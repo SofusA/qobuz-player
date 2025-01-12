@@ -1,14 +1,10 @@
 [package]
-name = "hifirs-qobuz-api"
-version = "0.1.2"
-edition = "2021"
-license-file = "../LICENSE"
-repository = "https://github.com/iamdb/hifi.rs"
-description = "An incomplete, async API client for the Qobuz music service."
+name = "qobuz-api"
 
-exclude = [
-  "*.snap"
-]
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+repository.workspace = true
 
 [dependencies]
 base64 = { workspace = true }

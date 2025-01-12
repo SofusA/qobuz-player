@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hifirs_qobuz_api::client::Image;
+use qobuz_api::client::Image;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug};
 
