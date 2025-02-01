@@ -5,10 +5,12 @@
 Powered by [Qobuz](https://www.qobuz.com). Requires a paid subscription. This does not allow you to listen for free.
 
 The player includes a terminal ui and a webui. 
-The web interface is ideal for a setup with a single board conputer, raspberry pi, connected to the speaker system and controlled with a smartphone or tablet.
+The web interface is ideal for a setup with a single board conputer, e.g. Raspberry Pi, connected to the speaker system and controlled with a smartphone or tablet.
 
+## Terminal UI screenshot
 ![TUI Screenshot](/qobuz-player.png?raw=true)
 
+## Web UI screenshot
 <img src="/qobuz-player-webui.png?raw=true" width="240">
 
 ## Player Features

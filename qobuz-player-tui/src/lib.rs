@@ -302,7 +302,7 @@ fn menubar(s: &mut Cursive) {
             s.set_screen(2);
         })
         .add_delimiter()
-        .add_leaf("Favorite playlists [4]", move |s| {
+        .add_leaf("Playlists [4]", move |s| {
             s.set_screen(3);
         })
         .add_delimiter()
