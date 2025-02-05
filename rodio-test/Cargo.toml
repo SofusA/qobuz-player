@@ -1,0 +1,12 @@
+[package]
+name = "rodio-test"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+repository.workspace = true
+
+[dependencies]
+qobuz-player-client = { version = "*", path = "../qobuz-player-client" }
+reqwest = { workspace = true, features = ["rustls-tls", "cookies", "stream", "multipart", "blocking"] }
+rodio = "0.20.1"
+tokio = { workspace = true, features = ["full"] }

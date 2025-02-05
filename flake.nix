@@ -22,10 +22,15 @@
             pkgs.gst_all_1.gstreamer
             pkgs.gst_all_1.gst-plugins-base
             pkgs.glib
+
+            # pkgs.alsa-lib
+            pkgs.pkg-config
           ];
 
           nativeBuildInputs = [
             pkgs.pkg-config
+            # pkgs.pkg-config
+            # pkgs.alsa-lib
           ];
         };
 
@@ -51,7 +56,7 @@
           packages = [
             pkgs.cargo-machete
             pkgs.sqlx-cli
-
+            # pkgs.pkg-config
           ];
 
           DATABASE_URL = "sqlite:///tmp/data.db";

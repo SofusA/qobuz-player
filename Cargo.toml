@@ -5,7 +5,7 @@ members = [
   "qobuz-player-web",
   "qobuz-player-mpris",
   "qobuz-player-tui",
-  "qobuz-player-client",
+  "qobuz-player-client" ,
 ]
 resolver = "2"
 
