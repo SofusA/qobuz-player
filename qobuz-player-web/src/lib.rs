@@ -6,8 +6,8 @@ use axum::{
     Router,
 };
 use futures::stream::Stream;
-use leptos::html::*;
 use leptos::*;
+use leptos::{html::*, prelude::RenderHtml};
 use qobuz_player_controls::{notification::Notification, tracklist};
 use routes::{album, artist, controls, discover, favorites, now_playing, playlist, queue, search};
 use std::{convert::Infallible, sync::Arc};
@@ -100,7 +100,33 @@ async fn background_task(tx: Sender<ServerSentEvent>) {
                     _ = tx.send(event);
                 }
                 Notification::Quit => (),
-                Notification::Error { error: _ } => (),
+                Notification::Message { message } => {
+                    let toast = components::toast(message.clone()).to_html();
+
+                    let event = match message {
+                        qobuz_player_controls::notification::Message::Error(_) => ServerSentEvent {
+                            event_name: "error".into(),
+                            event_data: toast,
+                        },
+                        qobuz_player_controls::notification::Message::Warning(_) => {
+                            ServerSentEvent {
+                                event_name: "warn".into(),
+                                event_data: toast,
+                            }
+                        }
+                        qobuz_player_controls::notification::Message::Success(_) => {
+                            ServerSentEvent {
+                                event_name: "success".into(),
+                                event_data: toast,
+                            }
+                        }
+                        qobuz_player_controls::notification::Message::Info(_) => ServerSentEvent {
+                            event_name: "info".into(),
+                            event_data: toast,
+                        },
+                    };
+                    _ = tx.send(event);
+                }
                 Notification::Volume { volume } => {
                     let event = ServerSentEvent {
                         event_name: "volume".into(),

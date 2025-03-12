@@ -1,9 +1,6 @@
 use gstreamer::ClockTime;
 
-use crate::{
-    error,
-    tracklist::{self, Tracklist},
-};
+use crate::tracklist::{self, Tracklist};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Notification {
@@ -11,6 +8,14 @@ pub enum Notification {
     Position { clock: ClockTime },
     CurrentTrackList { list: Tracklist },
     Quit,
-    Error { error: error::Error },
+    Message { message: Message },
     Volume { volume: f64 },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Message {
+    Error(String),
+    Warning(String),
+    Success(String),
+    Info(String),
 }

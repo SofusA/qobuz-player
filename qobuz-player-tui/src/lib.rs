@@ -711,7 +711,7 @@ async fn receive_notifications() {
                         }
                     }
                 }
-                Notification::Error { error: _ } => {}
+                Notification::Message { message: _ } => {}
                 Notification::Volume { volume: _ } => {}
             }
         }

@@ -1009,6 +1009,13 @@ pub async fn player_loop(credentials: Credentials, configuration: Configuration)
     Ok(())
 }
 
+pub fn send_message(message: notification::Message) {
+    BROADCAST_CHANNELS
+        .tx
+        .send(Notification::Message { message })
+        .unwrap();
+}
+
 async fn handle_message(msg: &Message) -> Result<()> {
     match msg.view() {
         MessageView::Eos(_) => {
@@ -1076,9 +1083,9 @@ async fn handle_message(msg: &Message) -> Result<()> {
             play().await?;
         }
         MessageView::Error(err) => {
-            BROADCAST_CHANNELS
-                .tx
-                .send(Notification::Error { error: err.into() })?;
+            BROADCAST_CHANNELS.tx.send(Notification::Message {
+                message: notification::Message::Error(err.to_string()),
+            })?;
 
             ready().await?;
             pause().await?;

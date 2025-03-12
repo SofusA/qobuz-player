@@ -264,7 +264,7 @@ pub async fn init() {
                             .unwrap();
                     }
                 }
-                Notification::Error { error: _ } => {}
+                Notification::Message { message: _ } => {}
                 Notification::Volume { volume } => {
                     server
                         .properties_changed([Property::Volume(volume)])

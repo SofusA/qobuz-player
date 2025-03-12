@@ -1,4 +1,5 @@
 use leptos::{component, prelude::*, IntoView};
+use qobuz_player_controls::notification;
 use serde::Deserialize;
 
 use crate::{html, icons::Star};
@@ -35,17 +36,42 @@ pub fn button_group(children: ChildrenFragment) -> impl IntoView {
         .filter(|n| n.html_len() > 10)
         .collect::<Vec<_>>();
 
-    let node_count = nodes.len();
-    let even = node_count % 2 == 0;
+    let even = nodes.len() % 2 == 0;
 
-    let breakpoint_style = match (even, node_count > 2) {
-        (true, true) => "",
-        (true, false) => "",
-        (false, true) => "grid-cols-2 *:last:col-span-2",
-        (false, false) => "",
+    html! {
+        <div class=format!(
+            "grid grid-cols-2 {} gap-4",
+            if !even { "*:last:col-span-2" } else { "" },
+        )>{nodes}</div>
+    }
+}
+
+pub fn toast(message: notification::Message) -> impl IntoView {
+    let (message, severity) = match message {
+        notification::Message::Error(message) => (message, 1),
+        notification::Message::Warning(message) => (message, 2),
+        notification::Message::Success(message) => (message, 3),
+        notification::Message::Info(message) => (message, 4),
     };
-
-    html! { <div class=format!("grid grid-cols-2 {} gap-4", breakpoint_style)>{nodes}</div> }
+    html! {
+        <div
+            class=format!(
+                "block p-4 shadow max-w-sm rounded-lg text-wrap text-white {}",
+                if severity == 1 {
+                    "bg-red-500"
+                } else if severity == 2 {
+                    "bg-yellow-500"
+                } else if severity == 3 {
+                    "bg-teal-500"
+                } else {
+                    "bg-blue-500"
+                },
+            )
+            remove-me="5s"
+        >
+            {message}
+        </div>
+    }
 }
 
 #[component]

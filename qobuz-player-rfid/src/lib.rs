@@ -62,6 +62,9 @@ fn submit_scan(s: &mut Cursive, rfid_id: &str) {
 }
 
 pub async fn link_album(id: String) {
+    qobuz_player_controls::send_message(qobuz_player_controls::notification::Message::Info(
+        "Scan rfid to link album".to_string(),
+    ));
     let sink = SINK.get().unwrap();
 
     sink.send(Box::new(move |s| {
@@ -107,6 +110,10 @@ fn submit_link_album(s: &mut Cursive, rfid_id: &str, id: String) {
                     reference_id,
                     None::<u32>,
                 ).fetch_one(&mut *conn).await.unwrap();
+
+        qobuz_player_controls::send_message(qobuz_player_controls::notification::Message::Success(
+            "Link completed".to_string(),
+        ));
     });
 
     s.pop_layer();
@@ -114,6 +121,9 @@ fn submit_link_album(s: &mut Cursive, rfid_id: &str, id: String) {
 }
 
 pub async fn link_playlist(id: u32) {
+    qobuz_player_controls::send_message(qobuz_player_controls::notification::Message::Info(
+        "Scan rfid to link playlist".to_string(),
+    ));
     let sink = SINK.get().unwrap();
 
     sink.send(Box::new(move |s| {
@@ -147,6 +157,10 @@ fn submit_link_playlist(s: &mut Cursive, rfid_id: &str, id: u32) {
                     None::<String>,
                     reference_id,
                 ).fetch_one(&mut *conn).await.unwrap();
+
+        qobuz_player_controls::send_message(qobuz_player_controls::notification::Message::Success(
+            "Link completed".to_string(),
+        ));
     });
 
     s.pop_layer();

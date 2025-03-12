@@ -38,12 +38,13 @@ pub fn page(children: Children, active_page: Page) -> impl IntoView {
                 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
                 <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
                 <script src="https://unpkg.com/htmx-ext-preload@2.1.0/preload.js"></script>
+                <script src="https://unpkg.com/htmx-ext-remove-me@2.0.0/remove-me.js"></script>
                 <script src="/assets/script.js?version=1"></script>
             </head>
 
             <body
                 class="flex flex-col justify-between text-gray-50 bg-black h-dvh touch-none overflow-clip px-safe pt-safe"
-                hx-ext="sse, preload"
+                hx-ext="sse, preload, remove-me"
                 sse-connect="/sse"
                 hx-boost="true"
                 hx-indicator="#loading-spinner"
@@ -51,10 +52,17 @@ pub fn page(children: Children, active_page: Page) -> impl IntoView {
                 <div
                     id="loading-spinner"
                     hx-preserve
-                    class="fixed top-8 right-8 z-10 p-2 rounded pointer-events-none bg-gray-900/20 my-indicator backdrop-blur size-12"
+                    class="fixed top-8 right-8 z-10 p-2 rounded-lg pointer-events-none bg-gray-900/20 my-indicator backdrop-blur size-12"
                 >
                     <icons::ArrowPath />
                 </div>
+
+                <div
+                    id="toast-container"
+                    class="fixed top-8 right-8 z-20"
+                    sse-swap="error,warn,success,info"
+                ></div>
+
                 <div class="overflow-auto h-full">
                     {children()}
                     {(active_page != Page::NowPlaying)
