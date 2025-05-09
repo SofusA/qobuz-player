@@ -34,6 +34,10 @@ struct Cli {
     /// Start web server with websocket API and embedded UI.
     web: bool,
 
+    #[clap(long)]
+    /// Secret used for web ui auth.
+    web_secret: Option<String>,
+
     #[clap(long, default_value_t = false)]
     /// Enable rfid interface.
     rfid: bool,
@@ -145,7 +149,7 @@ pub async fn run() -> Result<(), Error> {
 
             if cli.web {
                 tokio::spawn(async {
-                    qobuz_player_web::init(cli.interface).await;
+                    qobuz_player_web::init(cli.interface, cli.web_secret).await;
                 });
             }
 
