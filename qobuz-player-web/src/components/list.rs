@@ -252,11 +252,9 @@ pub fn list_tracks(
     track_number_display: TrackNumberDisplay,
     show_artist: bool,
     dim_played: bool,
+    now_playing_id: Option<u32>,
     #[prop(into)] api_call: Callback<(usize,), String>,
 ) -> impl IntoView {
-    let current_tracklist = futures::executor::block_on(qobuz_player_controls::current_tracklist());
-    let now_playing_id = current_tracklist.currently_playing();
-
     html! {
         <List>
             {tracks

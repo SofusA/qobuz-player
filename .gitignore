@@ -1,6 +1,7 @@
 target
 /db
 .envrc
+.env
 out
 dev.db*
 todo.txt

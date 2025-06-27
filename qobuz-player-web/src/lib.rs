@@ -25,7 +25,6 @@ mod routes;
 mod view;
 
 pub async fn init(address: String, secret: Option<String>) {
-    println!("Listening on {address}");
     let router = create_router(secret).await;
     let listener = tokio::net::TcpListener::bind(address).await.unwrap();
     axum::serve(listener, router)

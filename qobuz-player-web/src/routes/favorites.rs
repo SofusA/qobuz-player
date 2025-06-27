@@ -1,6 +1,7 @@
 use axum::{Router, extract::Path, response::IntoResponse, routing::get};
 use leptos::{IntoView, component, prelude::*};
 use qobuz_player_controls::models::Favorites;
+use tokio::join;
 
 use crate::{
     components::{
@@ -19,8 +20,17 @@ pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
 async fn index(Path(tab): Path<Tab>) -> impl IntoResponse {
     let favorites = qobuz_player_controls::favorites().await.unwrap();
 
+    let (current_tracklist, current_status) = join!(
+        qobuz_player_controls::current_tracklist(),
+        qobuz_player_controls::current_state()
+    );
+
     render(html! {
-        <Page active_page=Page::Favorites>
+        <Page
+            active_page=Page::Favorites
+            current_status=current_status
+            current_tracklist=current_tracklist
+        >
             <Favorites favorites=favorites tab=tab />
         </Page>
     })

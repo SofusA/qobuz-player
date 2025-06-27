@@ -60,10 +60,12 @@ async fn link(Path(id): Path<String>) -> impl IntoResponse {
 }
 
 async fn index(Path(id): Path<String>) -> impl IntoResponse {
-    let (album, suggested_albums, favorites) = join!(
+    let (album, suggested_albums, favorites, current_tracklist, current_status) = join!(
         qobuz_player_controls::album(id.clone()),
         qobuz_player_controls::suggested_albums(id.clone()),
-        qobuz_player_controls::favorites()
+        qobuz_player_controls::favorites(),
+        qobuz_player_controls::current_tracklist(),
+        qobuz_player_controls::current_state()
     );
 
     let album = album.unwrap();
@@ -73,20 +75,40 @@ async fn index(Path(id): Path<String>) -> impl IntoResponse {
     let is_favorite = favorites.albums.iter().any(|album| album.id == id);
 
     render(html! {
-        <Page active_page=Page::None>
-            <Album album=album suggested_albums=suggested_albums is_favorite=is_favorite />
+        <Page
+            active_page=Page::None
+            current_status=current_status
+            current_tracklist=current_tracklist.clone()
+        >
+            <Album
+                album=album
+                suggested_albums=suggested_albums
+                is_favorite=is_favorite
+                now_playing_id=current_tracklist.currently_playing()
+            />
         </Page>
     })
 }
 
 async fn album_tracks_partial(Path(id): Path<String>) -> impl IntoResponse {
     let album = qobuz_player_controls::album(id).await.unwrap();
+    let current_tracklist = qobuz_player_controls::current_tracklist().await;
 
-    render(html! { <AlbumTracks tracks=album.tracks album_id=album.id /> })
+    render(html! {
+        <AlbumTracks
+            now_playing_id=current_tracklist.currently_playing()
+            tracks=album.tracks
+            album_id=album.id
+        />
+    })
 }
 
 #[component]
-fn album_tracks(tracks: Vec<Track>, album_id: String) -> impl IntoView {
+fn album_tracks(
+    now_playing_id: Option<u32>,
+    tracks: Vec<Track>,
+    album_id: String,
+) -> impl IntoView {
     let album_id_clone = album_id.clone();
 
     html! {
@@ -97,6 +119,7 @@ fn album_tracks(tracks: Vec<Track>, album_id: String) -> impl IntoView {
             hx-swap="morph:outerHTML"
         >
             <ListTracks
+                now_playing_id=now_playing_id
                 track_number_display=TrackNumberDisplay::Number
                 tracks=tracks
                 show_artist=false
@@ -108,7 +131,12 @@ fn album_tracks(tracks: Vec<Track>, album_id: String) -> impl IntoView {
 }
 
 #[component]
-fn album(album: Album, suggested_albums: Vec<AlbumSimple>, is_favorite: bool) -> impl IntoView {
+fn album(
+    now_playing_id: Option<u32>,
+    album: Album,
+    suggested_albums: Vec<AlbumSimple>,
+    is_favorite: bool,
+) -> impl IntoView {
     let duration = parse_duration(album.duration_seconds);
 
     let album_id_clone_1 = album.id.clone();
@@ -173,7 +201,11 @@ fn album(album: Album, suggested_albums: Vec<AlbumSimple>, is_favorite: bool) ->
         </div>
         <div class="flex flex-col gap-4 w-full">
             <div class="sm:p-4">
-                <AlbumTracks tracks=album.tracks album_id=album_id_clone_2 />
+                <AlbumTracks
+                    tracks=album.tracks
+                    album_id=album_id_clone_2
+                    now_playing_id=now_playing_id
+                />
             </div>
 
             {if !suggested_albums.is_empty() {

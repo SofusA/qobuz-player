@@ -1,7 +1,7 @@
 use axum::{Router, response::IntoResponse, routing::get};
 use leptos::prelude::*;
 use qobuz_player_controls::models::{AlbumSimple, Playlist};
-use tokio::try_join;
+use tokio::{join, try_join};
 
 use crate::{
     components::list::{ListAlbumsVertical, ListPlaylistsVertical},
@@ -34,8 +34,17 @@ async fn index() -> impl IntoResponse {
     )
     .unwrap();
 
+    let (current_tracklist, current_status) = join!(
+        qobuz_player_controls::current_tracklist(),
+        qobuz_player_controls::current_state()
+    );
+
     render(html! {
-        <Page active_page=Page::Discover>
+        <Page
+            active_page=Page::Discover
+            current_status=current_status
+            current_tracklist=current_tracklist
+        >
             <div class="flex flex-col gap-8 p-4">
                 <div class="flex sticky top-0 flex-col flex-grow gap-4 pb-2 max-h-full pt-safe bg-black/80 backdrop-blur">
                     <h1 class="text-2xl">Discover</h1>

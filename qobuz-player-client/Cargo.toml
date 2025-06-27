@@ -10,7 +10,7 @@ base64 = { workspace = true }
 chrono = { workspace = true }
 md5 = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true, features = ["rustls-tls", "cookies", "stream", "multipart"] }
+reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 snafu = { workspace = true }

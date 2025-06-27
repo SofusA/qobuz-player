@@ -1,4 +1,5 @@
 use leptos::{IntoView, component, prelude::*};
+use qobuz_player_controls::tracklist::{Status, Tracklist};
 
 use crate::{
     html,
@@ -17,7 +18,12 @@ pub enum Page {
 }
 
 #[component]
-pub fn page(children: Children, active_page: Page) -> impl IntoView {
+pub fn page(
+    children: Children,
+    active_page: Page,
+    current_status: Status,
+    current_tracklist: Tracklist,
+) -> impl IntoView {
     html! {
         <!DOCTYPE html>
         <html lang="en" class="dark">
@@ -47,7 +53,12 @@ pub fn page(children: Children, active_page: Page) -> impl IntoView {
                 {children()}
                 {(active_page != Page::NowPlaying)
                     .then(|| {
-                        html! { <Controls /> }
+                        html! {
+                            <Controls
+                                current_status=current_status
+                                current_tracklist=current_tracklist
+                            />
+                        }
                     })}
                 <Navigation active_page=active_page />
 

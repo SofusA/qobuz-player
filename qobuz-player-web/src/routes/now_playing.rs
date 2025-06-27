@@ -82,7 +82,7 @@ async fn set_volume(axum::Form(parameters): axum::Form<VolumeParameters>) -> imp
 }
 
 async fn status_partial() -> impl IntoResponse {
-    let current_status = futures::executor::block_on(qobuz_player_controls::current_state());
+    let current_status = qobuz_player_controls::current_state().await;
 
     if current_status == tracklist::Status::Playing {
         render(html! { <PlayPause play=true /> })
@@ -156,7 +156,11 @@ async fn index() -> impl IntoResponse {
     let current_volume = (qobuz_player_controls::volume() * 100.0) as u32;
 
     render(html! {
-        <Page active_page=Page::NowPlaying>
+        <Page
+            active_page=Page::NowPlaying
+            current_status=current_status
+            current_tracklist=current_tracklist.clone()
+        >
             <NowPlaying
                 current_tracklist=current_tracklist
                 current_track=current_track

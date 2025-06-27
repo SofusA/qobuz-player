@@ -7,6 +7,7 @@ use axum::{
 use leptos::{component, prelude::*};
 use qobuz_player_controls::models::{self, SearchResults};
 use serde::Deserialize;
+use tokio::join;
 
 #[derive(Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -55,8 +56,17 @@ async fn index(
         None => SearchResults::default(),
     };
 
+    let (current_tracklist, current_status) = join!(
+        qobuz_player_controls::current_tracklist(),
+        qobuz_player_controls::current_state()
+    );
+
     let html = html! {
-        <Page active_page=Page::Search>
+        <Page
+            active_page=Page::Search
+            current_status=current_status
+            current_tracklist=current_tracklist
+        >
             <Search search_results=search_results tab=tab />
         </Page>
     };

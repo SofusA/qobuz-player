@@ -1,6 +1,6 @@
 use axum::{Router, response::IntoResponse, routing::get};
 use leptos::{IntoView, component, prelude::*};
-use qobuz_player_controls::tracklist::{self, TracklistType};
+use qobuz_player_controls::tracklist::{self, Status, Tracklist, TracklistType};
 
 use crate::{
     html,
@@ -13,7 +13,7 @@ pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
 }
 
 #[component]
-pub fn controls() -> impl IntoView {
+pub fn controls(current_status: Status, current_tracklist: Tracklist) -> impl IntoView {
     html! {
         <div
             hx-get="/controls"
@@ -22,19 +22,21 @@ pub fn controls() -> impl IntoView {
             hx-preserve
             id="controls"
         >
-            <ControlsPartial />
+            <ControlsPartial current_status=current_status current_tracklist=current_tracklist />
         </div>
     }
 }
 
 async fn controls() -> impl IntoResponse {
-    render(html! { <ControlsPartial /> })
+    let current_status = qobuz_player_controls::current_state().await;
+    let current_tracklist = qobuz_player_controls::current_tracklist().await;
+    render(
+        html! { <ControlsPartial current_status=current_status current_tracklist=current_tracklist /> },
+    )
 }
 
 #[component]
-fn controls_partial() -> impl IntoView {
-    let current_status = futures::executor::block_on(qobuz_player_controls::current_state());
-    let current_tracklist = futures::executor::block_on(qobuz_player_controls::current_tracklist());
+fn controls_partial(current_status: Status, current_tracklist: Tracklist) -> impl IntoView {
     let track_title = current_tracklist
         .current_track()
         .map(|track| track.title.clone());

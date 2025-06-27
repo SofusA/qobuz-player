@@ -6,6 +6,7 @@ use axum::{
 };
 use leptos::{IntoView, component, prelude::*};
 use qobuz_player_controls::tracklist::{Tracklist, TracklistType};
+use tokio::join;
 
 use crate::{
     components::list::{List, ListTracks, TrackNumberDisplay},
@@ -28,10 +29,17 @@ async fn skip_to(Path(track_number): Path<u32>) -> impl IntoResponse {
 }
 
 async fn index() -> impl IntoResponse {
-    let current_tracklist = qobuz_player_controls::current_tracklist().await;
+    let (current_tracklist, current_status) = join!(
+        qobuz_player_controls::current_tracklist(),
+        qobuz_player_controls::current_state()
+    );
 
     render(html! {
-        <Page active_page=Page::Queue>
+        <Page
+            active_page=Page::Queue
+            current_status=current_status
+            current_tracklist=current_tracklist.clone()
+        >
             <Queue current_tracklist=current_tracklist />
         </Page>
     })
@@ -84,6 +92,7 @@ async fn queue_partial() -> impl IntoResponse {
 
 #[component]
 fn queue_list(current_tracklist: Tracklist) -> impl IntoView {
+    let now_playing_id = current_tracklist.currently_playing();
     let tracks = current_tracklist.queue;
 
     html! {
@@ -94,6 +103,7 @@ fn queue_list(current_tracklist: Tracklist) -> impl IntoView {
                 show_artist=true
                 dim_played=true
                 api_call=|index: usize| format!("/queue/skip-to/{index}")
+                now_playing_id=now_playing_id
             />
         </List>
     }

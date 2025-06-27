@@ -79,21 +79,41 @@ async fn index(Path(id): Path<u32>) -> impl IntoResponse {
 
     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
 
+    let (current_tracklist, current_status) = join!(
+        qobuz_player_controls::current_tracklist(),
+        qobuz_player_controls::current_state()
+    );
+
     render(html! {
-        <Page active_page=Page::None>
-            <Playlist playlist=playlist is_favorite=is_favorite />
+        <Page
+            active_page=Page::None
+            current_status=current_status
+            current_tracklist=current_tracklist.clone()
+        >
+            <Playlist
+                now_playing_id=current_tracklist.currently_playing()
+                playlist=playlist
+                is_favorite=is_favorite
+            />
         </Page>
     })
 }
 
 async fn tracks_partial(Path(id): Path<u32>) -> impl IntoResponse {
     let playlist = qobuz_player_controls::playlist(id).await.unwrap();
+    let current_tracklist = qobuz_player_controls::current_tracklist().await;
 
-    render(html! { <Tracks tracks=playlist.tracks playlist_id=playlist.id /> })
+    render(html! {
+        <Tracks
+            tracks=playlist.tracks
+            playlist_id=playlist.id
+            now_playing_id=current_tracklist.currently_playing()
+        />
+    })
 }
 
 #[component]
-fn tracks(tracks: Vec<Track>, playlist_id: u32) -> impl IntoView {
+fn tracks(now_playing_id: Option<u32>, tracks: Vec<Track>, playlist_id: u32) -> impl IntoView {
     html! {
         <div
             class="w-full"
@@ -107,13 +127,14 @@ fn tracks(tracks: Vec<Track>, playlist_id: u32) -> impl IntoView {
                 show_artist=true
                 dim_played=false
                 api_call=move |index: usize| format!("/playlist/{playlist_id}/play/{index}")
+                now_playing_id=now_playing_id
             />
         </div>
     }
 }
 
 #[component]
-fn playlist(playlist: Playlist, is_favorite: bool) -> impl IntoView {
+fn playlist(now_playing_id: Option<u32>, playlist: Playlist, is_favorite: bool) -> impl IntoView {
     let duration = parse_duration(playlist.duration_seconds);
     let rfid = qobuz_player_rfid::is_initiated();
 
@@ -191,7 +212,11 @@ fn playlist(playlist: Playlist, is_favorite: bool) -> impl IntoView {
         </div>
         <div class="flex flex-col gap-4 w-full">
             <div class="sm:p-4">
-                <Tracks tracks=playlist.tracks playlist_id=playlist.id />
+                <Tracks
+                    now_playing_id=now_playing_id
+                    tracks=playlist.tracks
+                    playlist_id=playlist.id
+                />
             </div>
         </div>
     }
