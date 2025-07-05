@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT tracklist as \"tracklist: Json<Tracklist>\" FROM tracklist\n            ",
+  "query": "\n            SELECT tracklist as \"tracklist: Json<Tracklist>\" FROM tracklist\n        ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "fd4ded8adc6876e9ee32a5e4fa27486dc18d7184b0ea9b9713a5461e6d15812d"
+  "hash": "33de565830820ba85cb477c1de82275be4c296bce890157e98e34c345a814c13"
 }
