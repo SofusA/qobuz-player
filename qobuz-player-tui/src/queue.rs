@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{Output, UnfilteredListState},
+    app::{Output, PlayOutcome, UnfilteredListState},
     ui::basic_list_table,
 };
 
@@ -62,9 +62,7 @@ impl QueueState {
                         let index = self.queue.state.selected();
 
                         if let Some(index) = index {
-                            qobuz_player_controls::skip_to_position(index as u32, true)
-                                .await
-                                .unwrap();
+                            return Output::PlayOutcome(PlayOutcome::SkipToPosition(index as u32));
                         }
                         Output::Consumed
                     }

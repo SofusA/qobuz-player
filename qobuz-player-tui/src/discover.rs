@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{Output, UnfilteredListState},
+    app::{Output, PlayOutcome, UnfilteredListState},
     popup::{PlaylistPopupState, Popup},
     ui::{album_simple_table, basic_list_table},
 };
@@ -127,20 +127,20 @@ impl DiscoverState {
                             match self.sub_tab {
                                 SubTab::PressAwards => {
                                     let id = self.press_awards.items[selected_index].id.clone();
-                                    qobuz_player_controls::play_album(&id, 0).await.unwrap();
+                                    return Output::PlayOutcome(PlayOutcome::Album(id));
                                 }
                                 SubTab::NewReleases => {
                                     let id = self.new_releases.items[selected_index].id.clone();
-                                    qobuz_player_controls::play_album(&id, 0).await.unwrap();
+                                    return Output::PlayOutcome(PlayOutcome::Album(id));
                                 }
                                 SubTab::Qobuzissims => {
                                     let id = self.qobuzissims.items[selected_index].id.clone();
-                                    qobuz_player_controls::play_album(&id, 0).await.unwrap();
+                                    return Output::PlayOutcome(PlayOutcome::Album(id));
                                 }
                                 SubTab::IdealDiscography => {
                                     let id =
                                         self.ideal_discography.items[selected_index].id.clone();
-                                    qobuz_player_controls::play_album(&id, 0).await.unwrap();
+                                    return Output::PlayOutcome(PlayOutcome::Album(id));
                                 }
                                 SubTab::EditorPicks => {
                                     let selected = &self.editor_picks.items[selected_index];

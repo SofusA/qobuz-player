@@ -1,7 +1,10 @@
 use qobuz_player_controls::models::AlbumSimple;
 use ratatui::{crossterm::event::KeyCode, prelude::*, widgets::*};
 
-use crate::ui::{block, center};
+use crate::{
+    app::PlayOutcome,
+    ui::{block, center},
+};
 
 #[derive(PartialEq)]
 pub(crate) struct ArtistPopupState {
@@ -63,16 +66,16 @@ impl Popup {
         };
     }
 
-    pub(crate) async fn handle_event(&mut self, key: KeyCode) -> bool {
+    pub(crate) async fn handle_event(&mut self, key: KeyCode) -> Option<PlayOutcome> {
         match self {
             Popup::Artist(artist_popup_state) => match key {
                 KeyCode::Up => {
                     artist_popup_state.state.select_previous();
-                    false
+                    None
                 }
                 KeyCode::Down => {
                     artist_popup_state.state.select_next();
-                    false
+                    None
                 }
                 KeyCode::Enter => {
                     let index = artist_popup_state.state.selected();
@@ -82,31 +85,26 @@ impl Popup {
                         .map(|album| album.id.clone());
 
                     if let Some(id) = id {
-                        qobuz_player_controls::play_album(&id, 0).await.unwrap();
-                        return true;
+                        return Some(PlayOutcome::Album(id));
                     }
-                    false
+                    None
                 }
-                _ => false,
+                _ => None,
             },
             Popup::Playlist(playlist_popup_state) => match key {
                 KeyCode::Left => {
                     playlist_popup_state.shuffle = !playlist_popup_state.shuffle;
-                    false
+                    None
                 }
                 KeyCode::Right => {
                     playlist_popup_state.shuffle = !playlist_popup_state.shuffle;
-                    false
+                    None
                 }
                 KeyCode::Enter => {
                     let id = playlist_popup_state.playlist_id;
-
-                    qobuz_player_controls::play_playlist(id, 0, playlist_popup_state.shuffle)
-                        .await
-                        .unwrap();
-                    true
+                    Some(PlayOutcome::Playlist((id, playlist_popup_state.shuffle)))
                 }
-                _ => false,
+                _ => None,
             },
         }
     }

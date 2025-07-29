@@ -12,8 +12,11 @@ use ratatui::{
 };
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use reqwest::Client;
-use std::io;
-use tokio::time::{self, Duration};
+use std::{io, sync::Arc};
+use tokio::{
+    sync::RwLock,
+    time::{self, Duration},
+};
 
 pub(crate) struct App {
     pub(crate) current_screen: Tab,
@@ -25,6 +28,7 @@ pub(crate) struct App {
     pub(crate) search: SearchState,
     pub(crate) queue: QueueState,
     pub(crate) discover: DiscoverState,
+    pub(crate) tracklist: Arc<RwLock<Tracklist>>,
 }
 
 #[derive(Default, PartialEq)]
@@ -39,6 +43,14 @@ pub(crate) enum Output {
     Consumed,
     NotConsumed,
     Popup(Popup),
+    PlayOutcome(PlayOutcome),
+}
+
+pub(crate) enum PlayOutcome {
+    Album(String),
+    Playlist((u32, bool)),
+    Track(u32),
+    SkipToPosition(u32),
 }
 
 #[derive(Default, PartialEq)]
@@ -124,6 +136,32 @@ impl App {
         Ok(())
     }
 
+    async fn handle_playoutcome(&mut self, outcome: PlayOutcome) {
+        let tracklist = &mut self.tracklist.write().await;
+        match outcome {
+            PlayOutcome::Album(id) => {
+                qobuz_player_controls::play_album(tracklist, &id, 0)
+                    .await
+                    .unwrap();
+            }
+            PlayOutcome::Playlist(outcome) => {
+                qobuz_player_controls::play_playlist(tracklist, outcome.0, 0, outcome.1)
+                    .await
+                    .unwrap();
+            }
+            PlayOutcome::Track(id) => {
+                qobuz_player_controls::play_track(tracklist, id)
+                    .await
+                    .unwrap();
+            }
+            PlayOutcome::SkipToPosition(index) => {
+                qobuz_player_controls::skip_to_position(tracklist, index, true)
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+
     async fn handle_events(&mut self) -> io::Result<()> {
         let event = event::read()?;
 
@@ -142,7 +180,8 @@ impl App {
                             return Ok(());
                         }
 
-                        if popup.handle_event(key_event.code).await {
+                        if let Some(outcome) = popup.handle_event(key_event.code).await {
+                            self.handle_playoutcome(outcome).await;
                             self.state = State::Normal;
                         };
 
@@ -169,6 +208,9 @@ impl App {
                         self.state = State::Popup(popup);
                         self.should_draw = true;
                         return Ok(());
+                    }
+                    Output::PlayOutcome(outcome) => {
+                        self.handle_playoutcome(outcome).await;
                     }
                 }
 
@@ -198,15 +240,20 @@ impl App {
                         self.should_draw = true;
                     }
                     KeyCode::Char(' ') => {
-                        qobuz_player_controls::play_pause().await.unwrap();
+                        let tracklist = self.tracklist.read().await;
+                        qobuz_player_controls::play_pause(&tracklist).await.unwrap();
                         self.should_draw = true;
                     }
                     KeyCode::Char('n') => {
-                        qobuz_player_controls::next().await.unwrap();
+                        let mut tracklist = self.tracklist.write().await;
+                        qobuz_player_controls::next(&mut tracklist).await.unwrap();
                         self.should_draw = true;
                     }
                     KeyCode::Char('p') => {
-                        qobuz_player_controls::previous().await.unwrap();
+                        let mut tracklist = self.tracklist.write().await;
+                        qobuz_player_controls::previous(&mut tracklist)
+                            .await
+                            .unwrap();
                         self.should_draw = true;
                     }
                     KeyCode::Char('f') => {

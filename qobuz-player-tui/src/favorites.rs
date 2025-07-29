@@ -9,7 +9,7 @@ use ratatui::{
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
-    app::{FilteredListState, Output},
+    app::{FilteredListState, Output, PlayOutcome},
     popup::{ArtistPopupState, PlaylistPopupState, Popup},
     ui::{album_table, basic_list_table, render_input},
 };
@@ -140,7 +140,7 @@ impl FavoritesState {
                                 .map(|album| album.id.clone());
 
                             if let Some(id) = id {
-                                qobuz_player_controls::play_album(&id, 0).await.unwrap();
+                                return Output::PlayOutcome(PlayOutcome::Album(id));
                             }
                             Output::Consumed
                         }

@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use app::{App, FilteredListState, UnfilteredListState, get_current_state};
 use favorites::FavoritesState;
+use qobuz_player_controls::tracklist::Tracklist;
 use queue::QueueState;
 use ratatui::{prelude::*, widgets::*};
 use search::SearchState;
-use tokio::try_join;
+use tokio::{sync::RwLock, try_join};
 use ui::center;
 
 mod app;
@@ -15,7 +18,7 @@ mod queue;
 mod search;
 mod ui;
 
-pub async fn init() {
+pub async fn init(tracklist: Arc<RwLock<Tracklist>>) {
     let mut terminal = ratatui::init();
 
     draw_loading_screen(&mut terminal);
@@ -41,10 +44,10 @@ pub async fn init() {
         )
         .unwrap();
 
-    let tracklist = qobuz_player_controls::current_tracklist().await;
-    let now_playing = get_current_state(&tracklist).await;
+    let now_playing = get_current_state(&*tracklist.read().await).await;
 
     let mut app = App {
+        tracklist,
         now_playing,
         current_screen: Default::default(),
         exit: Default::default(),
