@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use database::{Database, LinkRequest};
 use qobuz_player_controls::tracklist::Tracklist;
 use tokio::sync::{Mutex, RwLock};
@@ -10,7 +12,7 @@ pub struct State {
     pub web_secret: Option<String>,
     pub database: Database,
     pub link_request: Mutex<Option<LinkRequest>>,
-    pub tracklist: RwLock<Tracklist>,
+    pub tracklist: Arc<RwLock<Tracklist>>,
 }
 
 impl State {
@@ -18,11 +20,10 @@ impl State {
         rfid: bool,
         web_interface: String,
         web_secret: Option<String>,
-        tracklist: Tracklist,
+        tracklist: Arc<RwLock<Tracklist>>,
         database: Database,
     ) -> Self {
         let link_request = Mutex::new(None);
-        let tracklist = RwLock::new(tracklist);
 
         Self {
             rfid,
