@@ -5,6 +5,7 @@ use dialoguer::{Input, Password};
 use qobuz_player_controls::{AudioQuality, Player, notification::Notification};
 use qobuz_player_state::{State, database::Database};
 use snafu::prelude::*;
+use tokio::sync::RwLock;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -126,11 +127,19 @@ pub async fn run() -> Result<(), Error> {
         Commands::Open => {
             let database_credentials = database.get_credentials().await;
             let database_configuration = database.get_configuration().await;
-            let tracklist = database.get_tracklist().await.unwrap_or_default();
-            let tracklist_player_clone = tracklist.clone();
+            let tracklist = Arc::new(RwLock::new(
+                database.get_tracklist().await.unwrap_or_default(),
+            ));
 
             let state = Arc::new(
-                State::new(cli.rfid, cli.interface, cli.web_secret, tracklist, database).await,
+                State::new(
+                    cli.rfid,
+                    cli.interface,
+                    cli.web_secret,
+                    tracklist.clone(),
+                    database,
+                )
+                .await,
             );
 
             let username = cli.username.unwrap_or_else(|| {
@@ -170,10 +179,9 @@ pub async fn run() -> Result<(), Error> {
                 });
             }
 
+            let tracklist_player_clone = tracklist.clone();
             tokio::spawn(async {
-                let mut player = Player {
-                    tracklist: tracklist_player_clone,
-                };
+                let mut player = Player::new(tracklist_player_clone);
                 match player
                     .player_loop(
                         qobuz_player_controls::Credentials { username, password },

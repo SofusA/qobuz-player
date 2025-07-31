@@ -10,7 +10,7 @@ use rand::seq::SliceRandom;
 use std::{
     str::FromStr,
     sync::{
-        LazyLock, OnceLock,
+        Arc, LazyLock, OnceLock,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -184,10 +184,13 @@ async fn get_client() -> &'static Client {
 
 #[derive(Debug)]
 pub struct Player {
-    pub tracklist: Tracklist,
+    tracklist: Arc<RwLock<Tracklist>>,
 }
 
 impl Player {
+    pub fn new(tracklist: Arc<RwLock<Tracklist>>) -> Self {
+        Self { tracklist }
+    }
     pub async fn quit(&self) -> Result<()> {
         tracing::debug!("stopping player");
 
@@ -228,7 +231,7 @@ impl Player {
     #[instrument]
     /// Play the player.
     pub async fn play(&self) -> Result<()> {
-        if let Some(current_track_id) = self.tracklist.currently_playing() {
+        if let Some(current_track_id) = self.tracklist.read().await.currently_playing() {
             let client = get_client().await;
             let track_url = track_url(client, current_track_id).await?;
             query_track_url(&track_url).await?;
@@ -238,7 +241,7 @@ impl Player {
             let current_position = PLAYBIN.query_position::<ClockTime>().unwrap_or_default();
 
             let client = get_client().await;
-            if let Some(track_id) = self.tracklist.currently_playing() {
+            if let Some(track_id) = self.tracklist.read().await.currently_playing() {
                 ready().await?;
                 let track_url = track_url(client, track_id).await?;
                 query_track_url(&track_url).await?;
@@ -265,11 +268,12 @@ impl Player {
             MessageView::Eos(_) => {
                 tracing::debug!("END OF STREAM");
 
-                if let Some(last_track) = self.tracklist.queue.last_mut() {
+                let mut tracklist = self.tracklist.write().await;
+                if let Some(last_track) = tracklist.queue.last_mut() {
                     last_track.status = TrackStatus::Played;
                 }
 
-                if let Some(first_track) = self.tracklist.queue.first_mut() {
+                if let Some(first_track) = tracklist.queue.first_mut() {
                     first_track.status = TrackStatus::Playing;
                     let client = get_client().await;
                     let track_url = client.track_url(first_track.id).await?;
@@ -278,7 +282,7 @@ impl Player {
 
                 ready().await?;
                 set_target_state(tracklist::Status::Paused).await;
-                self.broadcast_track_list().await?;
+                self.broadcast_track_list(tracklist.clone()).await?;
             }
             MessageView::StreamStart(_) => {
                 tracing::debug!("STREAM START");
@@ -286,7 +290,8 @@ impl Player {
                     tracing::debug!("Starting next song");
 
                     self.skip_to_next_track().await;
-                    self.broadcast_track_list().await?;
+                    let tracklist = self.tracklist.read().await;
+                    self.broadcast_track_list(tracklist.clone()).await?;
                 }
             }
             MessageView::AsyncDone(msg) => {
@@ -343,31 +348,33 @@ impl Player {
         Ok(())
     }
 
-    async fn broadcast_track_list(&self) -> Result<()> {
-        BROADCAST_CHANNELS.tx.send(Notification::CurrentTrackList {
-            list: self.tracklist.clone(),
-        })?;
+    async fn broadcast_track_list(&self, tracklist: Tracklist) -> Result<()> {
+        BROADCAST_CHANNELS
+            .tx
+            .send(Notification::CurrentTrackList { list: tracklist })?;
 
         Ok(())
     }
 
     async fn skip_to_next_track(&mut self) {
-        let current_position = self.tracklist.current_position();
+        let mut tracklist = self.tracklist.write().await;
+        let current_position = tracklist.current_position();
         let new_position = current_position + 1;
-        self.tracklist.skip_to_track(new_position);
+        tracklist.skip_to_track(new_position);
     }
 
     #[instrument]
     /// Skip to a specific track in the tracklist.
     pub async fn skip_to_position(&mut self, new_position: u32, force: bool) -> Result<()> {
-        let current_position = self.tracklist.current_position();
+        let mut tracklist = self.tracklist.write().await;
+        let current_position = tracklist.current_position();
 
         if !force && new_position < current_position && current_position == 1 {
             seek(ClockTime::default(), None).await?;
             return Ok(());
         }
 
-        let total_tracks = self.tracklist.total();
+        let total_tracks = tracklist.total();
 
         // Typical previous skip functionality where if,
         // the track is greater than 1 second into playing,
@@ -391,30 +398,30 @@ impl Player {
 
         let client = get_client().await;
 
-        if let Some(next_track) = self.tracklist.skip_to_track(new_position) {
+        if let Some(next_track) = tracklist.skip_to_track(new_position) {
             let next_track_url = track_url(client, next_track.id).await?;
             query_track_url(&next_track_url).await?;
-        } else if let Some(first_track) = self.tracklist.queue.first_mut() {
+        } else if let Some(first_track) = tracklist.queue.first_mut() {
             first_track.status = TrackStatus::Playing;
             let first_track_url = track_url(client, first_track.id).await?;
 
             PLAYBIN.set_property("uri", first_track_url);
         }
 
-        self.broadcast_track_list().await?;
+        self.broadcast_track_list(tracklist.clone()).await?;
 
         Ok(())
     }
 
     #[instrument]
     pub async fn next(&mut self) -> Result<()> {
-        let current_position = self.tracklist.current_position();
+        let current_position = self.tracklist.read().await.current_position();
         self.skip_to_position(current_position + 1, true).await
     }
 
     #[instrument]
     pub async fn previous(&mut self) -> Result<()> {
-        let current_position = self.tracklist.current_position();
+        let current_position = self.tracklist.read().await.current_position();
 
         let next = if current_position == 0 {
             0
@@ -436,7 +443,8 @@ impl Player {
 
         let mut track: Track = client.track(track_id).await?.into();
 
-        self.tracklist.list_type = TracklistType::Track(SingleTracklist {
+        let mut tracklist = self.tracklist.write().await;
+        tracklist.list_type = TracklistType::Track(SingleTracklist {
             track_title: track.title.clone(),
             album_id: track.album_id.clone(),
             image: track.image.clone(),
@@ -444,9 +452,9 @@ impl Player {
 
         track.status = TrackStatus::Playing;
 
-        self.tracklist.queue = vec![track];
+        tracklist.queue = vec![track];
 
-        self.broadcast_track_list().await?;
+        self.broadcast_track_list(tracklist.clone()).await?;
 
         Ok(())
     }
@@ -467,22 +475,20 @@ impl Player {
             .filter(|t| !t.available)
             .count() as u32;
 
-        self.tracklist.queue = album.tracks.into_iter().filter(|t| t.available).collect();
+        let mut tracklist = self.tracklist.write().await;
+        tracklist.queue = album.tracks.into_iter().filter(|t| t.available).collect();
 
-        if let Some(track) = self
-            .tracklist
-            .skip_to_track(index - unstreambale_tracks_to_index)
-        {
+        if let Some(track) = tracklist.skip_to_track(index - unstreambale_tracks_to_index) {
             let track_url = track_url(client, track.id).await?;
             query_track_url(&track_url).await?;
 
-            self.tracklist.list_type = TracklistType::Album(tracklist::AlbumTracklist {
+            tracklist.list_type = TracklistType::Album(tracklist::AlbumTracklist {
                 title: album.title,
                 id: album.id,
                 image: Some(album.image),
             });
 
-            self.broadcast_track_list().await?;
+            self.broadcast_track_list(tracklist.clone()).await?;
         }
 
         Ok(())
@@ -523,22 +529,20 @@ impl Player {
             .filter(|t| !t.available)
             .count() as u32;
 
-        self.tracklist.queue = tracks.into_iter().filter(|t| t.available).collect();
+        let mut tracklist = self.tracklist.write().await;
+        tracklist.queue = tracks.into_iter().filter(|t| t.available).collect();
 
-        if let Some(track) = self
-            .tracklist
-            .skip_to_track(index - unstreambale_tracks_to_index)
-        {
+        if let Some(track) = tracklist.skip_to_track(index - unstreambale_tracks_to_index) {
             let track_url = track_url(client, track.id).await?;
             query_track_url(&track_url).await?;
 
-            self.tracklist.list_type = TracklistType::TopTracks(tracklist::TopTracklist {
+            tracklist.list_type = TracklistType::TopTracks(tracklist::TopTracklist {
                 artist_name: artist.name.display,
                 id: artist_id,
                 image: artist.images.portrait.map(image_to_string),
             });
 
-            self.broadcast_track_list().await?;
+            self.broadcast_track_list(tracklist.clone()).await?;
         }
 
         Ok(())
@@ -577,22 +581,20 @@ impl Player {
             tracks.shuffle(&mut rng);
         }
 
-        self.tracklist.queue = tracks;
+        let mut tracklist = self.tracklist.write().await;
+        tracklist.queue = tracks;
 
-        if let Some(track) = self
-            .tracklist
-            .skip_to_track(index - unstreambale_tracks_to_index)
-        {
+        if let Some(track) = tracklist.skip_to_track(index - unstreambale_tracks_to_index) {
             let track_url = track_url(client, track.id).await?;
             query_track_url(&track_url).await?;
 
-            self.tracklist.list_type = TracklistType::Playlist(tracklist::PlaylistTracklist {
+            tracklist.list_type = TracklistType::Playlist(tracklist::PlaylistTracklist {
                 title: playlist.title,
                 id: playlist.id,
                 image: playlist.image,
             });
 
-            self.broadcast_track_list().await?;
+            self.broadcast_track_list(tracklist.clone()).await?;
         }
 
         Ok(())
@@ -606,8 +608,9 @@ impl Player {
 
         let client = get_client().await;
 
-        let total_tracks = self.tracklist.total();
-        let current_position = self.tracklist.current_position();
+        let tracklist = self.tracklist.read().await;
+        let total_tracks = tracklist.total();
+        let current_position = tracklist.current_position();
 
         tracing::info!(
             "Total tracks: {}, current position: {}",
@@ -619,8 +622,7 @@ impl Player {
             tracing::info!("No more tracks left");
         }
 
-        let next_track = self
-            .tracklist
+        let next_track = tracklist
             .queue
             .iter()
             .enumerate()
