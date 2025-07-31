@@ -12,7 +12,7 @@ pub struct State {
     pub web_secret: Option<String>,
     pub database: Database,
     pub link_request: Mutex<Option<LinkRequest>>,
-    pub tracklist: Arc<RwLock<Tracklist>>,
+    pub tracklist: ReadOnly<Tracklist>,
 }
 
 impl State {
@@ -31,7 +31,27 @@ impl State {
             web_secret,
             database,
             link_request,
-            tracklist,
+            tracklist: tracklist.into(),
         }
+    }
+}
+
+pub struct ReadOnly<T>(Arc<RwLock<T>>);
+
+impl<T> Clone for ReadOnly<T> {
+    fn clone(&self) -> Self {
+        ReadOnly(self.0.clone())
+    }
+}
+
+impl<T> ReadOnly<T> {
+    pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, T> {
+        self.0.read().await
+    }
+}
+
+impl<T> From<Arc<RwLock<T>>> for ReadOnly<T> {
+    fn from(arc: Arc<RwLock<T>>) -> Self {
+        ReadOnly(arc)
     }
 }
