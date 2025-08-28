@@ -8,7 +8,6 @@ use axum::{
 };
 use leptos::prelude::*;
 use qobuz_player_controls::models::{Playlist, Track};
-use tokio::join;
 
 use crate::{
     AppState,
@@ -102,14 +101,8 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl 
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
-    let (playlist, favorites) = join!(
-        state.player_state.client.playlist(id),
-        state.player_state.client.favorites()
-    );
-
-    let playlist = playlist.unwrap();
-    let favorites = favorites.unwrap();
-
+    let playlist = state.player_state.client.playlist(id).await.unwrap();
+    let favorites = state.get_favorites().await;
     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
 
     let rfid = state.player_state.rfid;

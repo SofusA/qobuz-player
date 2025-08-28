@@ -100,11 +100,10 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl 
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
-    let (artist, albums, similar_artists, favorites) = join!(
+    let (artist, albums, similar_artists) = join!(
         state.player_state.client.artist_page(id),
         state.player_state.client.artist_albums(id),
         state.player_state.client.similar_artists(id),
-        state.player_state.client.favorites(),
     );
 
     let tracklist = state.player_state.tracklist.read().await;
@@ -113,7 +112,7 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> imp
     let artist = artist.unwrap();
     let similar_artists = similar_artists.unwrap();
     let albums = albums.unwrap();
-    let favorites = favorites.unwrap();
+    let favorites = state.get_favorites().await;
 
     let is_favorite = favorites.artists.iter().any(|artist| artist.id == id);
 

@@ -10,7 +10,7 @@ use leptos::*;
 use leptos::{html::*, prelude::RenderHtml};
 use qobuz_player_controls::{
     Broadcast,
-    models::{AlbumSimple, Favorites, Playlist},
+    models::{Album, AlbumSimple, Favorites, Playlist},
     notification::Notification,
     tracklist,
 };
@@ -20,6 +20,7 @@ use routes::{
 use std::{convert::Infallible, sync::Arc};
 use time::Duration;
 use tokio::{
+    join,
     sync::{
         RwLock,
         broadcast::{self, Sender},
@@ -48,11 +49,17 @@ pub async fn init(state: Arc<qobuz_player_state::State>) {
 
 async fn create_router(state: Arc<qobuz_player_state::State>) -> Router {
     let (tx, _rx) = broadcast::channel::<ServerSentEvent>(100);
+
+    let album_cache = moka::future::CacheBuilder::new(1000)
+        .time_to_live(std::time::Duration::from_secs(60 * 60 * 24 * 7))
+        .build();
+
     let shared_state = Arc::new(AppState {
         tx: tx.clone(),
         player_state: state.clone(),
         favorites_cache: Cache::new(Duration::weeks(1)),
         discover_cache: Cache::new(Duration::days(1)),
+        album_cache,
     });
     tokio::spawn(background_task(tx, state.broadcast.clone()));
 
@@ -177,6 +184,55 @@ pub(crate) struct AppState {
     pub player_state: Arc<qobuz_player_state::State>,
     pub favorites_cache: Cache<Favorites>,
     pub discover_cache: Cache<Discover>,
+    pub album_cache: moka::future::Cache<String, AlbumData>,
+}
+
+impl AppState {
+    pub async fn get_favorites(&self) -> Favorites {
+        if let Some(cached) = self.favorites_cache.get().await {
+            return cached;
+        }
+
+        let favorites = self.player_state.client.favorites().await.unwrap();
+
+        self.favorites_cache.set(favorites.clone()).await;
+
+        favorites
+    }
+
+    pub async fn get_album(&self, id: &str) -> AlbumData {
+        if let Some(cached) = self.album_cache.get(&id.to_string()) {
+            return cached;
+        };
+
+        let (album, suggested_albums) = join!(
+            self.player_state.client.album(id),
+            self.player_state.client.suggested_albums(id),
+        );
+
+        let album = album.unwrap();
+        let suggested_albums = suggested_albums.unwrap();
+
+        let data = AlbumData {
+            album,
+            suggested_albums,
+        };
+
+        self.album_cache.insert(id.to_string(), data.clone()).await;
+
+        data
+    }
+
+    pub async fn is_album_favorite(&self, id: &str) -> bool {
+        let favorites = self.get_favorites().await;
+        favorites.albums.iter().any(|album| album.id == id)
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct AlbumData {
+    pub album: Album,
+    pub suggested_albums: Vec<AlbumSimple>,
 }
 
 #[derive(Clone)]

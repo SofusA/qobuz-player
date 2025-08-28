@@ -49,3 +49,4 @@ tokio-stream = { version = "*", features = ["sync"] }
 tracing = "*"
 tracing-subscriber = { version = "*", features = ["env-filter"] }
 url = "*"
+moka = { version = "*", features = ["future"]}

@@ -115,9 +115,9 @@ impl Client {
         ))
     }
 
-    pub async fn suggested_albums(&self, album_id: String) -> Result<Vec<AlbumSimple>> {
+    pub async fn suggested_albums(&self, album_id: &str) -> Result<Vec<AlbumSimple>> {
         let client = self.get_client().await;
-        let suggested_albums = client.suggested_albums(&album_id).await?;
+        let suggested_albums = client.suggested_albums(album_id).await?;
 
         Ok(suggested_albums
             .albums

@@ -8,7 +8,6 @@ use axum::{
 };
 use leptos::{IntoView, component, prelude::*};
 use qobuz_player_controls::models::{Album, AlbumSimple, Track};
-use tokio::join;
 
 use crate::{
     AppState,
@@ -91,6 +90,27 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> im
     let current_status = state.player_state.target_status.read().await;
     let tracklist = state.player_state.tracklist.read().await;
 
+    let album = state.album_cache.get(&id);
+
+    if let Some(album) = album {
+        let rfid = state.player_state.rfid;
+        let tracklist = state.player_state.tracklist.read().await;
+        let currently_playing = tracklist.currently_playing();
+        let is_favorite = state.is_album_favorite(&id).await;
+
+        return render(html! {
+            <Page active_page=Page::None current_status=&current_status tracklist=&tracklist>
+                <Album
+                    album=album.album
+                    suggested_albums=album.suggested_albums
+                    is_favorite=is_favorite
+                    now_playing_id=currently_playing
+                    rfid=rfid
+                />
+            </Page>
+        });
+    }
+
     render(html! {
         <Page active_page=Page::None current_status=&current_status tracklist=&tracklist>
             <LazyLoadComponent url=url />
@@ -99,26 +119,16 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> im
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> impl IntoResponse {
-    let (album, suggested_albums, favorites) = join!(
-        state.player_state.client.album(&id),
-        state.player_state.client.suggested_albums(id.clone()),
-        state.player_state.client.favorites(),
-    );
-
-    let album = album.unwrap();
-    let suggested_albums = suggested_albums.unwrap();
-    let favorites = favorites.unwrap();
-
+    let album_data = state.get_album(&id).await;
     let rfid = state.player_state.rfid;
     let tracklist = state.player_state.tracklist.read().await;
     let currently_playing = tracklist.currently_playing();
-
-    let is_favorite = favorites.albums.iter().any(|album| album.id == id);
+    let is_favorite = state.is_album_favorite(&id).await;
 
     render(html! {
         <Album
-            album=album
-            suggested_albums=suggested_albums
+            album=album_data.album
+            suggested_albums=album_data.suggested_albums
             is_favorite=is_favorite
             now_playing_id=currently_playing
             rfid=rfid

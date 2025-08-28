@@ -24,20 +24,8 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/favorites/{tab}", get(index))
 }
 
-async fn get_favorites(state: &AppState) -> Favorites {
-    if let Some(cached) = state.favorites_cache.get().await {
-        return cached;
-    }
-
-    let favorites = state.player_state.client.favorites().await.unwrap();
-
-    state.favorites_cache.set(favorites.clone()).await;
-
-    favorites
-}
-
 async fn index(State(state): State<Arc<AppState>>, Path(tab): Path<Tab>) -> impl IntoResponse {
-    let favorites = get_favorites(&state).await;
+    let favorites = state.get_favorites().await;
 
     let tracklist = state.player_state.tracklist.read().await;
     let current_status = state.player_state.target_status.read().await;
