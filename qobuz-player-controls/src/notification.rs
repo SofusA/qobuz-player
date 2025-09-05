@@ -34,9 +34,8 @@ pub enum PlayNotification {
     PlayPause,
     Play,
     Pause,
-    Stop,
     JumpForward,
     JumpBackward,
     Seek { time: Time },
-    TrackAboutToFinish,
+    TrackFinished,
 }

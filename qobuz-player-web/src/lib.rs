@@ -78,7 +78,6 @@ async fn background_task(tx: Sender<ServerSentEvent>, receiver: Arc<Broadcast>) 
             match notification {
                 Notification::Status { status } => {
                     let message_data = match status {
-                        tracklist::Status::Stopped => "pause",
                         tracklist::Status::Paused => "pause",
                         tracklist::Status::Playing => "play",
                     };

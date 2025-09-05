@@ -78,7 +78,7 @@ impl PlayerInterface for MprisPlayer {
     }
 
     async fn stop(&self) -> fdo::Result<()> {
-        self.state.broadcast.stop();
+        self.state.broadcast.pause();
         Ok(())
     }
 
@@ -88,7 +88,7 @@ impl PlayerInterface for MprisPlayer {
     }
 
     async fn seek(&self, offset: Time) -> fdo::Result<()> {
-        let clock = qobuz_player_controls::Time::from_seconds(offset.as_secs() as u64);
+        let clock = qobuz_player_controls::time::Time::from_seconds(offset.as_secs() as u64);
         self.state.broadcast.seek(clock);
         Ok(())
     }
@@ -105,7 +105,6 @@ impl PlayerInterface for MprisPlayer {
         let current_status = *self.state.target_status.read().await;
 
         let status = match current_status {
-            tracklist::Status::Stopped => PlaybackStatus::Stopped,
             tracklist::Status::Paused => PlaybackStatus::Paused,
             tracklist::Status::Playing => PlaybackStatus::Playing,
         };
@@ -149,7 +148,8 @@ impl PlayerInterface for MprisPlayer {
     }
 
     async fn volume(&self) -> fdo::Result<Volume> {
-        Ok(self.state.sink.volume())
+        let volume = self.state.volume.read().await;
+        Ok(*volume)
     }
 
     async fn set_volume(&self, volume: Volume) -> zbus::Result<()> {
@@ -158,13 +158,8 @@ impl PlayerInterface for MprisPlayer {
     }
 
     async fn position(&self) -> fdo::Result<Time> {
-        let position_seconds = self
-            .state
-            .sink
-            .position()
-            .map(|position| position.mseconds())
-            .map_or(0, |p| p as i64);
-        let time = Time::from_millis(position_seconds);
+        let position_seconds = self.state.position.read().await.mseconds();
+        let time = Time::from_millis(position_seconds as i64);
         Ok(time)
     }
 
@@ -214,7 +209,6 @@ pub async fn init(state: Arc<State>) {
                 Notification::Quit => return,
                 Notification::Status { status } => {
                     let (can_play, can_pause) = match status {
-                        tracklist::Status::Stopped => (false, false),
                         tracklist::Status::Paused => (true, true),
                         tracklist::Status::Playing => (true, true),
                     };
@@ -222,7 +216,6 @@ pub async fn init(state: Arc<State>) {
                     let playback_status = match status {
                         tracklist::Status::Playing => PlaybackStatus::Playing,
                         tracklist::Status::Paused => PlaybackStatus::Paused,
-                        tracklist::Status::Stopped => PlaybackStatus::Stopped,
                     };
 
                     server

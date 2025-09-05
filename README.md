@@ -20,16 +20,11 @@ Read more [in the wiki](https://github.com/SofusA/qobuz-player/wiki/RFID-player)
 
 ## Player Features
 
-- [GStreamer](https://gstreamer.freedesktop.org/)-backed player
 - High resolution audio: Supports up to 24bit/192Khz (max quality Qobuz offers)
 - MPRIS support (control via [playerctl](https://github.com/altdesktop/playerctl) or other D-Bus client)
 - Gapless playback
 - Web UI 
 - Terminal UI 
-
-## Requirements
-
-- [GStreamer v1.18+](https://gstreamer.freedesktop.org/documentation/installing/index.html) (comes with most/all current Linux)
 
 ## Installation
 

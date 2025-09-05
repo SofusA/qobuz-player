@@ -1,7 +1,5 @@
-use gstreamer::{StateChangeError, glib};
-use snafu::prelude::*;
-
 use crate::notification::Notification;
+use snafu::prelude::*;
 
 #[derive(Snafu, Debug, Clone, PartialEq)]
 pub enum Error {
@@ -16,36 +14,41 @@ pub enum Error {
     #[snafu(display("sorry, could not resume previous session"))]
     Resume,
     #[snafu(display("{message}"))]
-    GStreamer {
-        message: String,
-    },
-    #[snafu(display("{message}"))]
     Client {
         message: String,
     },
     Notification,
     App,
+    StreamError {
+        message: String,
+    },
 }
 
-impl From<glib::Error> for Error {
-    fn from(value: glib::Error) -> Self {
-        Error::GStreamer {
+impl From<rodio::source::SeekError> for Error {
+    fn from(_: rodio::source::SeekError) -> Self {
+        Error::Seek
+    }
+}
+
+impl From<rodio::StreamError> for Error {
+    fn from(value: rodio::StreamError) -> Self {
+        Self::StreamError {
             message: value.to_string(),
         }
     }
 }
 
-impl From<glib::BoolError> for Error {
-    fn from(value: glib::BoolError) -> Self {
-        Error::GStreamer {
+impl From<rodio::decoder::DecoderError> for Error {
+    fn from(value: rodio::decoder::DecoderError) -> Self {
+        Self::StreamError {
             message: value.to_string(),
         }
     }
 }
 
-impl From<StateChangeError> for Error {
-    fn from(value: StateChangeError) -> Self {
-        Error::GStreamer {
+impl From<reqwest::Error> for Error {
+    fn from(value: reqwest::Error) -> Self {
+        Self::StreamError {
             message: value.to_string(),
         }
     }
@@ -62,17 +65,5 @@ impl From<qobuz_player_client::Error> for Error {
 impl From<tokio::sync::broadcast::error::SendError<Notification>> for Error {
     fn from(_value: tokio::sync::broadcast::error::SendError<Notification>) -> Self {
         Self::Notification
-    }
-}
-
-impl From<&gstreamer::message::Error> for Error {
-    fn from(value: &gstreamer::message::Error) -> Self {
-        let error = format!(
-            "Error from {:?}: {} ({:?})",
-            value.src().map(|s| s.to_string()),
-            value.error(),
-            value.debug()
-        );
-        Error::GStreamer { message: error }
     }
 }

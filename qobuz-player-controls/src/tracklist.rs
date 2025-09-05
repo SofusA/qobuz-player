@@ -1,6 +1,6 @@
-use crate::models::{Track, TrackStatus};
-use tracing::instrument;
+use std::ops::Index;
 
+use crate::models::{Track, TrackStatus};
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct AlbumTracklist {
     pub title: String,
@@ -48,9 +48,8 @@ pub struct Tracklist {
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum Status {
     Playing,
-    Paused,
     #[default]
-    Stopped,
+    Paused,
 }
 
 impl Tracklist {
@@ -82,9 +81,34 @@ impl Tracklist {
             .unwrap_or(0)
     }
 
-    #[instrument(skip(self))]
     pub fn list_type(&self) -> &TracklistType {
         &self.list_type
+    }
+
+    pub fn reset(&mut self) {
+        for track in self.queue.iter_mut() {
+            if track.status == TrackStatus::Played || track.status == TrackStatus::Playing {
+                track.status = TrackStatus::Unplayed;
+            }
+        }
+
+        if let Some(first_track) = self
+            .queue
+            .iter_mut()
+            .find(|t| t.status == TrackStatus::Unplayed)
+        {
+            first_track.status = TrackStatus::Playing;
+        }
+    }
+
+    pub fn next_track(&self) -> Option<&Track> {
+        let current_position = self.current_position();
+        let next_position = current_position + 1;
+        if self.total() <= next_position {
+            return None;
+        }
+
+        Some(self.queue.index(next_position as usize))
     }
 
     pub fn current_track(&self) -> Option<&Track> {

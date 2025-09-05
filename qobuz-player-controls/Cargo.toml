@@ -9,7 +9,6 @@ repository.workspace = true
 [dependencies]
 qobuz-player-client = { version = "*", path = "../qobuz-player-client" }
 
-gstreamer = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true }
 rand = { workspace = true }
@@ -20,3 +19,5 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 moka = { workspace = true }
 time = { workspace = true }
+rodio = { workspace = true }
+reqwest = { workspace = true }

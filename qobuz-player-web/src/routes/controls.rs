@@ -43,7 +43,6 @@ fn controls_partial<'a>(current_status: &'a Status, tracklist: &'a Tracklist) ->
     let track_title = tracklist.current_track().map(|track| track.title.clone());
 
     let (playing, show) = match current_status {
-        tracklist::Status::Stopped => (false, false),
         tracklist::Status::Paused => (false, true),
         tracklist::Status::Playing => (true, true),
     };

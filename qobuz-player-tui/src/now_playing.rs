@@ -98,7 +98,6 @@ fn get_status_icon(state: tracklist::Status) -> String {
     match state {
         tracklist::Status::Playing => "⏵".to_string(),
         tracklist::Status::Paused => "⏸ ".to_string(),
-        tracklist::Status::Stopped => "⏹ ".to_string(),
     }
 }
 

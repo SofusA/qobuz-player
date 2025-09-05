@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use database::{Database, LinkRequest};
 use qobuz_player_controls::{
-    Broadcast, ReadOnly,
+    Broadcast,
     client::Client,
-    sink::Sink,
+    readonly::ReadOnly,
+    time::Time,
     tracklist::{self, Tracklist},
 };
 use tokio::sync::{Mutex, RwLock};
@@ -20,8 +21,9 @@ pub struct State {
     pub link_request: Mutex<Option<LinkRequest>>,
     pub tracklist: ReadOnly<Tracklist>,
     pub target_status: ReadOnly<tracklist::Status>,
+    pub volume: ReadOnly<f64>,
+    pub position: ReadOnly<Time>,
     pub broadcast: Arc<Broadcast>,
-    pub sink: Arc<Sink>,
 }
 
 impl State {
@@ -35,7 +37,8 @@ impl State {
         database: Database,
         target_status: ReadOnly<tracklist::Status>,
         broadcast: Arc<Broadcast>,
-        sink: Arc<Sink>,
+        volume: ReadOnly<f64>,
+        position: ReadOnly<Time>,
     ) -> Self {
         let link_request = Mutex::new(None);
 
@@ -49,7 +52,8 @@ impl State {
             tracklist: tracklist.into(),
             target_status,
             broadcast,
-            sink,
+            volume,
+            position,
         }
     }
 }

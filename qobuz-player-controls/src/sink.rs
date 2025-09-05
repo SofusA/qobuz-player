@@ -1,133 +1,125 @@
+use std::io::Cursor;
+use std::sync::Arc;
+use std::time::Duration;
+
 use crate::{Broadcast, Time, error::Error};
-use gstreamer::{ClockTime, Element, SeekFlags, Structure, prelude::*};
-use std::{str::FromStr, sync::Arc};
+use rodio::{Source, decoder::DecoderBuilder, queue::queue};
+use tokio::sync::RwLock;
 
-static USER_AGENTS: &[&str] = &[
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-];
-
-#[derive(Debug)]
 pub struct Sink {
-    playbin: Element,
+    stream_handle: rodio::OutputStream,
+    sink: rodio::Sink,
+    sender: Arc<rodio::queue::SourcesQueueInput>,
+    broadcast: Arc<Broadcast>,
+    duration_played: Arc<RwLock<Duration>>,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl Sink {
+    pub fn new(broadcast: Arc<Broadcast>) -> Result<Self> {
+        let stream_handle = rodio::OutputStreamBuilder::open_default_stream()?;
+        let (sender, receiver) = queue(true);
+
+        let sink = rodio::Sink::connect_new(stream_handle.mixer());
+        sink.append(receiver);
+
+        Ok(Self {
+            sink,
+            stream_handle,
+            sender,
+            broadcast,
+            duration_played: Default::default(),
+        })
+    }
+
+    pub async fn clear(&mut self) -> Result<()> {
+        let (sender, receiver) = queue(true);
+        let sink = rodio::Sink::connect_new(self.stream_handle.mixer());
+        sink.append(receiver);
+
+        self.sink = sink;
+        self.sender = sender;
+
+        let mut duration_played = self.duration_played.write().await;
+        *duration_played = Duration::default();
+
+        Ok(())
+    }
+
+    pub fn play(&self) {
+        self.sink.play();
+    }
+
+    pub fn pause(&self) {
+        self.sink.pause();
+    }
+
     pub fn seek(&self, time: Time) -> Result<()> {
-        let clock_time = ClockTime::from_mseconds(time.mseconds());
-
-        let flags = SeekFlags::FLUSH | SeekFlags::TRICKMODE_KEY_UNITS;
-        self.playbin.seek_simple(flags, clock_time)?;
+        let duration = Duration::from_millis(time.mseconds());
+        self.sink.try_seek(duration)?;
         Ok(())
     }
 
-    pub fn position(&self) -> Option<Time> {
-        self.playbin
-            .query_position::<ClockTime>()
-            .map(|clock_time| Time::from_mseconds(clock_time.mseconds()))
+    pub async fn position(&self) -> Time {
+        let position = self.sink.get_pos();
+        let duration_played = self.duration_played.read().await;
+        let current_track_position = position - *duration_played;
+        Time::from_mseconds(current_track_position.as_millis() as u64)
     }
 
-    pub fn duration(&self) -> Option<Time> {
-        self.playbin
-            .query_duration::<ClockTime>()
-            .map(|clock_time| Time::from_mseconds(clock_time.mseconds()))
+    pub fn is_playing(&self) -> bool {
+        !self.sink.is_paused()
     }
 
-    pub fn set_state(&self, state: gstreamer::State) -> Result<()> {
-        self.playbin.set_state(state)?;
+    pub async fn query_track_url(&self, track_url: &str) -> Result<()> {
+        let track_url = track_url.to_string();
+        let sender = self.sender.clone();
+        let broadcast = self.broadcast.clone();
+        let duration_played = self.duration_played.clone();
+
+        // TODO: Cancelation signal. Cancel download when new download starts and when dropping
+        // Cancel thread or request?
+        tokio::spawn(async move {
+            let resp = reqwest::get(track_url).await.unwrap();
+            let cursor = Cursor::new(resp.bytes().await.unwrap());
+
+            let source = DecoderBuilder::new()
+                .with_data(cursor)
+                .with_seekable(true)
+                .build()
+                .unwrap();
+
+            let source_duration = source.total_duration();
+
+            let signal = sender.append_with_signal(source);
+
+            if signal.iter().next().is_some() {
+                if let Some(source_duration) = source_duration {
+                    let mut duration_played = duration_played.write().await;
+                    *duration_played += source_duration;
+                }
+                broadcast.track_finished();
+            }
+        });
+        self.play();
+
         Ok(())
-    }
-
-    pub fn query_track_url(&self, track_url: &str) -> Result<()> {
-        self.playbin.set_property("uri", track_url);
-        self.set_state(gstreamer::State::Playing)?;
-        Ok(())
-    }
-
-    pub fn state(&self) -> gstreamer::State {
-        self.playbin.current_state()
     }
 
     pub fn set_volume(&self, volume: f64) {
-        let volume_pow = volume.powi(3);
-        self.playbin.set_property("volume", volume_pow);
+        let volume_pow = volume.clamp(0.0, 1.0).powi(3);
+        self.sink.set_volume(volume_pow as f32);
     }
 
     pub fn volume(&self) -> f64 {
-        self.playbin.property::<f64>("volume").powf(1.0 / 3.0)
-    }
-
-    pub(crate) fn bus(&self) -> gstreamer::bus::BusStream {
-        self.playbin.bus().unwrap().stream()
+        self.sink.volume() as f64
     }
 }
 
 impl Drop for Sink {
     fn drop(&mut self) {
-        if let Err(err) = self.playbin.set_state(gstreamer::State::Null) {
-            tracing::warn!("Failed to set playbin to NULL state: {:?}", err);
-        }
+        self.stream_handle.log_on_drop(false);
+        self.sink.clear();
     }
-}
-
-pub(crate) fn init_sink(broadcast: Arc<Broadcast>) -> Sink {
-    gstreamer::init().expect("error initializing gstreamer");
-
-    let playbin = gstreamer::ElementFactory::make("playbin3")
-        .build()
-        .expect("error building playbin element");
-
-    playbin.set_property_from_str("flags", "audio+buffering");
-
-    if gstreamer::version().1 >= 22 {
-        playbin.connect("element-setup", false, |value| {
-            let element = &value[1].get::<gstreamer::Element>().unwrap();
-
-            if element.name().contains("urisourcebin") {
-                element.set_property("parse-streams", true);
-            }
-
-            None
-        });
-    }
-
-    playbin.connect("source-setup", false, |value| {
-        let element = &value[1].get::<gstreamer::Element>().unwrap();
-
-        if element.name().contains("souphttpsrc") {
-            tracing::debug!("new source, changing settings");
-            let ua = if rand::random() {
-                USER_AGENTS[0]
-            } else {
-                USER_AGENTS[1]
-            };
-
-            element.set_property("user-agent", ua);
-            element.set_property("compress", true);
-            element.set_property("retries", 10);
-            element.set_property("timeout", 30_u32);
-            element.set_property(
-                "extra-headers",
-                Structure::from_str("a-structure, DNT=1, Pragma=no-cache, Cache-Control=no-cache")
-                    .expect("failed to make structure from string"),
-            )
-        }
-
-        None
-    });
-
-    playbin.add_property_deep_notify_watch(Some("caps"), true);
-
-    // Connects to the `about-to-finish` signal so the player
-    // can setup the next track to play. Enables gapless playback.
-    playbin.connect("about-to-finish", false, move |_| {
-        tracing::debug!("about to finish");
-        broadcast.track_about_to_finish();
-
-        None
-    });
-
-    Sink { playbin }
 }
