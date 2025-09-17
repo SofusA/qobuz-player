@@ -104,7 +104,10 @@ fn head(load_htmx: bool) -> impl IntoView {
 #[component]
 fn navigation(active_page: Page) -> impl IntoView {
     html! {
-        <nav class="flex fixed bottom-0 justify-evenly w-full backdrop-blur bg-black/80 *:flex *:h-[3.25rem] *:w-20 *:flex-col *:items-center *:overflow-visible *:text-nowrap *:px-4 *:py-1 *:text-[10px] *:font-medium *:transition-colors">
+        <div class="pb-safe">
+            <div class="h-12"></div>
+        </div>
+        <nav class="flex fixed bottom-0 justify-evenly w-full pb-safe px-safe backdrop-blur bg-black/80 *:flex *:h-[3.25rem] *:w-20 *:flex-col *:items-center *:overflow-visible *:text-nowrap *:px-4 *:py-1 *:text-[10px] *:font-medium *:transition-colors">
             {html! {
                 <a
                     href="/"

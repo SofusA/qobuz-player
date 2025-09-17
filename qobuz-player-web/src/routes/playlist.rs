@@ -152,7 +152,7 @@ fn playlist(
     let duration = parse_duration(playlist.duration_seconds);
 
     html! {
-        <div class="flex flex-wrap gap-4 justify-center items-end p-4 w-full *:max-w-sm inner-page">
+        <div class="flex flex-wrap gap-4 justify-center items-end w-full p-safe-or-2 *:max-w-sm">
             <img
                 src=playlist.image
                 alt=playlist.title.clone()
