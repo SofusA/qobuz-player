@@ -70,8 +70,8 @@ fn controls_partial<'a>(current_status: Status, tracklist: &'a Tracklist) -> imp
     };
 
     html! {
-        <div class="h-16"></div>
-        <div class="fixed right-0 left-0 bottom-14 px-safe-offset-2 py-safe">
+        <div class="controls-placeholder"></div>
+        <div class="fixed right-0 left-0 bottom-14 controls">
             <div class="flex gap-2 justify-between items-center p-2 rounded-md bg-gray-900/70 backdrop-blur">
                 <a
                     class="flex overflow-hidden gap-2 items-center w-full"

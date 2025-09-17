@@ -163,7 +163,7 @@ fn album(
     let album_id_clone_2 = album.id.clone();
 
     html! {
-        <div class="flex flex-wrap gap-4 justify-center items-end w-full p-safe-or-4 *:max-w-sm">
+        <div class="flex flex-wrap gap-4 justify-center items-end p-4 w-full *:max-w-sm inner-page">
             <img
                 src=album.image
                 alt=album.title.clone()
