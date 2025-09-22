@@ -23,3 +23,5 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 ratatui = { workspace = true }
+tokio_schedule = { workspace = true }
+time = { workspace = true }

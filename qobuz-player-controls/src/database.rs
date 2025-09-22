@@ -39,6 +39,10 @@ impl Database {
 
         let pool = SqlitePool::connect_with(options).await?;
 
+        Database::init(pool).await
+    }
+
+    async fn init(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<Self> {
         sqlx::migrate!("./migrations").run(&pool).await?;
 
         create_credentials_row(&pool).await?;
@@ -240,6 +244,44 @@ impl Database {
             }
         }
     }
+
+    pub async fn clean_up_cache_entries(&self, older_than: time::Duration) {
+        let cutoff = time::OffsetDateTime::now_utc() - older_than;
+
+        let cutoff_str = cutoff
+            .format(&time::format_description::well_known::Rfc3339)
+            .expect("infailable");
+
+        sqlx::query!(
+            "DELETE FROM cache_entries WHERE last_opened > ?",
+            cutoff_str
+        )
+        .execute(&self.pool)
+        .await
+        .expect("infailable");
+    }
+
+    pub async fn set_cache_entry(&self, track_id: u32, path: &str) {
+        let now = time::OffsetDateTime::now_utc()
+            .format(&time::format_description::well_known::Rfc3339)
+            .expect("infailable");
+
+        sqlx::query!(
+            r#"
+                INSERT INTO cache_entries (track_id, path, last_opened)
+                VALUES (?, ?, ?)
+                ON CONFLICT(track_id) DO UPDATE SET
+                    path = excluded.path,
+                    last_opened = excluded.last_opened
+            "#,
+            track_id,
+            path,
+            now
+        )
+        .execute(&self.pool)
+        .await
+        .expect("infailable");
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -321,4 +363,44 @@ async fn create_configuration(pool: &Pool<Sqlite>) -> Result<()> {
     .execute(pool)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use time::{Duration, OffsetDateTime};
+
+    #[sqlx::test]
+    async fn clean_up_cache_entries(pool: sqlx::Pool<sqlx::Sqlite>) {
+        let db = Database::init(pool).await.unwrap();
+
+        db.set_cache_entry(1, "path/old").await;
+        db.set_cache_entry(2, "path/new").await;
+
+        let old_time = OffsetDateTime::now_utc() - Duration::days(10);
+        let old_time = old_time
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap();
+
+        sqlx::query!(
+            "UPDATE cache_entries SET last_opened = ? WHERE track_id = ?",
+            old_time,
+            1
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        db.clean_up_cache_entries(Duration::days(5)).await;
+
+        let remaining: Vec<u32> = sqlx::query!("SELECT track_id FROM cache_entries")
+            .fetch_all(&db.pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.track_id as u32)
+            .collect();
+
+        assert_eq!(remaining, vec![1], "Only the old entry should remain");
+    }
 }

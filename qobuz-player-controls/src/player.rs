@@ -49,7 +49,7 @@ impl Player {
         audio_cache_dir: PathBuf,
         database: Arc<Database>,
     ) -> Result<Self> {
-        let sink = Sink::new(volume, broadcast.clone(), audio_cache_dir)?;
+        let sink = Sink::new(volume, broadcast.clone(), audio_cache_dir, database.clone())?;
 
         let track_finished = sink.track_finished();
         let done_buffering = sink.done_buffering();

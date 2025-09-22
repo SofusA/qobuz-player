@@ -50,3 +50,4 @@ url = "*"
 moka = { version = "*", features = ["future"]}
 rodio = "*"
 ratatui = "*"
+tokio_schedule = "*"

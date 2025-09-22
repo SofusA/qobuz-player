@@ -10,6 +10,7 @@ use tokio::sync::watch::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
 
 use crate::Result;
+use crate::database::Database;
 use crate::notification::NotificationBroadcast;
 
 pub struct Sink {
@@ -21,6 +22,7 @@ pub struct Sink {
     done_buffering_tx: Sender<()>,
     broadcast: Arc<NotificationBroadcast>,
     audio_cache_dir: PathBuf,
+    database: Arc<Database>,
 }
 
 impl Sink {
@@ -28,6 +30,7 @@ impl Sink {
         volume: f32,
         broadcast: Arc<NotificationBroadcast>,
         audio_cache_dir: PathBuf,
+        database: Arc<Database>,
     ) -> Result<Self> {
         let mut stream_handle = rodio::OutputStreamBuilder::open_default_stream()?;
         stream_handle.log_on_drop(false);
@@ -49,6 +52,7 @@ impl Sink {
             done_buffering_tx,
             broadcast,
             audio_cache_dir,
+            database,
         })
     }
 
@@ -102,6 +106,7 @@ impl Sink {
         let track_finished_tx = self.track_finished_tx.clone();
         let done_buffering_tx = self.done_buffering_tx.clone();
         let broadcast = self.broadcast.clone();
+        let database = self.database.clone();
 
         let cache_path = {
             let artist_name = track.artist_name.as_deref().unwrap_or("unknown");
@@ -130,7 +135,13 @@ impl Sink {
                 .join(track_file)
         };
 
+        let track_id = track.id;
+
         let handle = tokio::spawn(async move {
+            database
+                .set_cache_entry(track_id, cache_path.to_str().expect("infailable"))
+                .await;
+
             let maybe_cached_bytes = (fs::read(&cache_path).await).ok();
 
             let bytes: Vec<u8> = if let Some(bytes) = maybe_cached_bytes {

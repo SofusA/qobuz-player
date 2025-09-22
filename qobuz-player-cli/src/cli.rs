@@ -7,6 +7,7 @@ use qobuz_player_controls::{
 };
 use qobuz_player_rfid::RfidState;
 use snafu::prelude::*;
+use tokio_schedule::{Job, every};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -68,6 +69,10 @@ enum Commands {
         #[clap(long)]
         /// Cache audio files in directory.
         audio_cache: Option<PathBuf>,
+
+        #[clap(long, default_value_t = false)]
+        /// Do not clean up audio cache
+        no_clean_up_audio_cache: bool,
     },
     /// Persist configurations
     Config {
@@ -147,6 +152,7 @@ pub async fn run() -> Result<(), Error> {
         #[cfg(feature = "gpio")]
         gpio: Default::default(),
         audio_cache: Default::default(),
+        no_clean_up_audio_cache: Default::default(),
     }) {
         Commands::Open {
             username,
@@ -162,6 +168,7 @@ pub async fn run() -> Result<(), Error> {
             #[cfg(feature = "gpio")]
             gpio,
             audio_cache,
+            no_clean_up_audio_cache,
         } => {
             let database_credentials = database.get_credentials().await?;
             let database_configuration = database.get_configuration().await?;
@@ -274,6 +281,7 @@ pub async fn run() -> Result<(), Error> {
             if let Some(rfid_state) = rfid_state {
                 let tracklist_receiver = player.tracklist();
                 let controls = player.controls();
+                let database = database.clone();
                 tokio::spawn(async move {
                     if let Err(e) = qobuz_player_rfid::init(
                         rfid_state,
@@ -310,6 +318,19 @@ pub async fn run() -> Result<(), Error> {
                 });
             };
 
+            if !no_clean_up_audio_cache {
+                let clean_up_schedule = every(1).hour().perform(move || {
+                    let database = database.clone();
+                    async move {
+                        database
+                            .clean_up_cache_entries(time::Duration::hours(1))
+                            .await;
+                    }
+                });
+
+                tokio::spawn(clean_up_schedule);
+            }
+
             player.player_loop().await?;
             Ok(())
         }
@@ -334,25 +355,6 @@ pub async fn run() -> Result<(), Error> {
         },
     }
 }
-
-// async fn store_state_loop(
-//     database: Arc<Database>,
-//     mut tracklist_receiver: TracklistReceiver,
-//     mut volume_receiver: VolumeReceiver,
-// ) -> Result<(), Error> {
-//     loop {
-//         tokio::select! {
-//             Ok(_) = volume_receiver.changed() => {
-//                 let volume = *volume_receiver.borrow_and_update();
-//                 database.set_volume(volume).await?;
-//             }
-//             Ok(_) = tracklist_receiver.changed() => {
-//                 let tracklist = tracklist_receiver.borrow_and_update().clone();
-//                 database.set_tracklist(&tracklist).await?;
-//             },
-//         }
-//     }
-// }
 
 fn exit(cli: bool, error: Error) {
     if cli {
