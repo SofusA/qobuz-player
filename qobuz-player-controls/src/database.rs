@@ -1,5 +1,4 @@
-use qobuz_player_controls::error::Error;
-use qobuz_player_controls::{AudioQuality, Result, tracklist::Tracklist};
+use crate::{AudioQuality, Error, Result, Tracklist};
 use serde_json::to_string;
 use sqlx::types::Json;
 use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};

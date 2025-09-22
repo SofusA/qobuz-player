@@ -1,9 +1,12 @@
 use dialoguer::Input;
 use qobuz_player_controls::{
-    Result, TracklistReceiver, controls::Controls, error::Error,
-    notification::NotificationBroadcast, tracklist,
+    Result, TracklistReceiver,
+    controls::Controls,
+    database::{Database, LinkRequest, ReferenceType},
+    error::Error,
+    notification::NotificationBroadcast,
+    tracklist,
 };
-use qobuz_player_database::{Database, LinkRequest, ReferenceType};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

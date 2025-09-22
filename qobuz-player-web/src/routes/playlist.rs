@@ -53,7 +53,7 @@ async fn link(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl I
     };
     qobuz_player_rfid::link(
         rfid_state,
-        qobuz_player_database::LinkRequest::Playlist(id),
+        qobuz_player_controls::database::LinkRequest::Playlist(id),
         state.broadcast.clone(),
     )
     .await;

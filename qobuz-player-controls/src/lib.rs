@@ -6,6 +6,7 @@ use tokio::sync::watch;
 use crate::{error::Error, tracklist::Tracklist};
 pub mod client;
 pub mod controls;
+pub mod database;
 pub mod error;
 pub mod notification;
 pub mod player;

@@ -2,10 +2,9 @@ use std::{path::PathBuf, sync::Arc};
 
 use clap::{Parser, Subcommand};
 use qobuz_player_controls::{
-    AudioQuality, TracklistReceiver, VolumeReceiver, client::Client,
+    AudioQuality, TracklistReceiver, VolumeReceiver, client::Client, database::Database,
     notification::NotificationBroadcast, player::Player,
 };
-use qobuz_player_database::Database;
 use qobuz_player_rfid::RfidState;
 use snafu::prelude::*;
 
