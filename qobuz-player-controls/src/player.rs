@@ -8,6 +8,7 @@ use tokio::{
 use crate::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     controls::{ControlCommand, Controls},
+    database::Database,
     notification::NotificationBroadcast,
     timer::Timer,
     tracklist::{SingleTracklist, TracklistType},
@@ -36,6 +37,7 @@ pub struct Player {
     done_buffering: Receiver<()>,
     controls_rx: tokio::sync::mpsc::UnboundedReceiver<ControlCommand>,
     controls: Controls,
+    database: Arc<Database>,
 }
 
 impl Player {
@@ -45,6 +47,7 @@ impl Player {
         volume: f32,
         broadcast: Arc<NotificationBroadcast>,
         audio_cache_dir: PathBuf,
+        database: Arc<Database>,
     ) -> Result<Self> {
         let sink = Sink::new(volume, broadcast.clone(), audio_cache_dir)?;
 
@@ -75,6 +78,7 @@ impl Player {
             first_track_queried: false,
             track_finished,
             done_buffering,
+            database,
         })
     }
 
@@ -179,13 +183,15 @@ impl Player {
         self.sink.query_track_url(&track_url, track)
     }
 
-    fn set_volume(&self, volume: f32) -> Result<()> {
+    async fn set_volume(&self, volume: f32) -> Result<()> {
         self.sink.set_volume(volume);
         self.volume.send(volume)?;
+        self.database.set_volume(volume).await?;
         Ok(())
     }
 
-    fn broadcast_tracklist(&self, tracklist: Tracklist) -> Result<()> {
+    async fn broadcast_tracklist(&self, tracklist: Tracklist) -> Result<()> {
+        self.database.set_tracklist(&tracklist).await?;
         self.tracklist_tx.send(tracklist)?;
         Ok(())
     }
@@ -277,7 +283,7 @@ impl Player {
             self.position.send(Default::default())?;
         }
 
-        self.broadcast_tracklist(tracklist)?;
+        self.broadcast_tracklist(tracklist).await?;
 
         Ok(())
     }
@@ -310,7 +316,7 @@ impl Player {
             self.first_track_queried = true;
         }
 
-        self.broadcast_tracklist(tracklist)?;
+        self.broadcast_tracklist(tracklist).await?;
 
         Ok(())
     }
@@ -488,13 +494,13 @@ impl Player {
                 self.seek(time)?;
             }
             ControlCommand::SetVolume { volume } => {
-                self.set_volume(volume)?;
+                self.set_volume(volume).await?;
             }
         }
         Ok(())
     }
 
-    fn track_finished(&mut self) -> Result<()> {
+    async fn track_finished(&mut self) -> Result<()> {
         self.reset_timer();
         self.position_timer.reset();
         let mut tracklist = self.tracklist_rx.borrow().clone();
@@ -508,7 +514,7 @@ impl Player {
             self.position_timer.stop();
         };
         self.next_track_is_queried = false;
-        self.broadcast_tracklist(tracklist)?;
+        self.broadcast_tracklist(tracklist).await?;
         Ok(())
     }
 
@@ -530,7 +536,7 @@ impl Player {
                 }
 
                 Ok(_) = self.track_finished.changed() => {
-                    if let Err(err) = self.track_finished() {
+                    if let Err(err) = self.track_finished().await {
                         self.broadcast.send_error(format!("{err}"));
                     };
                 }

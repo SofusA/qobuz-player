@@ -2,8 +2,8 @@ use std::{path::PathBuf, sync::Arc};
 
 use clap::{Parser, Subcommand};
 use qobuz_player_controls::{
-    AudioQuality, TracklistReceiver, VolumeReceiver, client::Client, database::Database,
-    notification::NotificationBroadcast, player::Player,
+    AudioQuality, client::Client, database::Database, notification::NotificationBroadcast,
+    player::Player,
 };
 use qobuz_player_rfid::RfidState;
 use snafu::prelude::*;
@@ -204,6 +204,7 @@ pub async fn run() -> Result<(), Error> {
                 volume,
                 broadcast.clone(),
                 audio_cache,
+                database.clone(),
             )?;
 
             let rfid_state = rfid.then(RfidState::default);
@@ -270,17 +271,6 @@ pub async fn run() -> Result<(), Error> {
                 });
             }
 
-            let tracklist_receiver = player.tracklist();
-            let volume_receiver = player.volume();
-            let database_clone = database.clone();
-            tokio::spawn(async move {
-                if let Err(e) =
-                    store_state_loop(database_clone, tracklist_receiver, volume_receiver).await
-                {
-                    exit(!disable_tui && !rfid, e);
-                }
-            });
-
             if let Some(rfid_state) = rfid_state {
                 let tracklist_receiver = player.tracklist();
                 let controls = player.controls();
@@ -345,24 +335,24 @@ pub async fn run() -> Result<(), Error> {
     }
 }
 
-async fn store_state_loop(
-    database: Arc<Database>,
-    mut tracklist_receiver: TracklistReceiver,
-    mut volume_receiver: VolumeReceiver,
-) -> Result<(), Error> {
-    loop {
-        tokio::select! {
-            Ok(_) = volume_receiver.changed() => {
-                let volume = *volume_receiver.borrow_and_update();
-                database.set_volume(volume).await?;
-            }
-            Ok(_) = tracklist_receiver.changed() => {
-                let tracklist = tracklist_receiver.borrow_and_update().clone();
-                database.set_tracklist(&tracklist).await?;
-            },
-        }
-    }
-}
+// async fn store_state_loop(
+//     database: Arc<Database>,
+//     mut tracklist_receiver: TracklistReceiver,
+//     mut volume_receiver: VolumeReceiver,
+// ) -> Result<(), Error> {
+//     loop {
+//         tokio::select! {
+//             Ok(_) = volume_receiver.changed() => {
+//                 let volume = *volume_receiver.borrow_and_update();
+//                 database.set_volume(volume).await?;
+//             }
+//             Ok(_) = tracklist_receiver.changed() => {
+//                 let tracklist = tracklist_receiver.borrow_and_update().clone();
+//                 database.set_tracklist(&tracklist).await?;
+//             },
+//         }
+//     }
+// }
 
 fn exit(cli: bool, error: Error) {
     if cli {
