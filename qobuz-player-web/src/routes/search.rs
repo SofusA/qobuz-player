@@ -7,7 +7,7 @@ use axum::{
     routing::{get, put},
 };
 use leptos::{component, prelude::*};
-use qobuz_player_controls::models::{self, SearchResults};
+use qobuz_player_models::SearchResults;
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone, PartialEq)]
@@ -122,7 +122,7 @@ fn search_partial(search_results: SearchResults, tab: Tab) -> impl IntoView {
 }
 
 #[component]
-fn list_tracks(tracks: Vec<models::Track>) -> impl IntoView {
+fn list_tracks(tracks: Vec<qobuz_player_models::Track>) -> impl IntoView {
     html! {
         <List>
             {tracks
@@ -140,7 +140,7 @@ fn list_tracks(tracks: Vec<models::Track>) -> impl IntoView {
 }
 
 #[component]
-fn track(track: models::Track) -> impl IntoView {
+fn track(track: qobuz_player_models::Track) -> impl IntoView {
     html! {
         <button
             class="flex gap-4 items-center w-full cursor-pointer"

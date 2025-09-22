@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use qobuz_player_models::Track;
 use rodio::{decoder::DecoderBuilder, queue::queue};
 use tokio::fs;
 use tokio::sync::watch::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
 
 use crate::Result;
-use crate::models::Track;
 use crate::notification::NotificationBroadcast;
 
 pub struct Sink {

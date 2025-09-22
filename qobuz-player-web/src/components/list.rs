@@ -1,5 +1,5 @@
 use leptos::{IntoView, component, prelude::*};
-use qobuz_player_controls::models::{Album, AlbumSimple, Artist, Playlist, Track};
+use qobuz_player_models::{Album, AlbumSimple, Artist, Playlist, Track};
 
 use crate::{
     components::Info,

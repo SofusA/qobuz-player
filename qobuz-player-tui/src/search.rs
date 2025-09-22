@@ -1,10 +1,7 @@
 use std::{fmt, sync::Arc};
 
-use qobuz_player_controls::{
-    Result,
-    client::Client,
-    models::{Album, Artist, Playlist, Track},
-};
+use qobuz_player_controls::{Result, client::Client};
+use qobuz_player_models::{Album, Artist, Playlist, Track};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,

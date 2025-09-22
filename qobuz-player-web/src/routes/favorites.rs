@@ -6,7 +6,7 @@ use axum::{
     routing::get,
 };
 use leptos::{IntoView, component, prelude::*};
-use qobuz_player_controls::models::Favorites;
+use qobuz_player_models::Favorites;
 
 use crate::{
     AppState, ResponseResult,

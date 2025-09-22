@@ -7,7 +7,7 @@ use axum::{
     routing::{get, put},
 };
 use leptos::prelude::*;
-use qobuz_player_controls::models::{Playlist, Track};
+use qobuz_player_models::{Playlist, Track};
 
 use crate::{
     AppState, ResponseResult,

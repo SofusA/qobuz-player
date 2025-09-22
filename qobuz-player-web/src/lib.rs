@@ -13,9 +13,9 @@ use qobuz_player_controls::{
     client::Client,
     controls::Controls,
     error::Error,
-    models::{Album, AlbumSimple, Favorites, Playlist},
     notification::{Notification, NotificationBroadcast},
 };
+use qobuz_player_models::{Album, AlbumSimple, Favorites, Playlist};
 use qobuz_player_rfid::RfidState;
 use routes::{
     album, artist, auth, controls, discover, favorites, now_playing, playlist, queue, search,

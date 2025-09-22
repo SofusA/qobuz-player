@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
+qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
 ratatui = { workspace = true }
 ratatui-image = "*"

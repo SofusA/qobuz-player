@@ -1,4 +1,4 @@
-use qobuz_player_controls::models::{AlbumSimple, Playlist};
+use qobuz_player_models::{AlbumSimple, Playlist};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,

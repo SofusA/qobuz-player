@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 qobuz-player-client = { version = "*", path = "../qobuz-player-client" }
+qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
 tokio = { workspace = true }
 rand = { workspace = true }

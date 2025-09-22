@@ -1,4 +1,4 @@
-use qobuz_player_controls::models::AlbumSimple;
+use qobuz_player_models::AlbumSimple;
 use ratatui::{crossterm::event::KeyCode, prelude::*, widgets::*};
 
 use crate::{

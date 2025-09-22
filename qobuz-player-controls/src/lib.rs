@@ -7,7 +7,6 @@ use crate::{error::Error, tracklist::Tracklist};
 pub mod client;
 pub mod controls;
 pub mod error;
-pub mod models;
 pub mod notification;
 pub mod player;
 pub(crate) mod simple_cache;

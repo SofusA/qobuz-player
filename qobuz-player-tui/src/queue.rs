@@ -1,4 +1,4 @@
-use qobuz_player_controls::models::Track;
+use qobuz_player_models::{Track, TrackStatus};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
@@ -24,14 +24,10 @@ impl QueueState {
                 .enumerate()
                 .map(|(index, track)| {
                     let style = match track.status {
-                        qobuz_player_controls::models::TrackStatus::Played => {
-                            Style::default().add_modifier(Modifier::CROSSED_OUT)
-                        }
-                        qobuz_player_controls::models::TrackStatus::Playing => {
-                            Style::default().add_modifier(Modifier::BOLD)
-                        }
-                        qobuz_player_controls::models::TrackStatus::Unplayed => Style::default(),
-                        qobuz_player_controls::models::TrackStatus::Unplayable => {
+                        TrackStatus::Played => Style::default().add_modifier(Modifier::CROSSED_OUT),
+                        TrackStatus::Playing => Style::default().add_modifier(Modifier::BOLD),
+                        TrackStatus::Unplayed => Style::default(),
+                        TrackStatus::Unplayable => {
                             Style::default().add_modifier(Modifier::CROSSED_OUT)
                         }
                     };

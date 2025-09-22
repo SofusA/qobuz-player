@@ -1,4 +1,4 @@
-use qobuz_player_controls::models::{Album, AlbumSimple};
+use qobuz_player_models::{Album, AlbumSimple};
 use ratatui::{layout::Flex, prelude::*, widgets::*};
 use tui_input::Input;
 

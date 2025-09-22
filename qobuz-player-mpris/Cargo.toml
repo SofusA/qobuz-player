@@ -7,6 +7,7 @@ repository.workspace = true
 
 [dependencies]
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
+qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
 mpris-server = { git = "https://github.com/SeaDve/mpris-server", features = ["tokio"] }
 tokio = { workspace = true }

@@ -7,7 +7,7 @@ use axum::{
     routing::{get, put},
 };
 use leptos::prelude::*;
-use qobuz_player_controls::models::{self, AlbumSimple, Artist, ArtistPage};
+use qobuz_player_models::{AlbumSimple, Artist, ArtistPage, Track};
 use tokio::try_join;
 
 use crate::{
@@ -196,11 +196,7 @@ fn artist(
 }
 
 #[component]
-fn list_tracks(
-    artist_id: u32,
-    tracks: Vec<models::Track>,
-    now_playing_id: Option<u32>,
-) -> impl IntoView {
+fn list_tracks(artist_id: u32, tracks: Vec<Track>, now_playing_id: Option<u32>) -> impl IntoView {
     tracks
         .into_iter()
         .enumerate()
@@ -212,7 +208,7 @@ fn list_tracks(
 }
 
 #[component]
-fn track(artist_id: u32, track: models::Track, index: usize, is_playing: bool) -> impl IntoView {
+fn track(artist_id: u32, track: Track, index: usize, is_playing: bool) -> impl IntoView {
     html! {
         <button
             class="flex gap-4 items-center w-5/6 max-w-lg rounded cursor-pointer"

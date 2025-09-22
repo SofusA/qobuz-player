@@ -1,17 +1,13 @@
 use moka::future::Cache;
 use qobuz_player_client::client::AudioQuality;
+use qobuz_player_models::{
+    Album, AlbumSimple, Artist, ArtistPage, Favorites, Playlist, SearchResults, Track,
+};
 use std::sync::OnceLock;
 use time::Duration;
 use tokio::sync::Mutex;
 
-use crate::{
-    error::Error,
-    models::{
-        self, Album, AlbumSimple, Artist, ArtistPage, Favorites, Playlist, SearchResults, Track,
-        parse_album, parse_album_simple, parse_track,
-    },
-    simple_cache::SimpleCache,
-};
+use crate::{error::Error, simple_cache::SimpleCache};
 
 type QobuzClient = qobuz_player_client::client::Client;
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -130,7 +126,6 @@ impl Client {
 
         let client = self.get_client().await?;
         let album = client.album(id).await?;
-        let album = parse_album(album, &self.max_audio_quality);
 
         self.album_cache.insert(id.to_string(), album.clone()).await;
 
@@ -143,10 +138,7 @@ impl Client {
         }
 
         let client = self.get_client().await?;
-        let user_id = client.get_user_id();
-
         let results = client.search_all(&query, 20).await?;
-        let results = models::parse_search_results(results, user_id, &self.max_audio_quality);
 
         self.search_cache.insert(query, results.clone()).await;
         Ok(results)
@@ -159,7 +151,6 @@ impl Client {
 
         let client = self.get_client().await?;
         let artist = client.artist(id).await?;
-        let artist: ArtistPage = artist.into();
 
         self.artist_cache.insert(id, artist.clone()).await;
         Ok(artist)
@@ -171,21 +162,12 @@ impl Client {
         }
 
         let client = self.get_client().await?;
-        let similar_artists = client.similar_artists(id, None).await?;
-
-        Ok(similar_artists
-            .items
-            .into_iter()
-            .map(|s_a| s_a.into())
-            .collect())
+        Ok(client.similar_artists(id, None).await?)
     }
 
     pub async fn track(&self, id: u32) -> Result<Track> {
         let client = self.get_client().await?;
-        Ok(parse_track(
-            client.track(id).await?,
-            &self.max_audio_quality,
-        ))
+        Ok(client.track(id).await?)
     }
 
     pub async fn suggested_albums(&self, id: &str) -> Result<Vec<AlbumSimple>> {
@@ -195,13 +177,6 @@ impl Client {
 
         let client = self.get_client().await?;
         let suggested_albums = client.suggested_albums(id).await?;
-
-        let suggested_albums: Vec<_> = suggested_albums
-            .albums
-            .items
-            .into_iter()
-            .map(|x| parse_album_simple(x, &self.max_audio_quality))
-            .collect();
 
         self.suggested_albums_cache
             .insert(id.to_string(), suggested_albums.clone())
@@ -218,31 +193,6 @@ impl Client {
         let client = self.get_client().await?;
         let featured = client.featured_albums().await?;
 
-        let featured: Vec<_> = featured
-            .into_iter()
-            .map(|featured| {
-                let featured_type = featured.0;
-
-                let albums = featured
-                    .1
-                    .albums
-                    .items
-                    .into_iter()
-                    .map(|value| AlbumSimple {
-                        id: value.id,
-                        title: value.title,
-                        artist: value.artist.into(),
-                        hires_available: value.hires_streamable,
-                        explicit: value.parental_warning,
-                        available: value.streamable,
-                        image: value.image.large,
-                    })
-                    .collect::<Vec<_>>();
-
-                (featured_type, albums)
-            })
-            .collect();
-
         self.featured_albums_cache.set(featured.clone()).await;
 
         Ok(featured)
@@ -254,26 +204,7 @@ impl Client {
         }
 
         let client = self.get_client().await?;
-        let user_id = client.get_user_id();
         let featured = client.featured_playlists().await?;
-
-        let featured: Vec<_> = featured
-            .into_iter()
-            .map(|featured| {
-                let featured_type = featured.0;
-                let playlists = featured
-                    .1
-                    .playlists
-                    .items
-                    .into_iter()
-                    .map(|playlist| {
-                        models::parse_playlist(playlist, user_id, &self.max_audio_quality)
-                    })
-                    .collect();
-
-                (featured_type, playlists)
-            })
-            .collect();
 
         self.featured_playlists_cache.set(featured.clone()).await;
 
@@ -286,10 +217,7 @@ impl Client {
         }
 
         let client = self.get_client().await?;
-        let user_id = client.get_user_id();
         let playlist = client.playlist(id).await?;
-
-        let playlist = models::parse_playlist(playlist, user_id, &self.max_audio_quality);
 
         self.playlist_cache.insert(id, playlist.clone()).await;
         Ok(playlist)
@@ -302,8 +230,6 @@ impl Client {
 
         let client = self.get_client().await?;
         let albums = client.artist_releases(id, None).await?;
-
-        let albums: Vec<_> = albums.into_iter().map(|release| release.into()).collect();
 
         self.artist_albums_cache.insert(id, albums.clone()).await;
 
@@ -358,51 +284,10 @@ impl Client {
         }
 
         let client = self.get_client().await?;
-        let (favorites, favorite_playlists) = tokio::join!(
-            client.favorites(1000),
-            user_playlists(client, &self.max_audio_quality)
-        );
 
-        let mut favorite_playlists = favorite_playlists.unwrap_or_default();
-
-        let qobuz_player_client::qobuz_models::favorites::Favorites {
-            albums,
-            tracks: _,
-            artists,
-        } = favorites?;
-        let mut albums = albums.items;
-        albums.sort_by(|a, b| a.artist.name.cmp(&b.artist.name));
-
-        let mut artists = artists.items;
-        artists.sort_by(|a, b| a.name.cmp(&b.name));
-
-        favorite_playlists.sort_by(|a, b| a.title.cmp(&b.title));
-
-        let favorites = Favorites {
-            albums: albums
-                .into_iter()
-                .map(|x| parse_album(x, &self.max_audio_quality))
-                .collect(),
-            artists: artists.into_iter().map(|x| x.into()).collect(),
-            playlists: favorite_playlists,
-        };
+        let favorites = client.favorites(1000).await?;
 
         self.favorites_cache.set(favorites.clone()).await;
         Ok(favorites)
     }
-}
-
-async fn user_playlists(
-    client: &QobuzClient,
-    max_audio_quality: &AudioQuality,
-) -> Result<Vec<Playlist>> {
-    let user_id = client.get_user_id();
-    let playlists = client.user_playlists().await?;
-
-    Ok(playlists
-        .playlists
-        .items
-        .into_iter()
-        .map(|playlist| models::parse_playlist(playlist, user_id, max_audio_quality))
-        .collect())
 }

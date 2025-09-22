@@ -6,6 +6,8 @@ license-file.workspace = true
 repository.workspace = true
 
 [dependencies]
+qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
+
 base64 = { workspace = true }
 time = { workspace = true }
 md5 = { workspace = true }

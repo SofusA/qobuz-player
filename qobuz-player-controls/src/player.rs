@@ -1,3 +1,4 @@
+use qobuz_player_models::{Album, Track, TrackStatus};
 use rand::seq::SliceRandom;
 use tokio::{
     select,
@@ -7,7 +8,6 @@ use tokio::{
 use crate::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     controls::{ControlCommand, Controls},
-    models::{Album, Track, TrackStatus},
     notification::NotificationBroadcast,
     timer::Timer,
     tracklist::{SingleTracklist, TracklistType},
