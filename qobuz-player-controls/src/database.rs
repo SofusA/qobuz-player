@@ -2,7 +2,7 @@ use crate::{AudioQuality, Error, Result, Tracklist};
 use serde_json::to_string;
 use sqlx::types::Json;
 use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::debug;
 
 pub struct Database {
@@ -245,26 +245,40 @@ impl Database {
         }
     }
 
-    pub async fn clean_up_cache_entries(&self, older_than: time::Duration) {
+    pub async fn clean_up_cache_entries(&self, older_than: time::Duration) -> Result<Vec<PathBuf>> {
         let cutoff = time::OffsetDateTime::now_utc() - older_than;
-
         let cutoff_str = cutoff
             .format(&time::format_description::well_known::Rfc3339)
             .expect("infailable");
 
+        let rows = sqlx::query!(
+            "SELECT path FROM cache_entries WHERE last_opened < ?",
+            cutoff_str
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
         sqlx::query!(
-            "DELETE FROM cache_entries WHERE last_opened > ?",
+            "DELETE FROM cache_entries WHERE last_opened < ?",
             cutoff_str
         )
         .execute(&self.pool)
-        .await
-        .expect("infailable");
+        .await?;
+
+        let paths: Vec<PathBuf> = rows
+            .into_iter()
+            .map(|row| PathBuf::from(row.path))
+            .collect();
+
+        Ok(paths)
     }
 
-    pub async fn set_cache_entry(&self, track_id: u32, path: &str) {
+    pub async fn set_cache_entry(&self, track_id: u32, path: &Path) {
         let now = time::OffsetDateTime::now_utc()
             .format(&time::format_description::well_known::Rfc3339)
             .expect("infailable");
+
+        let path_str: String = path.to_string_lossy().into_owned();
 
         sqlx::query!(
             r#"
@@ -275,7 +289,7 @@ impl Database {
                     last_opened = excluded.last_opened
             "#,
             track_id,
-            path,
+            path_str,
             now
         )
         .execute(&self.pool)
@@ -374,8 +388,10 @@ mod tests {
     async fn clean_up_cache_entries(pool: sqlx::Pool<sqlx::Sqlite>) {
         let db = Database::init(pool).await.unwrap();
 
-        db.set_cache_entry(1, "path/old").await;
-        db.set_cache_entry(2, "path/new").await;
+        let old_path = Path::new("path/old");
+        let new_path = Path::new("path/new");
+        db.set_cache_entry(1, old_path).await;
+        db.set_cache_entry(2, new_path).await;
 
         let old_time = OffsetDateTime::now_utc() - Duration::days(10);
         let old_time = old_time
@@ -391,7 +407,7 @@ mod tests {
         .await
         .unwrap();
 
-        db.clean_up_cache_entries(Duration::days(5)).await;
+        let deleted = db.clean_up_cache_entries(Duration::days(5)).await.unwrap();
 
         let remaining: Vec<u32> = sqlx::query!("SELECT track_id FROM cache_entries")
             .fetch_all(&db.pool)
@@ -401,6 +417,7 @@ mod tests {
             .map(|row| row.track_id as u32)
             .collect();
 
-        assert_eq!(remaining, vec![1], "Only the old entry should remain");
+        assert_eq!(remaining, vec![2]);
+        assert_eq!(deleted, vec![old_path]);
     }
 }

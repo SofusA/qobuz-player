@@ -322,9 +322,14 @@ pub async fn run() -> Result<(), Error> {
                 let clean_up_schedule = every(1).hour().perform(move || {
                     let database = database.clone();
                     async move {
-                        database
+                        if let Ok(deleted_paths) = database
                             .clean_up_cache_entries(time::Duration::hours(1))
-                            .await;
+                            .await
+                        {
+                            for path in deleted_paths {
+                                _ = tokio::fs::remove_file(path.as_path()).await;
+                            }
+                        };
                     }
                 });
 

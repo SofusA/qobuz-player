@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM cache_entries WHERE last_opened < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9ba32a9b605ebda49d00b50ba14733a82cbcd5b1732938c8d5c2374065587c11"
+}

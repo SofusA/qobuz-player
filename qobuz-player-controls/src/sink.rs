@@ -139,7 +139,7 @@ impl Sink {
 
         let handle = tokio::spawn(async move {
             database
-                .set_cache_entry(track_id, cache_path.to_str().expect("infailable"))
+                .set_cache_entry(track_id, cache_path.as_path())
                 .await;
 
             let maybe_cached_bytes = (fs::read(&cache_path).await).ok();
