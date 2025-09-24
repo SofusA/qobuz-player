@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE cache_entries SET last_opened = ? WHERE path = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "530723639ce2782f02f1bbdfb19c58699ce72ec37f11013e35e933439a88e880"
+}

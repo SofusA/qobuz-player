@@ -2,13 +2,14 @@ use crate::{
     Error, Result,
     qobuz_models::{
         TrackURL,
-        album_suggestion::{AlbumOfTheWeekQuery, AlbumSuggestion, AlbumSuggestionResponse},
+        album_suggestion::{
+            AlbumOfTheWeekQuery, AlbumSuggestion, AlbumSuggestionResponse, ReleaseQuery,
+        },
         artist::{self, ArtistsResponse},
         artist_page,
         favorites::Favorites,
         featured::{FeaturedAlbumsResponse, FeaturedPlaylistsResponse},
         playlist::{self, UserPlaylistsResult},
-        release::{Release, ReleaseQuery},
         search_results::SearchAllResults,
         track,
     },
@@ -431,7 +432,7 @@ impl Client {
                 .into_iter()
                 .map(|x| parse_album(x, &self.max_audio_quality))
                 .collect(),
-            artists: artists.into_iter().map(from_api_artist_to_artist).collect(),
+            artists: artists.into_iter().map(parse_artist).collect(),
             playlists: favorite_playlists,
         })
     }
@@ -557,7 +558,7 @@ impl Client {
 
         let response = get!(self, &endpoint, Some(&params))?;
 
-        Ok(from_api_artist_page_to_artist_page(response))
+        Ok(parse_artist_page(response))
     }
 
     pub async fn similar_artists(
@@ -582,7 +583,7 @@ impl Client {
             .map(|res| res.artists)?
             .items
             .into_iter()
-            .map(from_api_artist_to_artist)
+            .map(parse_artist)
             .collect())
     }
 
@@ -610,7 +611,7 @@ impl Client {
 
         Ok(response
             .into_iter()
-            .map(from_release_to_album_simple)
+            .map(|s| parse_album_simple(s, &self.max_audio_quality))
             .collect())
     }
 
@@ -955,7 +956,7 @@ fn parse_featured_albums(
                 .map(|value| qobuz_player_models::AlbumSimple {
                     id: value.id,
                     title: value.title,
-                    artist: from_api_artist_to_artist(value.artist),
+                    artist: parse_artist(value.artist),
                     hires_available: value.hires_streamable,
                     explicit: value.parental_warning,
                     available: value.streamable,
@@ -1007,7 +1008,7 @@ fn parse_search_results(
             .artists
             .items
             .into_iter()
-            .map(from_api_artist_to_artist)
+            .map(parse_artist)
             .collect(),
         playlists: search_results
             .playlists
@@ -1021,22 +1022,6 @@ fn parse_search_results(
             .into_iter()
             .map(|t| parse_track(t, max_audio_quality))
             .collect(),
-    }
-}
-
-fn from_release_to_album_simple(release: Release) -> qobuz_player_models::AlbumSimple {
-    qobuz_player_models::AlbumSimple {
-        id: release.id,
-        title: release.title,
-        artist: qobuz_player_models::Artist {
-            id: release.artist.id,
-            name: release.artist.name.display,
-            ..Default::default()
-        },
-        image: release.image.large,
-        available: release.rights.streamable,
-        hires_available: release.rights.hires_streamable,
-        explicit: release.parental_warning,
     }
 }
 
@@ -1102,7 +1087,7 @@ fn parse_album(
     qobuz_player_models::Album {
         id: value.id,
         title: value.title,
-        artist: from_api_artist_to_artist(value.artist),
+        artist: parse_artist(value.artist),
         total_tracks: value.tracks_count as u32,
         release_year: year
             .to_string()
@@ -1153,9 +1138,7 @@ fn image_to_string(value: artist_page::Image) -> String {
     )
 }
 
-fn from_api_artist_page_to_artist_page(
-    value: artist_page::ArtistPage,
-) -> qobuz_player_models::ArtistPage {
+fn parse_artist_page(value: artist_page::ArtistPage) -> qobuz_player_models::ArtistPage {
     let artist_image_url = value.images.portrait.map(image_to_string);
 
     qobuz_player_models::ArtistPage {
@@ -1190,7 +1173,7 @@ fn from_api_artist_page_to_artist_page(
     }
 }
 
-fn from_api_artist_to_artist(value: artist::Artist) -> qobuz_player_models::Artist {
+fn parse_artist(value: artist::Artist) -> qobuz_player_models::Artist {
     qobuz_player_models::Artist {
         id: value.id,
         name: value.name,
@@ -1241,10 +1224,7 @@ fn parse_track(
             image: None,
         })
     } else {
-        value
-            .album
-            .as_ref()
-            .map(|a| from_api_artist_to_artist(a.clone().artist))
+        value.album.as_ref().map(|a| parse_artist(a.clone().artist))
     };
 
     let image = value.album.as_ref().map(|a| a.image.large.clone());

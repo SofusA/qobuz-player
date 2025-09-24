@@ -3,7 +3,6 @@ use serde_json::to_string;
 use sqlx::types::Json;
 use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 use std::path::{Path, PathBuf};
-use tracing::debug;
 
 pub struct Database {
     pool: Pool<Sqlite>,
@@ -29,8 +28,6 @@ impl Database {
 
             url
         };
-
-        debug!("DATABASE_URL: {}", database_url.to_string_lossy());
 
         let options = SqliteConnectOptions::new()
             .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)

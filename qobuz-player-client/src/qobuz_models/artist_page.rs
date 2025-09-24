@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use super::{
-    artist::OtherArtists,
-    release::{Artist, AudioInfo, PhysicalSupport, Rights},
-};
+use crate::qobuz_models::album_suggestion::{Artist, AudioInfo, PhysicalSupport, Rights};
+
+use super::artist::OtherArtists;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArtistName {

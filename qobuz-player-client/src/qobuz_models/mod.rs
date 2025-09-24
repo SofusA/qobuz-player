@@ -8,7 +8,6 @@ pub mod artist_page;
 pub mod favorites;
 pub mod featured;
 pub mod playlist;
-pub mod release;
 pub mod search_results;
 pub mod track;
 
