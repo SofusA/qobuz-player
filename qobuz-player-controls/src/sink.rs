@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use qobuz_player_client::qobuz_models::TrackURL;
 use qobuz_player_models::Track;
 use rodio::{decoder::DecoderBuilder, queue::queue};
 use tokio::fs;
@@ -14,15 +15,16 @@ use crate::database::Database;
 use crate::notification::NotificationBroadcast;
 
 pub struct Sink {
-    stream_handle: rodio::OutputStream,
-    sink: rodio::Sink,
-    sender: Arc<rodio::queue::SourcesQueueInput>,
+    stream_handle: Option<rodio::OutputStream>,
+    sink: Option<rodio::Sink>,
+    sender: Option<Arc<rodio::queue::SourcesQueueInput>>,
     current_download: Arc<Mutex<Option<JoinHandle<()>>>>,
     track_finished_tx: Sender<()>,
     done_buffering_tx: Sender<()>,
     broadcast: Arc<NotificationBroadcast>,
     audio_cache_dir: PathBuf,
     database: Arc<Database>,
+    volume: f32,
 }
 
 impl Sink {
@@ -32,27 +34,20 @@ impl Sink {
         audio_cache_dir: PathBuf,
         database: Arc<Database>,
     ) -> Result<Self> {
-        let mut stream_handle = rodio::OutputStreamBuilder::open_default_stream()?;
-        stream_handle.log_on_drop(false);
-        let (sender, receiver) = queue(true);
-
-        let sink = rodio::Sink::connect_new(stream_handle.mixer());
-        sink.append(receiver);
-        set_volume(&sink, volume);
-
         let (track_finished_tx, _) = watch::channel(());
         let (done_buffering_tx, _) = watch::channel(());
 
         Ok(Self {
-            sink,
-            stream_handle,
-            sender,
+            sink: Default::default(),
+            stream_handle: Default::default(),
+            sender: Default::default(),
             current_download: Default::default(),
             track_finished_tx,
             done_buffering_tx,
             broadcast,
             audio_cache_dir,
             database,
+            volume,
         })
     }
 
@@ -69,40 +64,57 @@ impl Sink {
             handle.abort();
         }
 
-        let volume = self.sink.volume();
-
-        let (sender, receiver) = queue(true);
-        let sink = rodio::Sink::connect_new(self.stream_handle.mixer());
-        sink.append(receiver);
-        sink.set_volume(volume);
-
-        self.sink = sink;
-        self.sender = sender;
+        self.sink = None;
+        self.sender = None;
+        self.stream_handle = None;
 
         Ok(())
     }
 
     pub fn play(&self) {
-        self.sink.play();
+        if let Some(sink) = &self.sink {
+            sink.play();
+        }
     }
 
     pub fn pause(&self) {
-        self.sink.pause();
+        if let Some(sink) = &self.sink {
+            sink.pause();
+        }
     }
 
     pub fn seek(&self, duration: Duration) -> Result<()> {
-        self.sink.try_seek(duration)?;
+        if let Some(sink) = &self.sink {
+            sink.try_seek(duration)?;
+        }
 
         Ok(())
     }
 
-    pub fn query_track_url(&self, track_url: &str, track: &Track) -> Result<()> {
+    pub fn query_track_url(&mut self, track_url: TrackURL, track: &Track) -> Result<bool> {
         if let Some(handle) = self.current_download.lock()?.take() {
             handle.abort();
         }
 
-        let track_url = track_url.to_string();
-        let sender = self.sender.clone();
+        let sample_rate = (track_url.sampling_rate * 1000.0) as u32;
+
+        if self.stream_handle.is_none() || self.sink.is_none() || self.sender.is_none() {
+            let mut stream_handle = rodio::OutputStreamBuilder::from_default_device()?
+                .with_sample_rate(sample_rate)
+                .open_stream()?;
+            stream_handle.log_on_drop(false);
+
+            let (sender, receiver) = queue(true);
+            let sink = rodio::Sink::connect_new(stream_handle.mixer());
+            sink.append(receiver);
+            sink.set_volume(self.volume);
+            self.sink = Some(sink);
+            self.sender = Some(sender);
+            self.stream_handle = Some(stream_handle);
+        }
+
+        let track_url_url = track_url.url;
+        let sender = self.sender.as_ref().unwrap().clone();
         let track_finished_tx = self.track_finished_tx.clone();
         let done_buffering_tx = self.done_buffering_tx.clone();
         let broadcast = self.broadcast.clone();
@@ -143,7 +155,7 @@ impl Sink {
             let bytes: Vec<u8> = if let Some(bytes) = maybe_cached_bytes {
                 bytes
             } else {
-                let Ok(resp) = reqwest::get(&track_url).await else {
+                let Ok(resp) = reqwest::get(&track_url_url).await else {
                     broadcast.send_error("Unable to get track audio file".to_string());
                     return;
                 };
@@ -192,11 +204,15 @@ impl Sink {
         });
 
         *self.current_download.lock()? = Some(handle);
-        Ok(())
+
+        Ok(sample_rate == self.stream_handle.as_ref().unwrap().config().sample_rate())
     }
 
-    pub fn set_volume(&self, volume: f32) {
-        set_volume(&self.sink, volume);
+    pub fn set_volume(&mut self, volume: f32) {
+        self.volume = volume;
+        if let Some(sink) = &self.sink {
+            set_volume(sink, volume);
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 use moka::future::Cache;
-use qobuz_player_client::client::AudioQuality;
+use qobuz_player_client::{client::AudioQuality, qobuz_models::TrackURL};
 use qobuz_player_models::{
     Album, AlbumSimple, Artist, ArtistPage, Favorites, Playlist, SearchResults, Track,
 };
@@ -114,7 +114,7 @@ impl Client {
         })
     }
 
-    pub(crate) async fn track_url(&self, track_id: u32) -> Result<String> {
+    pub(crate) async fn track_url(&self, track_id: u32) -> Result<TrackURL> {
         let client = self.get_client().await?;
         Ok(client.track_url(track_id).await?)
     }

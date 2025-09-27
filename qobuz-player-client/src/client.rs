@@ -389,7 +389,7 @@ impl Client {
     //     post!(self, &endpoint, form_data)
     // }
 
-    pub async fn track_url(&self, track_id: u32) -> Result<String> {
+    pub async fn track_url(&self, track_id: u32) -> Result<TrackURL> {
         track_url(
             track_id,
             &self.active_secret,
@@ -400,7 +400,6 @@ impl Client {
             &self.max_audio_quality,
         )
         .await
-        .map(|u| u.url)
     }
 
     pub async fn favorites(&self, limit: i32) -> Result<qobuz_player_models::Favorites> {
