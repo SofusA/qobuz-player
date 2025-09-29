@@ -3371,7 +3371,7 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "clap",
  "qobuz-player-client",
@@ -3392,9 +3392,9 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player-client"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.21.7",
  "clap",
  "md5",
  "qobuz-player-models",
@@ -3411,14 +3411,14 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player-controls"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "dirs",
  "md5",
  "moka",
  "qobuz-player-client",
  "qobuz-player-models",
- "rand 0.9.2",
+ "rand 0.8.5",
  "reqwest",
  "rodio",
  "serde",
@@ -3432,7 +3432,7 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player-gpio"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "qobuz-player-controls",
  "rppal",
@@ -3441,14 +3441,14 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player-models"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "qobuz-player-mpris"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "mpris-server",
  "qobuz-player-controls",
@@ -3458,7 +3458,7 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player-rfid"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "qobuz-player-controls",
  "tokio",
@@ -3467,7 +3467,7 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player-tui"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "image",
  "qobuz-player-controls",
@@ -3481,7 +3481,7 @@ dependencies = [
 
 [[package]]
 name = "qobuz-player-web"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "axum",
  "axum-extra",
@@ -4197,9 +4197,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.226"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dca6411025b24b60bfa7ec1fe1f8e710ac09782dca409ee8237ba74b51295fd"
+checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
@@ -4207,18 +4207,18 @@ dependencies = [
 
 [[package]]
 name = "serde_core"
-version = "1.0.226"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba2ba63999edb9dac981fb34b3e5c0d111a69b0924e253ed29d83f7c99e966a4"
+checksum = "41d385c7d4ca58e59fc732af25c3983b67ac852c1a25000afe1175de458b67ad"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.226"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8db53ae22f34573731bafa1db20f04027b2d25e02d8205921b569171699cdb33"
+checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
