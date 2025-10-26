@@ -218,12 +218,15 @@ pub(crate) fn block(title: &str, selectable: bool) -> Block<'_> {
         .border_type(BorderType::Rounded)
 }
 
+const MAX_ROW_LENGTH: usize = 50;
+
 pub(crate) fn album_table<'a>(rows: &[Album], title: &'a str) -> Table<'a> {
     let max_title_length = rows
         .iter()
         .map(|album| album.title.len())
         .max()
-        .unwrap_or(0);
+        .unwrap_or(0)
+        .min(MAX_ROW_LENGTH);
 
     let max_artist_name_length = rows
         .iter()
@@ -235,7 +238,7 @@ pub(crate) fn album_table<'a>(rows: &[Album], title: &'a str) -> Table<'a> {
         .iter()
         .map(|album| {
             Row::new(vec![
-                Span::from(album.title.clone()),
+                Span::from(trim_long_name(album.title.clone(), album.title.len())),
                 Span::from(album.artist.name.clone()),
                 Span::from(album.release_year.to_string()),
             ])
@@ -277,7 +280,7 @@ pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple], title: &'a str) -> Ta
         .iter()
         .map(|album| {
             Row::new(vec![
-                Span::from(album.title.clone()),
+                Span::from(trim_long_name(album.title.clone(), album.title.len())),
                 Span::from(album.artist.name.clone()),
             ])
         })
@@ -304,4 +307,12 @@ pub(crate) fn basic_list_table<'a>(rows: Vec<Row<'a>>, title: &'a str) -> Table<
     Table::new(rows, [Constraint::Min(1)])
         .block(block(title, true))
         .row_highlight_style(ROW_HIGHLIGHT_STYLE)
+}
+
+fn trim_long_name(title: String, length: usize) -> String {
+    if length > MAX_ROW_LENGTH {
+        title[..MAX_ROW_LENGTH].to_string()
+    } else {
+        title
+    }
 }
