@@ -1115,7 +1115,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1254,7 +1254,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2221,9 +2221,9 @@ checksum = "7a79a3332a6609480d7d0c9eab957bca6b455b91bb84e66d19f5ff66294b85b8"
 
 [[package]]
 name = "leptos"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de48e23f7d411ab2f048e2b8f34839c81f6db88489377b045c1099e7e828149e"
+checksum = "9d916b7c270615f493e43a43c389725094b8e08eb635fe2469c5c767750c62a0"
 dependencies = [
  "any_spawner",
  "cfg-if",
@@ -2306,9 +2306,9 @@ dependencies = [
 
 [[package]]
 name = "leptos_macro"
-version = "0.8.9"
+version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2ef164285bdd94acb91a57a47f26c4ee3f37fc351e67a67642efb74bc3e198"
+checksum = "18e29d53c342a1ebb63c4578b4d398057a25967166e7eaa3759f25bb74263472"
 dependencies = [
  "attribute-derive",
  "cfg-if",
@@ -2719,7 +2719,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3712,9 +3712,9 @@ dependencies = [
 
 [[package]]
 name = "reactive_graph"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e907f9b4c1ba69f3cd47c85f0d8cacafe681ff2b7cda91ff7d3c1a26432d249"
+checksum = "77cbe7c61b939523104883fd00d431f6c681c7005fd350f01a9ff2fc96509399"
 dependencies = [
  "any_spawner",
  "async-lock",
@@ -3735,9 +3735,9 @@ dependencies = [
 
 [[package]]
 name = "reactive_stores"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79983e88dfd1a2925e29a4853ab9161b234ea78dd0d44ed33a706c9cd5e35762"
+checksum = "25b73d94139821e0a2f31fb4e0eaf6ebbcf4d15c5e2fb353dc3babd4f6d35674"
 dependencies = [
  "dashmap",
  "guardian",
@@ -4009,7 +4009,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4229,9 +4229,9 @@ dependencies = [
 
 [[package]]
 name = "server_fn"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f77e178602e84703fd88cc3633b11bfcdcca51def9004ed467387a52e1434ba"
+checksum = "fdc30228718f62d80a376964baf990edbcb5e97688fdc71183a8ef3d44cb6c89"
 dependencies = [
  "base64",
  "bytes",
@@ -4263,9 +4263,9 @@ dependencies = [
 
 [[package]]
 name = "server_fn_macro"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d1a916793571234d1c4622153d42495d26605ed7b9d5d38a2699666cfef46b3"
+checksum = "950b8cfc9ff5f39ca879c5a7c5e640de2695a199e18e424c3289d0964cabe642"
 dependencies = [
  "const_format",
  "convert_case 0.8.0",
@@ -4925,9 +4925,9 @@ dependencies = [
 
 [[package]]
 name = "tachys"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b7c22c0a3e8ab7afc9ac34448031316f2e9416f4d489431c5d997a47075fa95"
+checksum = "f88be37609c1891b748ed1feb9b08b0e772156a80d586b38726253f80859134d"
 dependencies = [
  "any_spawner",
  "async-trait",
@@ -4979,7 +4979,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5033,9 +5033,9 @@ dependencies = [
 
 [[package]]
 name = "throw_error"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41e42a6afdde94f3e656fae18f837cb9bbe500a5ac5de325b09f3ec05b9c28e3"
+checksum = "dc0ed6038fcbc0795aca7c92963ddda636573b956679204e044492d2b13c8f64"
 dependencies = [
  "pin-project-lite",
 ]
@@ -5822,7 +5822,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
