@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@plugin "tailwindcss-safe-area";
+
+html {
+  min-height: calc(100% + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.my-indicator {
+  opacity: 0;
+  transition: opacity 150ms ease-in;
+  transition-delay: 200ms;
+}
+.htmx-request.my-indicator {
+  opacity: 1;
+}

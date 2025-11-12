@@ -1,4 +1,11 @@
 [[language]]
-name = "rust"
-formatter = { command = "leptosfmt", args = ["--stdin", "--override-macro-names", "html", "--experimental-tailwind", "--rustfmt"] }
-language-servers = ["rust-analyzer", "typos", "tailwindcss-ls"]
+name = "glimmer"
+scope = "source.glimmer"
+injection-regex = "hbs"
+file-types = ["hbs"]
+block-comment-tokens = { start = "{{!", end = "}}" }
+roots = ["Cargo.toml", "Cargo.lock"]
+grammar = "glimmer"
+language-servers = []
+formatter = { command = "prettier", args = ['--parser', 'angular'] }
+auto-format = true

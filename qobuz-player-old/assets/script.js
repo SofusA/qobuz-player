@@ -3,12 +3,8 @@ let evtSource;
 function initSse() {
   evtSource = new EventSource("/sse");
 
-  evtSource.addEventListener("reload", (_event) => {
-    console.warn("Reload event");
-    location.reload();
-  });
-
   evtSource.addEventListener("status", (_event) => {
+    console.warn("status event");
     const elements = document.querySelectorAll("[data-sse=status]");
 
     for (const element of elements) {

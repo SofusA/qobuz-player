@@ -1,0 +1,10 @@
+pub(crate) mod album;
+pub(crate) mod artist;
+pub(crate) mod auth;
+pub(crate) mod controls;
+pub(crate) mod discover;
+pub(crate) mod favorites;
+pub(crate) mod now_playing;
+pub(crate) mod playlist;
+pub(crate) mod queue;
+pub(crate) mod search;

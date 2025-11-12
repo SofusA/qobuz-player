@@ -15,10 +15,7 @@ axum = { workspace = true }
 axum-extra = { workspace = true }
 time = { workspace = true }
 futures = { workspace = true }
-handlebars = "6.3.2"
-notify = "8.2.0"
-filesentry = "0.2.1"
-serde_json.workspace = true
+leptos = { workspace = true }
 mime = { workspace = true }
 mime_guess = { workspace = true }
 tokio = { workspace = true }

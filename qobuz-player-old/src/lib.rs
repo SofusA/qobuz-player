@@ -6,7 +6,8 @@ use axum::{
     routing::get,
 };
 use futures::stream::Stream;
-use handlebars::Handlebars;
+use leptos::*;
+use leptos::{html::*, prelude::RenderHtml};
 use qobuz_player_controls::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
@@ -16,17 +17,10 @@ use qobuz_player_controls::{
 };
 use qobuz_player_models::{Album, AlbumSimple, Favorites, Playlist};
 use qobuz_player_rfid::RfidState;
-use rust_embed::RustEmbed;
-// use routes::{
-//     album, artist, auth, controls, discover, favorites, now_playing, playlist, queue, search,
-// };
-use std::{
-    convert::Infallible,
-    env, fs,
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::Arc,
+use routes::{
+    album, artist, auth, controls, discover, favorites, now_playing, playlist, queue, search,
 };
+use std::{convert::Infallible, sync::Arc};
 use tokio::{
     sync::broadcast::{self, Receiver, Sender},
     try_join,
@@ -34,14 +28,14 @@ use tokio::{
 use tokio_stream::StreamExt as _;
 use tokio_stream::wrappers::BroadcastStream;
 
-use crate::routes::now_playing;
+use crate::view::render;
 
 mod assets;
-// mod components;
-// mod icons;
-// mod page;
+mod components;
+mod icons;
+mod page;
 mod routes;
-// mod view;
+mod view;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn init(
@@ -78,36 +72,6 @@ pub async fn init(
     Ok(())
 }
 
-#[derive(RustEmbed)]
-#[folder = "templates"]
-struct Templates;
-
-fn templates(root_dir: &Path) -> Handlebars<'static> {
-    let mut reg = Handlebars::new();
-    #[cfg(debug_assertions)]
-    reg.set_dev_mode(true);
-
-    for file in Templates::iter() {
-        let name = file.trim_end_matches(".hbs");
-
-        #[cfg(debug_assertions)]
-        {
-            let mut path = root_dir.to_path_buf();
-            path.push(&*file);
-            reg.register_template_file(name, path).unwrap();
-        }
-
-        #[cfg(not(debug_assertions))]
-        {
-            let content = Templates::get(&file).unwrap();
-            let content = String::from_utf8_lossy(&content.data);
-            reg.register_template_string(name, content).unwrap();
-        }
-    }
-
-    reg
-}
-
 #[allow(clippy::too_many_arguments)]
 async fn create_router(
     controls: Controls,
@@ -122,36 +86,6 @@ async fn create_router(
 ) -> Router {
     let (tx, _rx) = broadcast::channel::<ServerSentEvent>(100);
     let broadcast_subscribe = broadcast.subscribe();
-
-    let template_path = {
-        let current_dir = env::current_dir().expect("Failed to get current directory");
-        current_dir.join("qobuz-player-web/templates")
-    };
-
-    let templates = templates(&template_path);
-
-    #[cfg(debug_assertions)]
-    {
-        let watcher_sender = tx.clone();
-        let watcher = filesentry::Watcher::new().unwrap();
-        watcher.add_root(&template_path, true, |_| ()).unwrap();
-
-        watcher.add_handler(move |events| {
-            for event in &*events {
-                if event.ty == filesentry::EventType::Modified {
-                    let event = ServerSentEvent {
-                        event_name: "reload".into(),
-                        event_data: "template changed".into(),
-                    };
-
-                    _ = watcher_sender.send(event);
-                }
-            }
-            true
-        });
-        watcher.start();
-    }
-
     let shared_state = Arc::new(AppState {
         controls,
         web_secret,
@@ -163,7 +97,6 @@ async fn create_router(
         tracklist_receiver: tracklist_receiver.clone(),
         volume_receiver: volume_receiver.clone(),
         status_receiver: status_receiver.clone(),
-        templates,
     });
     tokio::spawn(background_task(
         tx,
@@ -177,20 +110,20 @@ async fn create_router(
     axum::Router::new()
         .route("/sse", get(sse_handler))
         .merge(now_playing::routes())
-        // .merge(search::routes())
-        // .merge(album::routes())
-        // .merge(artist::routes())
-        // .merge(playlist::routes())
-        // .merge(favorites::routes())
-        // .merge(queue::routes())
-        // .merge(discover::routes())
-        // .merge(controls::routes())
-        // .layer(axum::middleware::from_fn_with_state(
-        //     shared_state.clone(),
-        //     auth::auth_middleware,
-        // ))
+        .merge(search::routes())
+        .merge(album::routes())
+        .merge(artist::routes())
+        .merge(playlist::routes())
+        .merge(favorites::routes())
+        .merge(queue::routes())
+        .merge(discover::routes())
+        .merge(controls::routes())
+        .layer(axum::middleware::from_fn_with_state(
+            shared_state.clone(),
+            auth::auth_middleware,
+        ))
         .route("/assets/{*file}", get(static_handler))
-        // .merge(auth::routes())
+        .merge(auth::routes())
         .with_state(shared_state.clone())
 }
 
@@ -245,34 +178,33 @@ async fn background_task(
                 _ = tx.send(event);
             }
             notification = receiver.recv() => {
-                tracing::info!("notification: {:?}", notification);
-                // if let Ok(message) = notification {
-                //     let toast = components::toast(message.clone()).to_html();
+                if let Ok(message) = notification {
+                    let toast = components::toast(message.clone()).to_html();
 
-                //     let event = match message {
-                //         qobuz_player_controls::notification::Notification::Error(_) => ServerSentEvent {
-                //             event_name: "error".into(),
-                //             event_data: toast,
-                //         },
-                //         qobuz_player_controls::notification::Notification::Warning(_) => {
-                //             ServerSentEvent {
-                //                 event_name: "warn".into(),
-                //                 event_data: toast,
-                //             }
-                //         }
-                //         qobuz_player_controls::notification::Notification::Success(_) => {
-                //             ServerSentEvent {
-                //                 event_name: "success".into(),
-                //                 event_data: toast,
-                //             }
-                //         }
-                //         qobuz_player_controls::notification::Notification::Info(_) => ServerSentEvent {
-                //             event_name: "info".into(),
-                //             event_data: toast,
-                //         },
-                //     };
-                //     _ = tx.send(event);
-                // }
+                    let event = match message {
+                        qobuz_player_controls::notification::Notification::Error(_) => ServerSentEvent {
+                            event_name: "error".into(),
+                            event_data: toast,
+                        },
+                        qobuz_player_controls::notification::Notification::Warning(_) => {
+                            ServerSentEvent {
+                                event_name: "warn".into(),
+                                event_data: toast,
+                            }
+                        }
+                        qobuz_player_controls::notification::Notification::Success(_) => {
+                            ServerSentEvent {
+                                event_name: "success".into(),
+                                event_data: toast,
+                            }
+                        }
+                        qobuz_player_controls::notification::Notification::Info(_) => ServerSentEvent {
+                            event_name: "info".into(),
+                            event_data: toast,
+                        },
+                    };
+                    _ = tx.send(event);
+                }
             }
         }
     }
@@ -309,7 +241,6 @@ pub(crate) struct AppState {
     pub(crate) tracklist_receiver: TracklistReceiver,
     pub(crate) status_receiver: StatusReceiver,
     pub(crate) volume_receiver: VolumeReceiver,
-    pub(crate) templates: Handlebars<'static>,
 }
 
 impl AppState {
@@ -353,31 +284,31 @@ pub(crate) struct Discover {
 
 type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;
 
-// #[allow(clippy::result_large_err)]
-// fn ok_or_error_component<T>(
-//     value: Result<T, qobuz_player_controls::error::Error>,
-// ) -> Result<T, axum::response::Response> {
-//     match value {
-//         Ok(value) => Ok(value),
-//         Err(err) => Err(render(html! { <div>{format!("{err}")}</div> })),
-//     }
-// }
+#[allow(clippy::result_large_err)]
+fn ok_or_error_component<T>(
+    value: Result<T, qobuz_player_controls::error::Error>,
+) -> Result<T, axum::response::Response> {
+    match value {
+        Ok(value) => Ok(value),
+        Err(err) => Err(render(html! { <div>{format!("{err}")}</div> })),
+    }
+}
 
-// #[allow(clippy::result_large_err)]
-// fn ok_or_broadcast<T>(
-//     broadcast: &NotificationBroadcast,
-//     value: Result<T, qobuz_player_controls::error::Error>,
-// ) -> Result<T, axum::response::Response> {
-//     match value {
-//         Ok(value) => Ok(value),
-//         Err(err) => {
-//             broadcast.send(Notification::Error(format!("{err}")));
+#[allow(clippy::result_large_err)]
+fn ok_or_broadcast<T>(
+    broadcast: &NotificationBroadcast,
+    value: Result<T, qobuz_player_controls::error::Error>,
+) -> Result<T, axum::response::Response> {
+    match value {
+        Ok(value) => Ok(value),
+        Err(err) => {
+            broadcast.send(Notification::Error(format!("{err}")));
 
-//             let mut response = render(html! { <div></div> });
-//             let headers = response.headers_mut();
-//             headers.insert("HX-Reswap", "none".try_into().expect("infallible"));
+            let mut response = render(html! { <div></div> });
+            let headers = response.headers_mut();
+            headers.insert("HX-Reswap", "none".try_into().expect("infallible"));
 
-//             Err(response)
-//         }
-//     }
-// }
+            Err(response)
+        }
+    }
+}
