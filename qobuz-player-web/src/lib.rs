@@ -2,7 +2,7 @@ use assets::static_handler;
 use axum::{
     Router,
     extract::State,
-    response::{Sse, sse::Event},
+    response::{Html, Sse, sse::Event},
     routing::get,
 };
 use futures::stream::Stream;
@@ -16,17 +16,7 @@ use qobuz_player_controls::{
 };
 use qobuz_player_models::{Album, AlbumSimple, Favorites, Playlist};
 use qobuz_player_rfid::RfidState;
-use rust_embed::RustEmbed;
-// use routes::{
-//     album, artist, auth, controls, discover, favorites, now_playing, playlist, queue, search,
-// };
-use std::{
-    convert::Infallible,
-    env, fs,
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{convert::Infallible, env, path::Path, sync::Arc};
 use tokio::{
     sync::broadcast::{self, Receiver, Sender},
     try_join,
@@ -78,6 +68,54 @@ pub async fn init(
     Ok(())
 }
 
+macro_rules! views {
+    ( $( $name:ident => $path:expr ),+ $(,)? ) => {
+        #[derive(Clone, Copy, Debug)]
+        pub(crate) enum View {
+            $( $name ),+
+        }
+
+        impl View {
+            pub fn path(self) -> &'static str {
+                match self {
+                    $( View::$name => $path ),+
+                }
+            }
+
+            pub fn iter() -> impl Iterator<Item = View> {
+                [ $( View::$name ),+ ].into_iter()
+            }
+        }
+    }
+}
+
+views! {
+    Page => "page.hbs",
+    NowPlaying => "now-playing.hbs",
+    NowPlayingPartial => "now-playing-partial.hbs",
+    LoadingSpinner => "icons/loading-spinner.hbs",
+    VolumeSlider => "volume-slider.hbs",
+    PlayPause => "play-pause.hbs",
+    Play => "play.hbs",
+    Pause => "pause.hbs",
+    Next => "next.hbs",
+    Previous => "previous.hbs",
+    Progress => "progress.hbs",
+    PlayerState => "player-state.hbs",
+}
+
+impl View {
+    pub(crate) fn name(&self) -> String {
+        self.path()
+            .split("/")
+            .last()
+            .unwrap()
+            .trim_end_matches(".hbs")
+            .into()
+    }
+}
+
+#[cfg(not(debug_assertions))]
 #[derive(RustEmbed)]
 #[folder = "templates"]
 struct Templates;
@@ -87,21 +125,21 @@ fn templates(root_dir: &Path) -> Handlebars<'static> {
     #[cfg(debug_assertions)]
     reg.set_dev_mode(true);
 
-    for file in Templates::iter() {
-        let name = file.trim_end_matches(".hbs");
+    for file in View::iter() {
+        let name = file.name();
 
         #[cfg(debug_assertions)]
         {
             let mut path = root_dir.to_path_buf();
-            path.push(&*file);
-            reg.register_template_file(name, path).unwrap();
+            path.push(file.path());
+            reg.register_template_file(&name, path).unwrap();
         }
 
         #[cfg(not(debug_assertions))]
         {
-            let content = Templates::get(&file).unwrap();
+            let content = Templates::get(&file.path()).unwrap();
             let content = String::from_utf8_lossy(&content.data);
-            reg.register_template_string(name, content).unwrap();
+            reg.register_template_string(&name, content).unwrap();
         }
     }
 
@@ -313,11 +351,23 @@ pub(crate) struct AppState {
 }
 
 impl AppState {
-    pub async fn get_favorites(&self) -> Result<Favorites> {
+    pub(crate) fn render<T>(&self, view: View, context: &T) -> Html<String>
+    where
+        T: serde::Serialize,
+    {
+        let result = self
+            .templates
+            .render(&view.name(), context)
+            .unwrap_or_else(|e| e.to_string());
+
+        Html(result)
+    }
+
+    pub(crate) async fn get_favorites(&self) -> Result<Favorites> {
         self.client.favorites().await
     }
 
-    pub async fn get_album(&self, id: &str) -> Result<AlbumData> {
+    pub(crate) async fn get_album(&self, id: &str) -> Result<AlbumData> {
         let (album, suggested_albums) =
             try_join!(self.client.album(id), self.client.suggested_albums(id))?;
 
@@ -327,7 +377,7 @@ impl AppState {
         })
     }
 
-    pub async fn is_album_favorite(&self, id: &str) -> Result<bool> {
+    pub(crate) async fn is_album_favorite(&self, id: &str) -> Result<bool> {
         let favorites = self.get_favorites().await?;
         Ok(favorites.albums.iter().any(|album| album.id == id))
     }

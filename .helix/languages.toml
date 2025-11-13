@@ -2,10 +2,18 @@
 name = "glimmer"
 scope = "source.glimmer"
 injection-regex = "hbs"
+indent = { tab-width = 2, unit = "  " }
 file-types = ["hbs"]
 block-comment-tokens = { start = "{{!", end = "}}" }
 roots = ["Cargo.toml", "Cargo.lock"]
 grammar = "glimmer"
-language-servers = []
-formatter = { command = "prettier", args = ['--parser', 'angular'] }
+language-servers = ["vscode-html-language-server", "tailwindcss-ls", "codebook"]
+formatter = { command = "superhtml", args = ["fmt", "--syntax-only", "--stdin"]}
 auto-format = true
+
+# [[language]]
+# name = "html"
+# formatter = { command = "superhtml", args = ["fmt", "--syntax-only", "--stdin"]}
+# auto-format = true
+# language-servers = ["vscode-html-language-server", "tailwindcss-ls", "angular", "codebook"]
+

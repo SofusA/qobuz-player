@@ -1,14 +1,8 @@
 use std::sync::Arc;
 
-use axum::{
-    Router,
-    extract::State,
-    response::{Html, IntoResponse},
-    routing::get,
-};
-use serde_json::json;
+use axum::{Router, extract::State, response::IntoResponse, routing::get};
 
-use crate::AppState;
+use crate::{AppState, View};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/", get(index))
@@ -23,14 +17,5 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
 }
 
 async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    // let context = Context::new();
-    // let template = state.tera.render("now-playing.html", &context).unwrap();
-    // Html(template)
-
-    let result = state
-        .templates
-        .render("now-playing", &json!({}))
-        .unwrap_or_else(|e| e.to_string());
-
-    Html(result)
+    state.render(View::NowPlaying, &())
 }

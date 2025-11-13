@@ -202,6 +202,12 @@
   .fixed {
     position: fixed;
   }
+  .relative {
+    position: relative;
+  }
+  .static {
+    position: static;
+  }
   .top-8 {
     top: calc(var(--spacing) * 8);
   }
@@ -219,6 +225,12 @@
     margin-right: env(safe-area-inset-right);
     margin-bottom: env(safe-area-inset-bottom);
     margin-left: env(safe-area-inset-left);
+  }
+  .block {
+    display: block;
+  }
+  .contents {
+    display: contents;
   }
   .flex {
     display: flex;
@@ -239,6 +251,9 @@
   }
   .transform {
     transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
+  }
+  .animate-spin {
+    animation: var(--animate-spin);
   }
   .touch-pan-y {
     --tw-pan-y: pan-y;
