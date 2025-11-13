@@ -6,7 +6,7 @@ use axum::{
     routing::get,
 };
 use futures::stream::Stream;
-use handlebars::Handlebars;
+use handlebars::{Handlebars, handlebars_helper};
 use qobuz_player_controls::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
@@ -102,6 +102,7 @@ views! {
     Previous => "previous.hbs",
     Progress => "progress.hbs",
     PlayerState => "player-state.hbs",
+    Info => "info.hbs",
 }
 
 impl View {
@@ -143,8 +144,20 @@ fn templates(root_dir: &Path) -> Handlebars<'static> {
         }
     }
 
+    reg.register_helper("msec-to-mmss", Box::new(mseconds_to_mm_ss));
+    reg.register_helper("multiply", Box::new(multiply));
     reg
 }
+
+handlebars_helper!(mseconds_to_mm_ss: |a: i64| {
+    let seconds: i64= a / 1000;
+
+    let minutes = seconds / 60;
+    let seconds = seconds % 60;
+    format!("{minutes:02}:{seconds:02}")
+});
+
+handlebars_helper!(multiply: |a: i64, b: i64| a * b);
 
 #[allow(clippy::too_many_arguments)]
 async fn create_router(
