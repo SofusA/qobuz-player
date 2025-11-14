@@ -24,7 +24,7 @@ use tokio::{
 use tokio_stream::StreamExt as _;
 use tokio_stream::wrappers::BroadcastStream;
 
-use crate::routes::now_playing;
+use crate::routes::{api, now_playing};
 
 mod assets;
 // mod components;
@@ -104,6 +104,10 @@ views! {
     PlayerState => "player-state.hbs",
     Info => "info.hbs",
     Error => "error.hbs",
+    BackwardIcon => "icons/backward-icon.hbs",
+    ForwardIcon => "icons/forward-icon.hbs",
+    PlayIcon => "icons/play-icon.hbs",
+    PauseIcon => "icons/pause-icon.hbs"
 }
 
 impl View {
@@ -147,6 +151,8 @@ fn templates(root_dir: &Path) -> Handlebars<'static> {
 
     reg.register_helper("msec-to-mmss", Box::new(mseconds_to_mm_ss));
     reg.register_helper("multiply", Box::new(multiply));
+    reg.register_helper("play-pause-api", Box::new(play_pause_api_string));
+
     reg
 }
 
@@ -159,6 +165,12 @@ handlebars_helper!(mseconds_to_mm_ss: |a: i64| {
 });
 
 handlebars_helper!(multiply: |a: i64, b: i64| a * b);
+handlebars_helper!(play_pause_api_string: |a: Status| {
+    match a {
+        Status::Paused | Status::Buffering => "/api/play",
+        Status::Playing => "/api/pause"
+    }
+});
 
 #[allow(clippy::too_many_arguments)]
 async fn create_router(
@@ -229,6 +241,7 @@ async fn create_router(
     axum::Router::new()
         .route("/sse", get(sse_handler))
         .merge(now_playing::routes())
+        .merge(api::routes())
         // .merge(search::routes())
         // .merge(album::routes())
         // .merge(artist::routes())
