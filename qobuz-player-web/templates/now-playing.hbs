@@ -25,28 +25,25 @@
 		</div>
 
 		<a href=artist_link class="text-gray-400 truncate w-fit">
-			{{artist_name}}
+			{{artist-name}}
 		</a>
 
 		<div class="flex flex-col gap-y-4 w-full">
 			<div class="flex gap-2 justify-between items-center">
 				<span class="text-lg truncate">{{title}}</span>
-				{{> info explicit=explicit hires-available=hires-available}}
+				{{> info }}
 			</div>
-
-				{{> info explicit=explicit hires-available=hires-available}}
-				{{> progress position-mseconds=position-mseconds duration-seconds=duration-seconds}}
+			{{> progress }}
 		</div>
 
 		<div class="flex flex-col gap-4">
 			<div class="flex flex-row gap-2 justify-center h-10">
-				{{! <Previous/> }}
-				{{! <PlayerState status=current_status/> }}
-				{{! <Next/> }}
+				{{> previous }}
+				{{> player-state }}
+				{{> next }}
 			</div>
-			{{! <VolumeSlider current_volume=current_volume/> }}
+			{{> volume-slider }}
 		</div>
 	</div>
 </div>
 {{/page}}
-

@@ -1,0 +1,12 @@
+<input id="volume-slider"
+       class="w-full accent-blue-500"
+       autocomplete="off"
+       hx-post="/api/volume"
+       hx-trigger="input delay:100ms"
+       hx-swap="none"
+       value={{current-volume}}
+       type="range"
+       name="value"
+       min="0"
+       max="100"
+>

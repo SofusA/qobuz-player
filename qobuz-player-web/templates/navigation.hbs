@@ -1,0 +1,49 @@
+<div class="pb-safe">
+	<div class="h-12"></div>
+</div>
+<nav class="flex fixed bottom-0 justify-evenly w-full pb-safe px-safe backdrop-blur bg-black/80 *:flex *:h-[3.25rem] *:w-20 *:flex-col *:items-center *:overflow-visible *:text-nowrap *:px-4 *:py-1 *:text-[10px] *:font-medium *:transition-colors">
+	<a href="/"
+	   preload="mouseover"
+	   preload-images="true"
+	   class="{{ternary (eq active-page 'NowPlaying') 'text-blue-500' 'text-gray-500'}}"
+	>
+		{{> play-circle }}
+		Now Playing
+	</a>
+
+	<a href="/queue"
+	   class="{{ternary (eq active-page 'Queue') 'text-blue-500' 'text-gray-500'}}"
+	>
+		{{> queue-list }}
+		Queue
+	</a>
+	<a href="/discover"
+	   preload="mouseover"
+	   preload-images="true"
+	   class="{{ternary (eq active-page 'Discover') 'text-blue-500' 'text-gray-500'}}"
+	>
+		{{> megaphone }}
+		Discover
+	</a>
+	<a href="/favorites/albums"
+	   href="/discover"
+	   preload="mouseover"
+	   class="{{ternary (eq active-page 'Favorites') 'text-blue-500' 'text-gray-500'}}"
+	>
+		{{> star-solid }}
+		Favorites
+	</a>
+
+	{{#if (eq active-page "Search")}}
+	<button class="text-blue-500" onclick="focusSearchInput()">
+		{{> magnifying-glass }}
+		Search
+	</button>
+	}
+	{{ else }}
+	<a href="/search/albums" class="text-gray-500">
+		{{> magnifying-glass }}
+		Search
+	</a>
+	{{/if}}
+</nav>

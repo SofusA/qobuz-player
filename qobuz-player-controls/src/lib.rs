@@ -22,7 +22,7 @@ pub type VolumeReceiver = watch::Receiver<f32>;
 pub type StatusReceiver = watch::Receiver<Status>;
 pub type TracklistReceiver = watch::Receiver<Tracklist>;
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Status {
     Playing,
     Buffering,

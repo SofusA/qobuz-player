@@ -1,3 +1,4 @@
+{{#if (not partial)}}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 	<head>
@@ -11,6 +12,7 @@
 		<script src="https://unpkg.com/htmx-ext-preload@2.1.0/preload.js"></script>
 		<script src="https://unpkg.com/htmx-ext-remove-me@2.0.0/remove-me.js"></script>
 		<script src="https://unpkg.com/idiomorph@0.7.3"></script>
+		<script src="/assets/script.js?version=100"></script>
 	</head>
 	<body class="text-gray-50 bg-black touch-pan-y"
 	      hx-ext="preload, remove-me, morph"
@@ -27,16 +29,16 @@
 		     class="flex fixed top-8 right-8 z-20 flex-col gap-4"
 		></div>
 
-		<p>top page</p>
-
 		{{> @partial-block }}
 
-		<!-- {children()} -->
 		<!-- {(active_page != Page::NowPlaying) -->
 		<!-- .then(|| { -->
 		<!-- html! { <Controls current_status=current_status tracklist=tracklist /> } -->
 		<!-- })} -->
-		<!-- <Navigation active_page=active_page /> -->
-		<script src="/assets/script.js?version=100"></script>
+		{{> navigation }}
 	</body>
 </html>
+
+{{else}}
+{{> @partial-block }}
+{{/if}}
