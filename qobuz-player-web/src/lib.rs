@@ -103,6 +103,7 @@ views! {
     Progress => "progress.hbs",
     PlayerState => "player-state.hbs",
     Info => "info.hbs",
+    Error => "error.hbs",
 }
 
 impl View {
@@ -371,6 +372,12 @@ impl AppState {
         let result = self
             .templates
             .render(&view.name(), context)
+            .or_else(|error| {
+                self.templates.render(
+                    &View::Error.name(),
+                    &serde_json::json!({"error": format!("{error}")}),
+                )
+            })
             .unwrap_or_else(|e| e.to_string());
 
         Html(result)
