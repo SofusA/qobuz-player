@@ -30,11 +30,10 @@
 		></div>
 
 		{{> @partial-block }}
-
-		<!-- {(active_page != Page::NowPlaying) -->
-		<!-- .then(|| { -->
-		<!-- html! { <Controls current_status=current_status tracklist=tracklist /> } -->
-		<!-- })} -->
+		
+		{{#if (not(eq active-page "NowPlaying"))}}
+		{{> controls }}
+		{{/if}}
 		{{> navigation }}
 	</body>
 </html>
