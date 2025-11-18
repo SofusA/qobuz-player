@@ -2,37 +2,34 @@ use assets::static_handler;
 use axum::{
     Router,
     extract::State,
-    response::{Html, Sse, sse::Event},
+    response::{Sse, sse::Event},
     routing::get,
 };
 use futures::stream::Stream;
-use handlebars::{Handlebars, handlebars_helper};
 use qobuz_player_controls::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
     controls::Controls,
     error::Error,
     notification::{Notification, NotificationBroadcast},
-    tracklist::{Tracklist, TracklistType},
 };
-use qobuz_player_models::{Album, AlbumSimple, Favorites, Playlist};
+use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
-use std::{convert::Infallible, env, path::Path, sync::Arc};
-use tokio::{
-    sync::broadcast::{self, Receiver, Sender},
-    try_join,
-};
+use std::{convert::Infallible, env, sync::Arc};
+use tokio::sync::broadcast::{self, Receiver, Sender};
 use tokio_stream::StreamExt as _;
 use tokio_stream::wrappers::BroadcastStream;
 
-use crate::routes::{api, controls, now_playing};
+use crate::{
+    app_state::AppState,
+    routes::{api, controls, now_playing},
+    views::templates,
+};
 
+mod app_state;
 mod assets;
-// mod components;
-// mod icons;
-// mod page;
 mod routes;
-// mod view;
+mod views;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn init(
@@ -68,125 +65,6 @@ pub async fn init(
     axum::serve(listener, router).await.expect("infallible");
     Ok(())
 }
-
-macro_rules! views {
-    ( $( $name:ident => $path:expr ),+ $(,)? ) => {
-        #[derive(Clone, Copy, Debug)]
-        pub(crate) enum View {
-            $( $name ),+
-        }
-
-        impl View {
-            pub fn path(self) -> &'static str {
-                match self {
-                    $( View::$name => $path ),+
-                }
-            }
-
-            pub fn iter() -> impl Iterator<Item = View> {
-                [ $( View::$name ),+ ].into_iter()
-            }
-        }
-    }
-}
-
-views! {
-    Page => "page.hbs",
-    NowPlaying => "now-playing.hbs",
-    LoadingSpinner => "icons/loading-spinner.hbs",
-    VolumeSlider => "volume-slider.hbs",
-    PlayPause => "play-pause.hbs",
-    Play => "play.hbs",
-    Pause => "pause.hbs",
-    Next => "next.hbs",
-    Previous => "previous.hbs",
-    Progress => "progress.hbs",
-    PlayerState => "player-state.hbs",
-    Info => "info.hbs",
-    Error => "error.hbs",
-    BackwardIcon => "icons/backward-icon.hbs",
-    ForwardIcon => "icons/forward-icon.hbs",
-    PlayIcon => "icons/play-icon.hbs",
-    PauseIcon => "icons/pause-icon.hbs",
-    PlayCircleIcon => "icons/play-circle.hbs",
-    Megaphone => "icons/megaphone.hbs",
-    QueueList => "icons/queue-list.hbs",
-    Star => "icons/star.hbs",
-    StarSolid => "icons/star-solid.hbs",
-    MagnifyingGlass => "icons/magnifying-glass.hbs",
-    Navigation => "navigation.hbs",
-    Controls => "controls.hbs"
-}
-
-impl View {
-    pub(crate) fn name(&self) -> String {
-        self.path()
-            .split("/")
-            .last()
-            .unwrap()
-            .trim_end_matches(".hbs")
-            .into()
-    }
-}
-
-#[cfg(not(debug_assertions))]
-#[derive(RustEmbed)]
-#[folder = "templates"]
-struct Templates;
-
-fn templates(root_dir: &Path) -> Handlebars<'static> {
-    let mut reg = Handlebars::new();
-    #[cfg(debug_assertions)]
-    reg.set_dev_mode(true);
-
-    for file in View::iter() {
-        let name = file.name();
-
-        #[cfg(debug_assertions)]
-        {
-            let mut path = root_dir.to_path_buf();
-            path.push(file.path());
-            reg.register_template_file(&name, path).unwrap();
-        }
-
-        #[cfg(not(debug_assertions))]
-        {
-            let content = Templates::get(&file.path()).unwrap();
-            let content = String::from_utf8_lossy(&content.data);
-            reg.register_template_string(&name, content).unwrap();
-        }
-    }
-
-    reg.register_helper("msec-to-mmss", Box::new(mseconds_to_mm_ss));
-    reg.register_helper("multiply", Box::new(multiply));
-    reg.register_helper("ternary", Box::new(ternary));
-    reg.register_helper("play-pause-api", Box::new(play_pause_api_string));
-
-    reg
-}
-
-handlebars_helper!(mseconds_to_mm_ss: |a: i64| {
-    let seconds: i64= a / 1000;
-
-    let minutes = seconds / 60;
-    let seconds = seconds % 60;
-    format!("{minutes:02}:{seconds:02}")
-});
-
-handlebars_helper!(multiply: |a: i64, b: i64| a * b);
-handlebars_helper!(play_pause_api_string: |a: Status| {
-    match a {
-        Status::Paused | Status::Buffering => "/api/play",
-        Status::Playing => "/api/pause"
-    }
-});
-
-handlebars_helper!(ternary: |cond: bool, a: String, b: String| {
-    match cond {
-        true => a,
-        false => b,
-    }
-});
 
 #[derive(PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Page {
@@ -387,141 +265,6 @@ async fn sse_handler(
     headers.insert("X-Accel-Buffering", "no".parse().expect("infallible"));
 
     (headers, Sse::new(stream))
-}
-
-pub(crate) struct AppState {
-    tx: Sender<ServerSentEvent>,
-    pub(crate) web_secret: Option<String>,
-    pub(crate) rfid_state: Option<RfidState>,
-    pub(crate) broadcast: Arc<NotificationBroadcast>,
-    pub(crate) client: Arc<Client>,
-    pub(crate) controls: Controls,
-    pub(crate) position_receiver: PositionReceiver,
-    pub(crate) tracklist_receiver: TracklistReceiver,
-    pub(crate) status_receiver: StatusReceiver,
-    pub(crate) volume_receiver: VolumeReceiver,
-    pub(crate) templates: Handlebars<'static>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct PlayingInfo {
-    title: String,
-    artist_link: Option<String>,
-    artist_name: Option<String>,
-    entity_title: Option<String>,
-    entity_link: Option<String>,
-    status: Status,
-    cover_image: Option<String>,
-}
-
-fn merge_serialized<T: serde::Serialize, Y: serde::Serialize>(
-    info: &T,
-    extra: &Y,
-) -> serde_json::Result<serde_json::Value> {
-    let mut info_value = serde_json::to_value(info)?;
-    let extra_value = serde_json::to_value(extra)?;
-
-    if let (serde_json::Value::Object(info_map), serde_json::Value::Object(extra_map)) =
-        (&mut info_value, extra_value)
-    {
-        for (k, v) in extra_map {
-            info_map.insert(k, v);
-        }
-    }
-
-    Ok(info_value)
-}
-
-impl AppState {
-    pub(crate) fn render<T>(&self, view: View, context: &T) -> Html<String>
-    where
-        T: serde::Serialize,
-    {
-        let tracklist = self.tracklist_receiver.borrow().clone();
-        let current_track = tracklist.current_track().cloned();
-        let status = *self.status_receiver.borrow();
-        let cover_image = current_track.as_ref().and_then(|track| track.image.clone());
-        let artist_name = current_track
-            .as_ref()
-            .and_then(|track| track.artist_name.clone());
-        let artist_id = current_track.as_ref().and_then(|track| track.artist_id);
-
-        let (title, artist_link) =
-            current_track
-                .as_ref()
-                .map_or((String::default(), None), |track| {
-                    (
-                        track.title.clone(),
-                        artist_id.map(|id| format!("/artist/{id}")),
-                    )
-                });
-
-        let (entity_title, entity_link) = match tracklist.list_type() {
-            TracklistType::Album(tracklist) => (
-                Some(tracklist.title.clone()),
-                Some(format!("/album/{}", tracklist.id)),
-            ),
-            TracklistType::Playlist(tracklist) => (
-                Some(tracklist.title.clone()),
-                Some(format!("/playlist/{}", tracklist.id)),
-            ),
-            TracklistType::TopTracks(tracklist) => {
-                (None, Some(format!("/artist/{}", tracklist.id)))
-            }
-            TracklistType::Track(tracklist) => (
-                current_track
-                    .as_ref()
-                    .and_then(|track| track.album_title.clone()),
-                tracklist.album_id.as_ref().map(|id| format!("/album/{id}")),
-            ),
-            TracklistType::None => (None, None),
-        };
-
-        let playing_info = PlayingInfo {
-            title,
-            artist_link,
-            artist_name,
-            entity_title,
-            entity_link,
-            status,
-            cover_image,
-        };
-
-        let context = merge_serialized(&playing_info, context).unwrap();
-
-        let result = self
-            .templates
-            .render(&view.name(), &context)
-            .or_else(|error| {
-                self.templates.render(
-                    &View::Error.name(),
-                    &serde_json::json!({"error": format!("{error}")}),
-                )
-            })
-            .unwrap_or_else(|e| e.to_string());
-
-        Html(result)
-    }
-
-    pub(crate) async fn get_favorites(&self) -> Result<Favorites> {
-        self.client.favorites().await
-    }
-
-    pub(crate) async fn get_album(&self, id: &str) -> Result<AlbumData> {
-        let (album, suggested_albums) =
-            try_join!(self.client.album(id), self.client.suggested_albums(id))?;
-
-        Ok(AlbumData {
-            album,
-            suggested_albums,
-        })
-    }
-
-    pub(crate) async fn is_album_favorite(&self, id: &str) -> Result<bool> {
-        let favorites = self.get_favorites().await?;
-        Ok(favorites.albums.iter().any(|album| album.id == id))
-    }
 }
 
 #[derive(Clone)]

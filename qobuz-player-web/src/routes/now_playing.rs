@@ -8,7 +8,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{AppState, Page, View};
+use crate::{AppState, Page, views::View};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()

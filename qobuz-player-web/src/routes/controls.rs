@@ -1,13 +1,9 @@
 use std::sync::Arc;
 
 use axum::{Router, extract::State, response::IntoResponse, routing::get};
-use qobuz_player_controls::{
-    Status,
-    tracklist::{Tracklist, TracklistType},
-};
 use serde_json::json;
 
-use crate::{AppState, View};
+use crate::{AppState, views::View};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/controls", get(controls))
