@@ -5,17 +5,17 @@
 	       hx-post="/api/position"
 	       hx-trigger="input delay:100ms"
 	       hx-swap="none"
-	       value={{position-mseconds}}
+	       value={{position_mseconds}}
 	       type="range"
 	       name="value"
 	       min="0"
 	       max={{multiply
-	       duration-seconds
+	       duration_seconds
 	       1000}}
 	>
 
 	<div class="flex justify-between text-sm text-gray-500">
-		<span id="position">{{msec-to-mmss position-mseconds}}</span>
-		<span>{{msec-to-mmss (multiply duration-seconds 1000)}}</span>
+		<span id="position">{{msec-to-mmss position_mseconds}}</span>
+		<span>{{msec-to-mmss (multiply duration_seconds 1000)}}</span>
 	</div>
 </div>

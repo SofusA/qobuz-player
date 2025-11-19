@@ -72,14 +72,19 @@ impl AppState {
             TracklistType::None => (None, None),
         };
 
+        let tracklist_type = tracklist.list_type().into();
+        let now_playing_id = tracklist.currently_playing();
+
         let playing_info = PlayingInfo {
             title,
+            now_playing_id,
             artist_link,
             artist_name,
             entity_title,
             entity_link,
             status,
             cover_image,
+            tracklist_type,
         };
 
         let context = merge_serialized(&playing_info, context).unwrap();
@@ -89,7 +94,7 @@ impl AppState {
             .render(&view.name(), &context)
             .or_else(|error| {
                 self.templates.render(
-                    &View::Error.name(),
+                    &View::ErrorPage.name(),
                     &serde_json::json!({"error": format!("{error}")}),
                 )
             })
@@ -119,15 +124,37 @@ impl AppState {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
 struct PlayingInfo {
     title: String,
+    now_playing_id: Option<u32>,
     artist_link: Option<String>,
     artist_name: Option<String>,
     entity_title: Option<String>,
     entity_link: Option<String>,
     status: Status,
     cover_image: Option<String>,
+    tracklist_type: TrackListTypeSimple,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+enum TrackListTypeSimple {
+    TopTracks,
+    Album,
+    Playlist,
+    Track,
+    None,
+}
+
+impl From<&TracklistType> for TrackListTypeSimple {
+    fn from(value: &TracklistType) -> Self {
+        match value {
+            TracklistType::Album(_) => TrackListTypeSimple::Album,
+            TracklistType::Playlist(_) => TrackListTypeSimple::Playlist,
+            TracklistType::TopTracks(_) => TrackListTypeSimple::TopTracks,
+            TracklistType::Track(_) => TrackListTypeSimple::Track,
+            TracklistType::None => TrackListTypeSimple::None,
+        }
+    }
 }
 
 fn merge_serialized<T: serde::Serialize, Y: serde::Serialize>(

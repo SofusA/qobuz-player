@@ -8,7 +8,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{AppState, Page, views::View};
+use crate::{AppState, views::View};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -22,14 +22,7 @@ async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 }
 
 async fn status_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let status = state.status_receiver.borrow();
-
-    state.render(
-        View::PlayPause,
-        &json! ({
-            "status": *status
-        }),
-    )
+    state.render(View::PlayPause, &())
 }
 
 async fn now_playing_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -62,15 +55,14 @@ fn now_playing(state: &AppState, partial: bool) -> Html<String> {
     state.render(
         View::NowPlaying,
         &json! ({
-            "active-page": Page::NowPlaying,
             "partial": partial,
-            "number-of-tracks": number_of_tracks,
-            "current-volume": current_volume,
-            "duration-seconds": duration_seconds,
-            "position-mseconds": position_mseconds,
-            "current-position": current_position + 1,
+            "number_of_tracks": number_of_tracks,
+            "current_volume": current_volume,
+            "duration_seconds": duration_seconds,
+            "position_mseconds": position_mseconds,
+            "current_position": current_position + 1,
             "explicit": explicit,
-            "hires-available": hires_available,
+            "hires_available": hires_available,
         }),
     )
 }

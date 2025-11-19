@@ -10,29 +10,25 @@
 		<div class="flex gap-2 justify-between items-center p-2 rounded-md bg-gray-900/70 backdrop-blur">
 			<a class="flex overflow-hidden gap-2 items-center w-full"
 			   hx-target="unset"
-			   href={{entity-link}}
+			   href={{entity_link}}
 			>
-				<div class="bg-gray-800 bg-center bg-no-repeat bg-cover shadow aspect-square size-10 {{ternary (circle) 'rounded-full' 'rounded-md'}}"
-				     style="image_style"
+				<div class="bg-gray-800 bg-center bg-no-repeat bg-cover shadow aspect-square size-10 {{ternary (eq tracklist_type 'Artist') 'rounded-full' 'rounded-md'}}"
+				     style="{{#if cover_image}} background-image: url({{cover_image}}); {{/if}}"
 				></div>
 				<div class="flex overflow-hidden flex-wrap gap-2 leading-none">
 					<span class="truncate">{{title}}</span>
-					<span class="text-gray-500 truncate">{{track-title}}</span>
+					<span class="text-gray-500 truncate">{{track_title}}</span>
 				</div>
 			</a>
 			<div class="flex gap-4 items-center">
 				<span class="hidden w-8 sm:flex">
-					{{! <Previous></Previous>
-					}}
+					{{> previous }}
 				</span>
 				<span class="flex w-8">
-					{{! <PlayerState status={{current_status}}>
-					</PlayerState>
-					}}
+					{{> player-state }}
 				</span>
 				<span class="flex w-8">
-					{{! <Next></Next>
-					}}
+					{{> next }}
 				</span>
 			</div>
 		</div>

@@ -5,14 +5,14 @@
 	<a href="/"
 	   preload="mouseover"
 	   preload-images="true"
-	   class="{{ternary (eq active-page 'NowPlaying') 'text-blue-500' 'text-gray-500'}}"
+	   class="{{ternary (eq active_page 'NowPlaying') 'text-blue-500' 'text-gray-500'}}"
 	>
 		{{> play-circle }}
 		Now Playing
 	</a>
 
 	<a href="/queue"
-	   class="{{ternary (eq active-page 'Queue') 'text-blue-500' 'text-gray-500'}}"
+	   class="{{ternary (eq active_page 'Queue') 'text-blue-500' 'text-gray-500'}}"
 	>
 		{{> queue-list }}
 		Queue
@@ -20,7 +20,7 @@
 	<a href="/discover"
 	   preload="mouseover"
 	   preload-images="true"
-	   class="{{ternary (eq active-page 'Discover') 'text-blue-500' 'text-gray-500'}}"
+	   class="{{ternary (eq active_page 'Discover') 'text-blue-500' 'text-gray-500'}}"
 	>
 		{{> megaphone }}
 		Discover
@@ -28,13 +28,13 @@
 	<a href="/favorites/albums"
 	   href="/discover"
 	   preload="mouseover"
-	   class="{{ternary (eq active-page 'Favorites') 'text-blue-500' 'text-gray-500'}}"
+	   class="{{ternary (eq active_page 'Favorites') 'text-blue-500' 'text-gray-500'}}"
 	>
 		{{> star-solid }}
 		Favorites
 	</a>
 
-	{{#if (eq active-page "Search")}}
+	{{#if (eq active_page "Search")}}
 	<button class="text-blue-500" onclick="focusSearchInput()">
 		{{> magnifying-glass }}
 		Search

@@ -26,6 +26,8 @@ macro_rules! views {
 
 views! {
     Page => "page.hbs",
+    ErrorPage => "error-page.hbs",
+    Error => "error.hbs",
     NowPlaying => "now-playing.hbs",
     LoadingSpinner => "icons/loading-spinner.hbs",
     VolumeSlider => "volume-slider.hbs",
@@ -37,7 +39,6 @@ views! {
     Progress => "progress.hbs",
     PlayerState => "player-state.hbs",
     Info => "info.hbs",
-    Error => "error.hbs",
     BackwardIcon => "icons/backward-icon.hbs",
     ForwardIcon => "icons/forward-icon.hbs",
     PlayIcon => "icons/play-icon.hbs",
@@ -49,7 +50,12 @@ views! {
     StarSolid => "icons/star-solid.hbs",
     MagnifyingGlass => "icons/magnifying-glass.hbs",
     Navigation => "navigation.hbs",
-    Controls => "controls.hbs"
+    Controls => "controls.hbs",
+    Queue => "queue.hbs",
+    List => "list.hbs",
+    ListItem => "list-item.hbs",
+    ListTracks => "list-tracks.hbs",
+    Favorites => "favorites.hbs"
 }
 
 impl View {
@@ -64,7 +70,7 @@ impl View {
 }
 
 #[cfg(not(debug_assertions))]
-#[derive(RustEmbed)]
+#[derive(rust_embed::Embed)]
 #[folder = "templates"]
 struct Templates;
 
@@ -85,7 +91,7 @@ pub(crate) fn templates(root_dir: &Path) -> Handlebars<'static> {
 
         #[cfg(not(debug_assertions))]
         {
-            let content = Templates::get(&file.path()).unwrap();
+            let content = Templates::get(file.path()).unwrap();
             let content = String::from_utf8_lossy(&content.data);
             reg.register_template_string(&name, content).unwrap();
         }
@@ -95,6 +101,7 @@ pub(crate) fn templates(root_dir: &Path) -> Handlebars<'static> {
     reg.register_helper("multiply", Box::new(multiply));
     reg.register_helper("ternary", Box::new(ternary));
     reg.register_helper("play-pause-api", Box::new(play_pause_api_string));
+    reg.register_helper("list-callback", Box::new(list_callback));
 
     reg
 }
@@ -120,4 +127,8 @@ handlebars_helper!(ternary: |cond: bool, a: String, b: String| {
         true => a,
         false => b,
     }
+});
+
+handlebars_helper!(list_callback: |template: String, index: i32| {
+    template.replace("@index", &format!("{index}"))
 });

@@ -25,7 +25,7 @@ pub struct Track {
     pub album_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Album {
     pub id: String,
     pub title: String,
@@ -62,14 +62,14 @@ pub struct SearchResults {
     pub tracks: Vec<Track>,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Favorites {
     pub albums: Vec<Album>,
     pub artists: Vec<Artist>,
     pub playlists: Vec<Playlist>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Artist {
     pub id: u32,
     pub name: String,
@@ -85,7 +85,7 @@ pub struct ArtistPage {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Playlist {
     pub is_owned: bool,
     pub title: String,

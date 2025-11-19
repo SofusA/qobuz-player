@@ -2,7 +2,7 @@ use assets::static_handler;
 use axum::{
     Router,
     extract::State,
-    response::{Sse, sse::Event},
+    response::{Html, Sse, sse::Event},
     routing::get,
 };
 use futures::stream::Stream;
@@ -15,6 +15,7 @@ use qobuz_player_controls::{
 };
 use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
+use serde_json::json;
 use std::{convert::Infallible, env, sync::Arc};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tokio_stream::StreamExt as _;
@@ -22,8 +23,8 @@ use tokio_stream::wrappers::BroadcastStream;
 
 use crate::{
     app_state::AppState,
-    routes::{api, controls, now_playing},
-    views::templates,
+    routes::{api, controls, favorites, now_playing, queue},
+    views::{View, templates},
 };
 
 mod app_state;
@@ -64,16 +65,6 @@ pub async fn init(
 
     axum::serve(listener, router).await.expect("infallible");
     Ok(())
-}
-
-#[derive(PartialEq, serde::Serialize, serde::Deserialize)]
-pub(crate) enum Page {
-    NowPlaying,
-    Queue,
-    Favorites,
-    Search,
-    Discover,
-    None,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -145,12 +136,13 @@ async fn create_router(
     axum::Router::new()
         .route("/sse", get(sse_handler))
         .merge(now_playing::routes())
+        .merge(queue::routes())
         .merge(api::routes())
         // .merge(search::routes())
         // .merge(album::routes())
         // .merge(artist::routes())
         // .merge(playlist::routes())
-        // .merge(favorites::routes())
+        .merge(favorites::routes())
         // .merge(queue::routes())
         // .merge(discover::routes())
         .merge(controls::routes())
@@ -285,18 +277,31 @@ pub(crate) struct Discover {
     pub playlists: Vec<(String, Vec<Playlist>)>,
 }
 
-type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;
+type ResponseResult =
+    std::result::Result<axum::response::Html<String>, axum::response::Html<String>>;
 
-// #[allow(clippy::result_large_err)]
-// fn ok_or_error_component<T>(
-//     value: Result<T, qobuz_player_controls::error::Error>,
-// ) -> Result<T, axum::response::Response> {
-//     match value {
-//         Ok(value) => Ok(value),
-//         Err(err) => Err(render(html! { <div>{format!("{err}")}</div> })),
-//     }
-// }
-
+fn ok_or_error_component<T>(
+    state: &AppState,
+    value: Result<T, qobuz_player_controls::error::Error>,
+) -> Result<T, axum::response::Html<String>> {
+    match value {
+        Ok(value) => Ok(value),
+        Err(err) => {
+            let err = format!("{err}");
+            Err(Html(
+                state
+                    .templates
+                    .render(&View::Error.name(), &json!({"error": err}))
+                    .unwrap(),
+            ))
+        }
+    }
+}
+// Err(Html(
+//             state
+//                 .templates
+//                 .render(View::Error.name(), &json!({error: err})),
+//         ))
 // #[allow(clippy::result_large_err)]
 // fn ok_or_broadcast<T>(
 //     broadcast: &NotificationBroadcast,

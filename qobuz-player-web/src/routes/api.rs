@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
     Router,
-    extract::State,
+    extract::{Path, State},
     response::IntoResponse,
     routing::{post, put},
 };
@@ -17,6 +17,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route("/api/next", put(next))
         .route("/api/volume", post(set_volume))
         .route("/api/position", post(set_position))
+        .route("/api/skip-to/{track_number}", put(skip_to))
 }
 
 async fn play(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -33,6 +34,13 @@ async fn previous(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 
 async fn next(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     state.controls.next();
+}
+
+async fn skip_to(
+    State(state): State<Arc<AppState>>,
+    Path(track_number): Path<u32>,
+) -> impl IntoResponse {
+    state.controls.skip_to_position(track_number, true);
 }
 
 #[derive(serde::Deserialize, Clone, Copy)]
