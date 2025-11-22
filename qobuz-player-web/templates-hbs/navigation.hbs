@@ -7,14 +7,14 @@
 	   preload-images="true"
 	   class="{{ternary (eq active_page 'NowPlaying') 'text-blue-500' 'text-gray-500'}}"
 	>
-		{{> play-circle }}
+		{% include "icons/play-circle.html" %}}
 		Now Playing
 	</a>
 
 	<a href="/queue"
 	   class="{{ternary (eq active_page 'Queue') 'text-blue-500' 'text-gray-500'}}"
 	>
-		{{> queue-list }}
+		{% include "icons/queue-list.html" %}}
 		Queue
 	</a>
 	<a href="/discover"
@@ -22,7 +22,7 @@
 	   preload-images="true"
 	   class="{{ternary (eq active_page 'Discover') 'text-blue-500' 'text-gray-500'}}"
 	>
-		{{> megaphone }}
+		{% include "icons/megaphone.html" %}}
 		Discover
 	</a>
 	<a href="/favorites/albums"
@@ -30,19 +30,19 @@
 	   preload="mouseover"
 	   class="{{ternary (eq active_page 'Favorites') 'text-blue-500' 'text-gray-500'}}"
 	>
-		{{> star-solid }}
+		{% include "icons/star-solid.html" %}}
 		Favorites
 	</a>
 
 	{{#if (eq active_page "Search")}}
 	<button class="text-blue-500" onclick="focusSearchInput()">
-		{{> magnifying-glass }}
+		{% include "icons/magnifying-glass.html" %}}
 		Search
 	</button>
 	}
 	{{ else }}
 	<a href="/search/albums" class="text-gray-500">
-		{{> magnifying-glass }}
+		{% include "icons/magnifying-glass.html" %}}
 		Search
 	</a>
 	{{/if}}

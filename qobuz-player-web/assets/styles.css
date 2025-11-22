@@ -189,9 +189,6 @@
   .fixed {
     position: fixed;
   }
-  .static {
-    position: static;
-  }
   .sticky {
     position: sticky;
   }
@@ -230,6 +227,9 @@
     margin-right: env(safe-area-inset-right);
     margin-bottom: env(safe-area-inset-bottom);
     margin-left: env(safe-area-inset-left);
+  }
+  .block {
+    display: block;
   }
   .flex {
     display: flex;
@@ -294,6 +294,9 @@
     width: 100%;
   }
   .flex-grow {
+    flex-grow: 1;
+  }
+  .grow {
     flex-grow: 1;
   }
   .transform {
@@ -514,6 +517,11 @@
   .\*\:flex {
     :is(& > *) {
       display: flex;
+    }
+  }
+  .\*\:h-13 {
+    :is(& > *) {
+      height: calc(var(--spacing) * 13);
     }
   }
   .\*\:h-\[3\.25rem\] {

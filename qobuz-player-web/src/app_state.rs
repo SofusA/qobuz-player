@@ -1,6 +1,5 @@
 use axum::response::Html;
 use futures::try_join;
-use handlebars::Handlebars;
 use qobuz_player_controls::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client, controls::Controls, notification::NotificationBroadcast,
@@ -9,9 +8,10 @@ use qobuz_player_controls::{
 use qobuz_player_models::Favorites;
 use qobuz_player_rfid::RfidState;
 use std::sync::Arc;
-use tokio::sync::broadcast::Sender;
+use tera::{Context, Tera};
+use tokio::sync::{broadcast::Sender, watch};
 
-use crate::{AlbumData, ServerSentEvent, views::View};
+use crate::{AlbumData, ServerSentEvent};
 
 pub(crate) struct AppState {
     pub(crate) tx: Sender<ServerSentEvent>,
@@ -24,11 +24,11 @@ pub(crate) struct AppState {
     pub(crate) tracklist_receiver: TracklistReceiver,
     pub(crate) status_receiver: StatusReceiver,
     pub(crate) volume_receiver: VolumeReceiver,
-    pub(crate) templates: Handlebars<'static>,
+    pub(crate) templates: watch::Receiver<Tera>,
 }
 
 impl AppState {
-    pub(crate) fn render<T>(&self, view: View, context: &T) -> Html<String>
+    pub(crate) fn render<T>(&self, view: &str, context: &T) -> Html<String>
     where
         T: serde::Serialize,
     {
@@ -88,14 +88,17 @@ impl AppState {
         };
 
         let context = merge_serialized(&playing_info, context).unwrap();
+        let context = Context::from_serialize(context).unwrap();
 
-        let result = self
-            .templates
-            .render(&view.name(), &context)
+        let templates = self.templates.borrow();
+
+        let result = templates
+            .render(view, &context)
             .or_else(|error| {
-                self.templates.render(
-                    &View::ErrorPage.name(),
-                    &serde_json::json!({"error": format!("{error}")}),
+                templates.render(
+                    "error-page.html",
+                    &Context::from_serialize(serde_json::json!({"error": format!("{error}")}))
+                        .unwrap(),
                 )
             })
             .unwrap_or_else(|e| e.to_string());

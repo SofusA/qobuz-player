@@ -16,15 +16,23 @@ use qobuz_player_controls::{
 use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
 use serde_json::json;
-use std::{convert::Infallible, env, sync::Arc};
-use tokio::sync::broadcast::{self, Receiver, Sender};
+use std::{
+    convert::Infallible,
+    env,
+    sync::{Arc, RwLock},
+};
+use tera::Context;
+use tokio::sync::{
+    broadcast::{self, Receiver, Sender},
+    watch,
+};
 use tokio_stream::StreamExt as _;
 use tokio_stream::wrappers::BroadcastStream;
 
 use crate::{
     app_state::AppState,
     routes::{api, controls, favorites, now_playing, queue},
-    views::{View, templates},
+    views::templates,
 };
 
 mod app_state;
@@ -89,6 +97,11 @@ async fn create_router(
 
     let templates = templates(&template_path);
 
+    let (templates_tx, templates_rx) = watch::channel(templates);
+
+    let templates_clone = templates_rx.clone();
+    let broadcast_clone = broadcast.clone();
+
     #[cfg(all(debug_assertions, target_os = "linux"))]
     {
         let watcher_sender = tx.clone();
@@ -97,13 +110,27 @@ async fn create_router(
 
         watcher.add_handler(move |events| {
             for event in &*events {
-                if event.ty == filesentry::EventType::Modified {
-                    let event = ServerSentEvent {
-                        event_name: "reload".into(),
-                        event_data: "template changed".into(),
-                    };
+                match event.ty {
+                    filesentry::EventType::Modified | filesentry::EventType::Create => {
+                        let mut templates = templates_clone.borrow().clone();
 
-                    _ = watcher_sender.send(event);
+                        match templates.full_reload().is_ok() {
+                            true => {
+                                templates_tx.send(templates).unwrap();
+                            }
+                            false => {
+                                broadcast_clone.send_error("Error parsing templates".into());
+                            }
+                        };
+
+                        let event = ServerSentEvent {
+                            event_name: "reload".into(),
+                            event_data: "template changed".into(),
+                        };
+
+                        _ = watcher_sender.send(event);
+                    }
+                    _ => (),
                 }
             }
             true
@@ -122,8 +149,9 @@ async fn create_router(
         tracklist_receiver: tracklist_receiver.clone(),
         volume_receiver: volume_receiver.clone(),
         status_receiver: status_receiver.clone(),
-        templates,
+        templates: templates_rx,
     });
+
     tokio::spawn(background_task(
         tx,
         broadcast_subscribe,
@@ -291,7 +319,11 @@ fn ok_or_error_component<T>(
             Err(Html(
                 state
                     .templates
-                    .render(&View::Error.name(), &json!({"error": err}))
+                    .borrow()
+                    .render(
+                        "error.html",
+                        &Context::from_serialize(json!({"error": err})).unwrap(),
+                    )
                     .unwrap(),
             ))
         }

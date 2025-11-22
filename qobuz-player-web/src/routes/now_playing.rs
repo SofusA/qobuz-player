@@ -8,7 +8,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{AppState, views::View};
+use crate::AppState;
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -22,7 +22,7 @@ async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 }
 
 async fn status_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    state.render(View::PlayPause, &())
+    state.render("play-pause.html", &())
 }
 
 async fn now_playing_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -53,7 +53,7 @@ fn now_playing(state: &AppState, partial: bool) -> Html<String> {
     let number_of_tracks = tracklist.total();
 
     state.render(
-        View::NowPlaying,
+        "now-playing.html",
         &json! ({
             "partial": partial,
             "number_of_tracks": number_of_tracks,

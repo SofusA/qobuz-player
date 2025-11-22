@@ -8,7 +8,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{app_state::AppState, views::View};
+use crate::app_state::AppState;
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -28,7 +28,7 @@ fn queue(state: &AppState, partial: bool) -> Html<String> {
     let tracks = state.tracklist_receiver.borrow().queue().to_vec();
 
     state.render(
-        View::Queue,
+        "queue.html",
         &json! ({
             "partial": partial,
             "tracks": tracks,

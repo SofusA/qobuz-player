@@ -1,0 +1,13 @@
+<button
+  class="transition-colors cursor-pointer"
+  hx-swap="none"
+  hx-put="{{ status | play_pause_api_string }}"
+>
+  {% if status == "Playing" %}
+    {% include "icons/pause.html" %}
+  {% elif status == "Buffering" %}
+    {% include "icons/loading-spinner.html" %}
+  {% else %}
+    {% include "icons/play.html" %}
+  {% endif %}
+</button>

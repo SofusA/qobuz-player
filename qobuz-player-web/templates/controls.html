@@ -1,0 +1,35 @@
+<div
+  hx-get="/controls"
+  hx-trigger="tracklist"
+  data-sse="tracklist"
+  hx-target="this"
+  hx-preserve
+  id="controls"
+>
+  <div class="h-16"></div>
+  <div class="fixed right-0 left-0 bottom-14 px-safe-offset-2 py-safe">
+    <div
+      class="flex gap-2 justify-between items-center p-2 rounded-md bg-gray-900/70 backdrop-blur"
+    >
+      <a
+        class="flex overflow-hidden gap-2 items-center w-full"
+        hx-target="unset"
+        href="{{ entity_link }}"
+      >
+        <div
+          class="bg-gray-800 bg-center bg-no-repeat bg-cover shadow aspect-square size-10 {% if tracklist_type == 'Artist' %}'rounded-full'{% else %}'rounded-md'{% endif %}"
+          style="{% if cover_image %}background-image: url({{ cover_image }});{% endif %}"
+        ></div>
+        <div class="flex overflow-hidden flex-wrap gap-2 leading-none">
+          <span class="truncate">{{ entity_title }}</span>
+          <span class="text-gray-500 truncate">{{ title }}</span>
+        </div>
+      </a>
+      <div class="flex gap-4 items-center">
+        <span class="hidden w-8 sm:flex"> {% include "previous.html" %} </span>
+        <span class="flex w-8"> {% include "player-state.html" %} </span>
+        <span class="flex w-8"> {% include "next.html" %} </span>
+      </div>
+    </div>
+  </div>
+</div>

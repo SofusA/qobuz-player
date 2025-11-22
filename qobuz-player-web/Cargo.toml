@@ -15,7 +15,6 @@ axum = { workspace = true }
 axum-extra = { workspace = true }
 time = { workspace = true }
 futures = { workspace = true }
-handlebars = "6.3.2"
 serde_json.workspace = true
 mime = { workspace = true }
 mime_guess = { workspace = true }
@@ -24,6 +23,7 @@ rust-embed = { workspace = true }
 serde = { workspace = true }
 tokio-stream = { workspace = true }
 tracing = { workspace = true }
+tera = "*"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 filesentry = "0.2.1"

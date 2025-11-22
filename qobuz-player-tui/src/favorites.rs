@@ -270,3 +270,48 @@ impl FavoritesState {
         self.sub_tab = self.sub_tab.next();
     }
 }
+
+struct Templates {
+    templates: Vec<Template>,
+}
+
+struct Template {
+    path: String,
+    nodes: Vec<Node>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Node {
+    Text(String),
+
+    /// A `{{ }}` block
+    VariableBlock(Expr),
+
+    /// The `{% import "macros.html" as macros %}`
+    Forloop(Forloop),
+
+    /// A if/else if/else block, WS for the if/elif/else is directly in the struct
+    If(If),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Forloop {
+    /// Name of the key in the loop (only when iterating on map-like objects)
+    pub key: Option<String>,
+    /// Name of the local variable for the value in the loop
+    pub value: String,
+    /// Expression being iterated on
+    pub container: Expr,
+    /// What's in the forloop itself
+    pub body: Vec<Node>,
+    /// The body to execute in case of an empty object
+    pub empty_body: Option<Vec<Node>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct If {
+    /// First item if the if, all the ones after are elif
+    pub conditions: Vec<(Expr, Vec<Node>)>,
+    /// The optional `else` block
+    pub otherwise: Option<(Vec<Node>)>,
+}

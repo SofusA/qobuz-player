@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use axum::{Router, extract::State, response::IntoResponse, routing::get};
 
-use crate::{AppState, views::View};
+use crate::AppState;
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/controls", get(controls))
 }
 
 async fn controls(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    state.render(View::Controls, &())
+    state.render("controls.html", &())
 }

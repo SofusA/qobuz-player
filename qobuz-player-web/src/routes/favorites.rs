@@ -7,7 +7,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{AppState, ResponseResult, ok_or_error_component, views::View};
+use crate::{AppState, ResponseResult, ok_or_error_component};
 
 #[derive(Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -25,7 +25,7 @@ async fn index(State(state): State<Arc<AppState>>, Path(tab): Path<Tab>) -> Resp
     let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
 
     Ok(state.render(
-        View::Favorites,
+        "favorites.html",
         &json!({"favorites": favorites, "tab": tab}),
     ))
 }
