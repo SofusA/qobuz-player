@@ -1,6 +1,9 @@
-{% extends "base.html" %}
-{% block content %}
-  {% set active_page = "Queue" %}
+@include (
+  base.html;
+  partial=partial;
+  active_page="Queue";
+  playing_info=playing_info
+) {
   <div
     hx-get="/queue/list"
     hx-trigger="tracklist"
@@ -9,12 +12,25 @@
   >
     <div class="flex flex-col gap-4 p-4">
       <div class="sticky top-0 pb-2 pt-safe bg-black/20 backdrop-blur">
-        <a hx-target="unset" href="{{ entity_link }}" class="text-2xl">
-          {{ entity_title }}
+        <a
+          hx-target="unset"
+          href="{{ playing_info.entity_link }}"
+          class="text-2xl"
+        >
+          {{ playing_info.entity_title }}
         </a>
       </div>
 
-      <div id="queue-list">{% include "list-tracks.html" %}</div>
+      <div id="queue-list">
+        @include (
+          list-tracks.html;
+          tracks=tracks;
+          show_track_cover=true;
+          show_artist=true;
+          now_playing_id=playing_info.now_playing_id;
+          click="/api/skip-to/"
+        ) {}
+      </div>
     </div>
   </div>
-{% endblock content %}
+}

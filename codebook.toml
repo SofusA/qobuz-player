@@ -1,6 +1,8 @@
 words = [
     "alsa",
+    "mousedown",
     "mpris",
+    "mseconds",
     "qobuz",
     "rfid",
     "tera",

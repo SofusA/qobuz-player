@@ -1,7 +1,6 @@
-{% if partial and partial == true %}
-  {% block content %}
-  {% endblock content %}
-{% else %}
+@if (partial) {
+  {{ content }}
+} @else {
   <!doctype html>
   <html lang="en" class="dark">
     <head>
@@ -30,7 +29,7 @@
         hx-preserve
         class="fixed top-8 right-8 z-10 p-2 rounded-lg pointer-events-none m-safe bg-gray-900/20 my-indicator backdrop-blur size-12"
       >
-        {% include "icons/loading-spinner.html" %}
+        @include (icons/loading-spinner.html) {}
       </div>
 
       <div
@@ -38,11 +37,13 @@
         class="flex fixed top-8 right-8 z-20 flex-col gap-4"
       ></div>
 
-      {% block content %}{% endblock content %}
-      {% if active_page != 'NowPlaying' %}
-        {% include "controls.html" %}
-      {% endif %}
-      {% include "navigation.html" %}
+      {{ content }}
+
+      @if (active_page != "NowPlaying") {
+        @include (controls.html; playing_info=playing_info) {}
+      }
+
+      @include (navigation.html; active_page=active_page) {}
     </body>
   </html>
-{% endif %}
+}

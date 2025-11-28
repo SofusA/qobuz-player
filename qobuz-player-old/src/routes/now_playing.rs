@@ -196,7 +196,6 @@ async fn now_playing_partial(State(state): State<Arc<AppState>>) -> impl IntoRes
 #[component]
 fn progress(position_mseconds: u128, duration_seconds: Option<u32>) -> impl IntoView {
     let duration_mseconds = duration_seconds.map_or(0, |x| x * 1000);
-
     let position_string = mseconds_to_mm_ss(position_mseconds);
     let duration_string = mseconds_to_mm_ss(duration_mseconds);
 

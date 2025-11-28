@@ -1,9 +1,15 @@
-{% extends "base.html" %}
-{% block content %}
-  {% set active_page = "NowPlaying" %}
+@include (
+  base.html;
+  partial=partial;
+  active_page="NowPlaying";
+  playing_info=playing_info
+) {
   <div
     class="flex flex-col gap-4 p-4 mx-auto touch-none"
-    style="max-width: calc(600px + 2rem); height: calc(100% - 4rem - env(safe-area-inset-bottom))"
+    style="
+      max-width: calc(600px + 2rem);
+      height: calc(100% - 4rem - env(safe-area-inset-bottom));
+    "
     hx-get="/now-playing"
     hx-trigger="tracklist"
     data-sse="tracklist"
@@ -12,17 +18,21 @@
     <div
       class="flex overflow-hidden justify-center size-full aspect-square max-h-fit"
     >
-      {% if cover_image %}
-        <img src="{{ cover_image }}" alt="{{ title }}" class="rounded-lg" />
-      {% else %}
+      @if (playing_info.cover_image) {
+        <img
+          src="{{ playing_info.cover_image }}"
+          alt="{{ title }}"
+          class="rounded-lg"
+        />
+      } @else {
         <div class="h-full bg-gray-900 rounded-lg aspect-square"></div>
-      {% endif %}
+      }
     </div>
 
     <div class="flex flex-col grow justify-center w-full">
       <div class="flex gap-2 justify-between items-center">
-        <a class="text truncate" href="{{ entity_link }}">
-          {{ entity_title }}
+        <a class="text truncate" href="{{ playing_info.entity_link }}">
+          {{ playing_info.entity_title }}
         </a>
         <div class="text-gray-500 whitespace-nowrap">
           {{ current_position }} of {{ number_of_tracks }}
@@ -30,25 +40,34 @@
       </div>
 
       <a href="artist_link" class="text-gray-400 truncate w-fit">
-        {{ artist_name }}
+        {{ playing_info.artist_name }}
       </a>
 
       <div class="flex flex-col gap-y-4 w-full">
         <div class="flex gap-2 justify-between items-center">
-          <span class="text-lg truncate">{{ title }}</span>
-          {% include "info.html" %}
+          <span class="text-lg truncate">{{ playing_info.title }}</span>
+          @include (
+            info.html;
+            hires_available=playing_info.hires_available;
+            explicit=playing_info.explicit
+          ) {}
         </div>
-        {% include "progress.html" %}
+        @include (
+          progress.html;
+          position_mseconds=position_mseconds;
+          duration_mseconds=duration_mseconds;
+          position_string=position_string;
+          duration_string=duration_string
+        ) {}
       </div>
       <div class="flex flex-col gap-4">
         <div class="flex flex-row gap-2 justify-center h-10">
-          {% include "previous.html" %}
-          {% include "player-state.html" %}
-          {% include "next.html" %}
+          @include (previous.html) {}
+          @include (player-state.html; status=playing_info.status) {}
+          @include (next.html) {}
         </div>
-
-        {% include "volume-slider.html" %}
+        @include (volume-slider.html) {}
       </div>
     </div>
   </div>
-{% endblock content %}
+}

@@ -37,20 +37,25 @@ fn now_playing(state: &AppState, partial: bool) -> Html<String> {
     let current_volume = state.volume_receiver.borrow();
     let current_volume = (*current_volume * 100.0) as u32;
 
-    let current_position = tracklist.current_position();
+    let current_position = tracklist.current_position() + 1;
 
-    let (duration_seconds, explicit, hires_available) =
+    let (duration_mseconds, explicit, hires_available) =
         current_track
             .as_ref()
             .map_or((None, false, false), |track| {
                 (
-                    Some(track.duration_seconds),
+                    Some(track.duration_seconds * 1000),
                     track.explicit,
                     track.hires_available,
                 )
             });
 
+    let duration_mseconds = duration_mseconds.unwrap_or_default();
+
     let number_of_tracks = tracklist.total();
+
+    let position_string = mseconds_to_mm_ss(position_mseconds);
+    let duration_string = mseconds_to_mm_ss(duration_mseconds);
 
     state.render(
         "now-playing.html",
@@ -58,11 +63,21 @@ fn now_playing(state: &AppState, partial: bool) -> Html<String> {
             "partial": partial,
             "number_of_tracks": number_of_tracks,
             "current_volume": current_volume,
-            "duration_seconds": duration_seconds,
+            "duration_mseconds": duration_mseconds,
             "position_mseconds": position_mseconds,
-            "current_position": current_position + 1,
+            "position_string": position_string,
+            "duration_string": duration_string,
+            "current_position": current_position,
             "explicit": explicit,
             "hires_available": hires_available,
         }),
     )
+}
+
+fn mseconds_to_mm_ss<T: Into<u128>>(mseconds: T) -> String {
+    let seconds = mseconds.into() / 1000;
+
+    let minutes = seconds / 60;
+    let seconds = seconds % 60;
+    format!("{minutes:02}:{seconds:02}")
 }

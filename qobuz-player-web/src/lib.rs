@@ -16,12 +16,7 @@ use qobuz_player_controls::{
 use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
 use serde_json::json;
-use std::{
-    convert::Infallible,
-    env,
-    sync::{Arc, RwLock},
-};
-use tera::Context;
+use std::{convert::Infallible, env, sync::Arc};
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     watch,
@@ -100,7 +95,6 @@ async fn create_router(
     let (templates_tx, templates_rx) = watch::channel(templates);
 
     let templates_clone = templates_rx.clone();
-    let broadcast_clone = broadcast.clone();
 
     #[cfg(all(debug_assertions, target_os = "linux"))]
     {
@@ -113,15 +107,8 @@ async fn create_router(
                 match event.ty {
                     filesentry::EventType::Modified | filesentry::EventType::Create => {
                         let mut templates = templates_clone.borrow().clone();
-
-                        match templates.full_reload().is_ok() {
-                            true => {
-                                templates_tx.send(templates).unwrap();
-                            }
-                            false => {
-                                broadcast_clone.send_error("Error parsing templates".into());
-                            }
-                        };
+                        templates.reload();
+                        templates_tx.send(templates).unwrap();
 
                         let event = ServerSentEvent {
                             event_name: "reload".into(),
@@ -320,11 +307,7 @@ fn ok_or_error_component<T>(
                 state
                     .templates
                     .borrow()
-                    .render(
-                        "error.html",
-                        &Context::from_serialize(json!({"error": err})).unwrap(),
-                    )
-                    .unwrap(),
+                    .render("error.html", &json!({"error": err})),
             ))
         }
     }

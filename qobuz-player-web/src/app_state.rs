@@ -7,8 +7,8 @@ use qobuz_player_controls::{
 };
 use qobuz_player_models::Favorites;
 use qobuz_player_rfid::RfidState;
+use skabelon::Templates;
 use std::sync::Arc;
-use tera::{Context, Tera};
 use tokio::sync::{broadcast::Sender, watch};
 
 use crate::{AlbumData, ServerSentEvent};
@@ -24,7 +24,7 @@ pub(crate) struct AppState {
     pub(crate) tracklist_receiver: TracklistReceiver,
     pub(crate) status_receiver: StatusReceiver,
     pub(crate) volume_receiver: VolumeReceiver,
-    pub(crate) templates: watch::Receiver<Tera>,
+    pub(crate) templates: watch::Receiver<Templates>,
 }
 
 impl AppState {
@@ -87,21 +87,11 @@ impl AppState {
             tracklist_type,
         };
 
+        let playing_info = serde_json::json!({"playing_info": playing_info});
+
         let context = merge_serialized(&playing_info, context).unwrap();
-        let context = Context::from_serialize(context).unwrap();
-
         let templates = self.templates.borrow();
-
-        let result = templates
-            .render(view, &context)
-            .or_else(|error| {
-                templates.render(
-                    "error-page.html",
-                    &Context::from_serialize(serde_json::json!({"error": format!("{error}")}))
-                        .unwrap(),
-                )
-            })
-            .unwrap_or_else(|e| e.to_string());
+        let result = templates.render(view, &context);
 
         Html(result)
     }

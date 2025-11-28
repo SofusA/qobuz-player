@@ -1,6 +1,6 @@
-{% if explicit or hires_available %}
+@if (explicit || hires_available) {
   <div class="flex gap-2 items-center">
-    {% if explicit %}
+    @if (explicit) {
       <div class="text-gray-400 whitespace-nowrap size-6">
         <svg height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path
@@ -9,9 +9,9 @@
           />
         </svg>
       </div>
-    {% endif %}
+    }
 
-    {% if hires_available %}
+    @if (hires_available) {
       <div class="text-gray-400 whitespace-nowrap size-6">
         <svg
           height="24"
@@ -33,6 +33,6 @@
           />
         </svg>
       </div>
-    {% endif %}
+    }
   </div>
-{% endif %}
+}

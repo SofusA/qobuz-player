@@ -10,11 +10,11 @@
     type="range"
     name="value"
     min="0"
-    max="{{ duration_seconds * 1000 }}"
+    max="{{ duration_mseconds }}"
   />
 
   <div class="flex justify-between text-sm text-gray-500">
-    <span id="position">{{ position_mseconds | mseconds_to_mm_ss }}</span>
-    <span>{{ (duration_seconds * 1000) | mseconds_to_mm_ss }}</span>
+    <span id="position">{{ position_string }}</span>
+    <span>{{ duration_string }}</span>
   </div>
 </div>
