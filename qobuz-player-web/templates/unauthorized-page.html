@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en" class="h-full dark">
+  @include (head.html) {}
+  <div class="flex justify-center items-center w-full h-full">
+    <form class="flex flex-col gap-4" action="/auth/login" method="post">
+      <input
+        class="p-2 w-full text-black bg-white rounded"
+        type="password"
+        id="secret"
+        name="secret"
+        placeholder="Secret"
+      />
+      <button class="button_class()" type="submit">Submit</button>
+    </form>
+  </div>
+</html>

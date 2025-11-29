@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     Router,
     extract::State,
-    response::{Html, IntoResponse},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use serde_json::json;
@@ -24,7 +24,7 @@ async fn queue_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse 
     queue(&state, true)
 }
 
-fn queue(state: &AppState, partial: bool) -> Html<String> {
+fn queue(state: &AppState, partial: bool) -> Response {
     let tracks = state.tracklist_receiver.borrow().queue().to_vec();
 
     state.render(

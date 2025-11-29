@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     Router,
     extract::State,
-    response::{Html, IntoResponse},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use serde_json::json;
@@ -29,7 +29,7 @@ async fn now_playing_partial(State(state): State<Arc<AppState>>) -> impl IntoRes
     now_playing(&state, true)
 }
 
-fn now_playing(state: &AppState, partial: bool) -> Html<String> {
+fn now_playing(state: &AppState, partial: bool) -> Response {
     let tracklist = state.tracklist_receiver.borrow().clone();
     let current_track = tracklist.current_track().cloned();
 

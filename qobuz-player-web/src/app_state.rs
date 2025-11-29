@@ -1,4 +1,4 @@
-use axum::response::Html;
+use axum::response::{Html, IntoResponse};
 use futures::try_join;
 use qobuz_player_controls::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
@@ -28,7 +28,7 @@ pub(crate) struct AppState {
 }
 
 impl AppState {
-    pub(crate) fn render<T>(&self, view: &str, context: &T) -> Html<String>
+    pub(crate) fn render<T>(&self, view: &str, context: &T) -> axum::response::Response
     where
         T: serde::Serialize,
     {
@@ -93,7 +93,7 @@ impl AppState {
         let templates = self.templates.borrow();
         let result = templates.render(view, &context);
 
-        Html(result)
+        Html(result).into_response()
     }
 
     pub(crate) async fn get_favorites(&self) -> Result<Favorites> {

@@ -2,7 +2,7 @@ use assets::static_handler;
 use axum::{
     Router,
     extract::State,
-    response::{Html, Sse, sse::Event},
+    response::{Html, IntoResponse, Sse, sse::Event},
     routing::get,
 };
 use futures::stream::Stream;
@@ -26,7 +26,10 @@ use tokio_stream::wrappers::BroadcastStream;
 
 use crate::{
     app_state::AppState,
-    routes::{api, controls, favorites, now_playing, queue},
+    routes::{
+        album, api, artist, auth, controls, discover, favorites, now_playing, playlist, queue,
+        search,
+    },
     views::templates,
 };
 
@@ -153,20 +156,19 @@ async fn create_router(
         .merge(now_playing::routes())
         .merge(queue::routes())
         .merge(api::routes())
-        // .merge(search::routes())
-        // .merge(album::routes())
-        // .merge(artist::routes())
-        // .merge(playlist::routes())
+        .merge(search::routes())
+        .merge(album::routes())
+        .merge(artist::routes())
+        .merge(playlist::routes())
         .merge(favorites::routes())
-        // .merge(queue::routes())
-        // .merge(discover::routes())
+        .merge(discover::routes())
         .merge(controls::routes())
-        // .layer(axum::middleware::from_fn_with_state(
-        //     shared_state.clone(),
-        //     auth::auth_middleware,
-        // ))
+        .layer(axum::middleware::from_fn_with_state(
+            shared_state.clone(),
+            auth::auth_middleware,
+        ))
         .route("/assets/{*file}", get(static_handler))
-        // .merge(auth::routes())
+        .merge(auth::routes())
         .with_state(shared_state.clone())
 }
 
@@ -286,19 +288,18 @@ pub(crate) struct ServerSentEvent {
     event_data: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct Discover {
     pub albums: Vec<(String, Vec<AlbumSimple>)>,
     pub playlists: Vec<(String, Vec<Playlist>)>,
 }
 
-type ResponseResult =
-    std::result::Result<axum::response::Html<String>, axum::response::Html<String>>;
+type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;
 
 fn ok_or_error_component<T>(
     state: &AppState,
     value: Result<T, qobuz_player_controls::error::Error>,
-) -> Result<T, axum::response::Html<String>> {
+) -> Result<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
         Err(err) => {
@@ -308,30 +309,27 @@ fn ok_or_error_component<T>(
                     .templates
                     .borrow()
                     .render("error.html", &json!({"error": err})),
-            ))
+            )
+            .into_response())
         }
     }
 }
-// Err(Html(
-//             state
-//                 .templates
-//                 .render(View::Error.name(), &json!({error: err})),
-//         ))
-// #[allow(clippy::result_large_err)]
-// fn ok_or_broadcast<T>(
-//     broadcast: &NotificationBroadcast,
-//     value: Result<T, qobuz_player_controls::error::Error>,
-// ) -> Result<T, axum::response::Response> {
-//     match value {
-//         Ok(value) => Ok(value),
-//         Err(err) => {
-//             broadcast.send(Notification::Error(format!("{err}")));
 
-//             let mut response = render(html! { <div></div> });
-//             let headers = response.headers_mut();
-//             headers.insert("HX-Reswap", "none".try_into().expect("infallible"));
+#[allow(clippy::result_large_err)]
+fn ok_or_broadcast<T>(
+    broadcast: &NotificationBroadcast,
+    value: Result<T, qobuz_player_controls::error::Error>,
+) -> Result<T, axum::response::Response> {
+    match value {
+        Ok(value) => Ok(value),
+        Err(err) => {
+            broadcast.send(Notification::Error(format!("{err}")));
 
-//             Err(response)
-//         }
-//     }
-// }
+            let mut response = Html("<div></div>".to_string()).into_response();
+            let headers = response.headers_mut();
+            headers.insert("HX-Reswap", "none".try_into().expect("infallible"));
+
+            Err(response)
+        }
+    }
+}

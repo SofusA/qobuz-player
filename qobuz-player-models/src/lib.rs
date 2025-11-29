@@ -42,7 +42,7 @@ pub struct Album {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct AlbumSimple {
     pub id: String,
     pub title: String,
@@ -53,7 +53,7 @@ pub struct AlbumSimple {
     pub explicit: bool,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct SearchResults {
     pub query: String,
     pub albums: Vec<Album>,

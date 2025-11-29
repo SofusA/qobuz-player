@@ -18,6 +18,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route("/api/volume", post(set_volume))
         .route("/api/position", post(set_position))
         .route("/api/skip-to/{track_number}", put(skip_to))
+        .route("/api/play-track/{track_id}", put(play_track))
+}
+
+async fn play_track(
+    State(state): State<Arc<AppState>>,
+    Path(track_id): Path<u32>,
+) -> impl IntoResponse {
+    state.controls.play_track(track_id);
 }
 
 async fn play(State(state): State<Arc<AppState>>) -> impl IntoResponse {
