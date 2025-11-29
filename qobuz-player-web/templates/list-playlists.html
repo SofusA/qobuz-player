@@ -1,0 +1,19 @@
+@include (list.html) {
+  @for (playlist in playlists) {
+    @include (list-item.html) {
+      <a
+        class="flex gap-4 items-center w-full text-lg text-left"
+        href="/playlist/{{ playlist.id }}"
+      >
+        <div
+          class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-md aspect-square size-12"
+          @if(playlist.image)
+          {
+          style="background-image: url({{ playlist.image }});"
+          }
+        ></div>
+        <p class="w-full text-lg truncate">{{ playlist.title }}</p>
+      </a>
+    }
+  }
+}

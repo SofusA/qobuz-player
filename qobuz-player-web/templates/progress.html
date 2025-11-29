@@ -1,0 +1,20 @@
+<div class="flex flex-col">
+  <input
+    id="progress-slider"
+    class="w-full accent-gray-500"
+    autocomplete="off"
+    hx-post="/api/position"
+    hx-trigger="input delay:100ms"
+    hx-swap="none"
+    value="{{ position_mseconds }}"
+    type="range"
+    name="value"
+    min="0"
+    max="{{ duration_mseconds }}"
+  />
+
+  <div class="flex justify-between text-sm text-gray-500">
+    <span id="position">{{ position_string }}</span>
+    <span>{{ duration_string }}</span>
+  </div>
+</div>

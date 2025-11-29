@@ -1,0 +1,29 @@
+@include (list.html) {
+  @for (artist in artists) {
+    @include (list-item.html) {
+      <a
+        class="flex gap-4 items-center"
+        hx-push-url="true"
+        href="/artist/{{ artist.id }}"
+        preload="mousedown"
+        preload-images="true"
+      >
+        @if (artist.image) {
+          <div
+            class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-full aspect-square size-12"
+            style="background-image: url({{ artist.image }});"
+          ></div>
+        } @else {
+          <div
+            class="flex justify-center items-center bg-gray-500 rounded-full aspect-square size-12"
+          >
+            <div class="w-8">
+              @include (icons/user.html) {}
+            </div>
+          </div>
+        }
+        <p class="w-full text-lg truncate">{{ artist.name }}</p>
+      </a>
+    }
+  }
+}

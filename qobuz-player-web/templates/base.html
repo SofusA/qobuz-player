@@ -1,0 +1,34 @@
+@if (partial) {
+  {{ content }}
+} @else {
+  <!doctype html>
+  <html lang="en" class="dark">
+    @include (head.html) {}
+    <body
+      class="text-gray-50 bg-black touch-pan-y"
+      hx-ext="preload, remove-me, morph"
+      hx-indicator="#loading-spinner"
+    >
+      <div
+        id="loading-spinner"
+        hx-preserve
+        class="fixed top-8 right-8 z-10 p-2 rounded-lg pointer-events-none m-safe bg-gray-900/20 my-indicator backdrop-blur size-12"
+      >
+        @include (icons/loading-spinner.html) {}
+      </div>
+
+      <div
+        id="toast-container"
+        class="flex fixed top-8 right-8 z-20 flex-col gap-4"
+      ></div>
+
+      {{ content }}
+
+      @if (active_page != "NowPlaying") {
+        @include (controls.html; playing_info=playing_info) {}
+      }
+
+      @include (navigation.html; active_page=active_page) {}
+    </body>
+  </html>
+}
