@@ -33,7 +33,12 @@
         <span>Play</span>
       </button>
 
-      @include (toggle-favorite.html; id=album.id; is_favorite=is_favorite) {}
+      @include (
+        toggle-favorite.html;
+        id=album.id;
+        is_favorite=is_favorite;
+        api="/album"
+      ) {}
       @if (rfid) {
         <button class="button" hx-swap="none" hx-put="{{ album.id }}/link">
           <span class="size-6">

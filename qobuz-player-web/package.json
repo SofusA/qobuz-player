@@ -1,7 +1,7 @@
 {
   "scripts": {
     "build": "tailwindcss -i assets/tailwind.css -o assets/styles.css --minify",
-    "watch": "tailwindcss -i assets/tailwind.css -o assets/styles.css --watch",
+    "watch": "tailwindcss -i assets/tailwind.css -o assets/styles.css --watch --minify",
     "build-assets": "pwa-asset-generator -m assets/manifest.json -i dummy-index.html -b black assets/favicon.svg assets/pwa"
   },
   "devDependencies": {

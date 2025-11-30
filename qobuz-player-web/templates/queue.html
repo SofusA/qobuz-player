@@ -5,10 +5,11 @@
   playing_info=playing_info
 ) {
   <div
-    hx-get="/queue/list"
+    hx-get="/queue/partial"
     hx-trigger="tracklist"
     data-sse="tracklist"
-    hx-target="#queue-list"
+    hx-target="this"
+    hx-swap="outerHTML"
   >
     <div class="flex flex-col gap-4 p-4">
       <div class="sticky top-0 pb-2 pt-safe bg-black/20 backdrop-blur">
@@ -21,16 +22,14 @@
         </a>
       </div>
 
-      <div id="queue-list">
-        @include (
-          list-tracks.html;
-          tracks=tracks;
-          show_track_cover=true;
-          show_artist=true;
-          now_playing_id=playing_info.now_playing_id;
-          click="/api/skip-to/"
-        ) {}
-      </div>
+      @include (
+        list-tracks.html;
+        tracks=tracks;
+        show_track_cover=true;
+        show_artist=true;
+        now_playing_id=playing_info.now_playing_id;
+        click="/api/skip-to/"
+      ) {}
     </div>
   </div>
 }

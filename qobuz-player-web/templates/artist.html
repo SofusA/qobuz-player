@@ -21,7 +21,12 @@
         <span>Play</span>
       </button>
 
-      @include (toggle-favorite.html; id=artist.id; is_favorite=is_favorite) {}
+      @include (
+        toggle-favorite.html;
+        id=artist.id;
+        is_favorite=is_favorite;
+        api="/artist"
+      ) {}
     }
   </div>
 
