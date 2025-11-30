@@ -296,6 +296,7 @@ pub(crate) struct Discover {
 
 type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;
 
+#[allow(clippy::result_large_err)]
 fn ok_or_error_component<T>(
     state: &AppState,
     value: Result<T, qobuz_player_controls::error::Error>,

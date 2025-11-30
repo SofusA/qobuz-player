@@ -76,7 +76,7 @@ pub struct Artist {
     pub image: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct ArtistPage {
     pub id: u32,
     pub name: String,

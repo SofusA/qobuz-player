@@ -1,0 +1,17 @@
+        <div
+            class="w-full"
+            hx-get=format!("/album/{}/tracks", album_id_clone)
+            hx-target="this"
+            hx-trigger="tracklist"
+            data-sse="tracklist"
+            hx-swap="morph:outerHTML"
+        >
+            <ListTracks
+                now_playing_id=now_playing_id
+                track_number_display=TrackNumberDisplay::Number
+                tracks=tracks
+                show_artist=false
+                dim_played=false
+                api_call=move |index: usize| format!("/album/{album_id}/play/{index}")
+            />
+        </div>

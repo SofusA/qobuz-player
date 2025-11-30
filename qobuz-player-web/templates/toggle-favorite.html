@@ -1,0 +1,14 @@
+<button
+  class="button_class()"
+  id="toggle-favorite"
+  hx-swap="outerHTML"
+  hx-target="this"
+  hx-put="{{ api }}/{{
+    id
+  }}/@if(is_favorite){unset-favorite}@else{set-favorite}"
+>
+  <span class="size-6">
+    <Star solid="is_favorite" />
+  </span>
+  <span>Favorite</span>
+</button>
