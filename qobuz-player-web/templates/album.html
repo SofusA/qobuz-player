@@ -1,78 +1,64 @@
-        <div class="flex flex-wrap gap-4 justify-center items-end w-full p-safe-or-4 *:max-w-sm">
-            <img
-                src=album.image
-                alt=album.title.clone()
-                class="object-contain rounded-lg size-full"
-            />
+<div
+  class="flex flex-wrap gap-4 justify-center items-end w-full p-safe-or-4 *:max-w-sm"
+>
+  <img
+    src="{{ album.image }}"
+    alt="{{ album.title }}"
+    class="object-contain rounded-lg size-full"
+  />
 
-            <div class="flex flex-col grow gap-4 items-center w-full">
-                <div class="flex flex-col gap-2 justify-center items-center w-full text-center">
-                    <a
-                        href=format!("/artist/{}", album.artist.id)
-                        class="text-gray-400 rounded sm:text-lg"
-                    >
-                        {album.artist.name}
-                    </a>
-                    <span class="text-lg sm:text-xl">{album.title.clone()}</span>
-                    <span class="flex gap-2 text-gray-400 sm:text-lg">
-                        <span>{album.release_year}</span>
-                        <span>"•︎"</span>
-                        <span>{format!("{} minutes", duration.minutes)}</span>
-                    </span>
-                </div>
+  <div class="flex flex-col grow gap-4 items-center w-full">
+    <div
+      class="flex flex-col gap-2 justify-center items-center w-full text-center"
+    >
+      <a
+        href="/artist/{{ album.artist.id }}"
+        class="text-gray-400 rounded sm:text-lg"
+      >
+        {{ album.artist.name }}
+      </a>
+      <span class="text-lg sm:text-xl">{{ album.title }}</span>
+      <span class="flex gap-2 text-gray-400 sm:text-lg">
+        <span>{{ album.release_year }}</span>
+        <span>•︎</span>
+        <span>{{ duration }} minutes</span>
+      </span>
+    </div>
 
-                <ButtonGroup>
-                    <button
-                        class=button_class()
-                        hx-swap="none"
-                        hx-put=format!("{}/play", album_id_clone_1)
-                    >
-                        <span class="size-6">
-                            <Play />
-                        </span>
-                        <span>Play</span>
-                    </button>
+    @include (button-group.html) {
+      <button class="button" hx-swap="none" hx-put="{{ album.id }}/play">
+        <span class="size-6">
+          @include (icons/play.html) {}
+        </span>
+        <span>Play</span>
+      </button>
 
-                    <ToggleFavorite id=album.id.clone() is_favorite=is_favorite />
+      @include (toggle-favorite.html; id=album.id; is_favorite=is_favorite) {}
+      @if (rfid) {
+        <button class="button" hx-swap="none" hx-put="{{ album.id }}/link">
+          <span class="size-6">
+            @include (icons/link.html) {}
+          </span>
+          <span>Link RFID</span>
+        </button>
+      }
+    }
+  </div>
+</div>
+<div class="flex flex-col gap-4 w-full">
+  <div class="sm:p-4">
+    @include (album-tracks.html; album=album; now_playing_id=now_playing_id) {}
+  </div>
 
-                    {rfid
-                        .then_some(
-                            html! {
-                                <button
-                                    class=button_class()
-                                    hx-swap="none"
-                                    hx-put=format!("{}/link", album_id_clone_1)
-                                >
-                                    <span class="size-6">
-                                        <Link />
-                                    </span>
-                                    <span>Link RFID</span>
-                                </button>
-                            },
-                        )}
-                </ButtonGroup>
-            </div>
-        </div>
-        <div class="flex flex-col gap-4 w-full">
-            <div class="sm:p-4">
-                <AlbumTracks
-                    tracks=album.tracks
-                    album_id=album_id_clone_2
-                    now_playing_id=now_playing_id
-                />
-            </div>
-
-            {if !suggested_albums.is_empty() {
-                Some(
-                    html! {
-                        <div class="flex flex-col gap-2 w-full">
-                            <h3 class="px-4 text-lg">Album suggestions</h3>
-                            <ListAlbumsVertical albums=suggested_albums />
-                        </div>
-                    },
-                )
-            } else {
-                None
-            }}
-            <Description description=album.description entity_title=album.title />
-        </div>
+  @if (suggested_albums) {
+    <div class="flex flex-col gap-2 w-full">
+      <h3 class="px-4 text-lg">Album suggestions</h3>
+      @include (list-albums-vertical.html; albums=suggested_albums) {}
+    </div>
+  }
+  @include (
+    description.html;
+    description=album.description;
+    title=album.title
+  ) {}
+</div>

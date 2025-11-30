@@ -9,7 +9,7 @@
       >
         <div class="flex overflow-hidden gap-4 items-center w-full">
           <div
-            class="flex justify-center items-center {{#if show_track_cover}} size-12 aspect-square {{/if}}"
+            class="flex justify-center items-center @if(show_track_cover) {size-12 aspect-square}"
           >
             @if (track.id == now_playing_id) {
               <div class="text-blue-500 size-5">

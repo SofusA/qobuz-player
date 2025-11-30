@@ -1,0 +1,17 @@
+<div class="flex overflow-scroll gap-4 p-2 w-full">
+  @for (playlist in playlists) {
+    <a
+      href="/playlist/{{ playlist.id }}"
+      class="shrink-0 h-full"
+      preload="mousedown"
+      preload-images="true"
+    >
+      <img
+        class="rounded-lg h-32"
+        alt="{{ playlist.title }}"
+        src="{{ playlist.image }}"
+      />
+      <p class="text-sm truncate">{{ playlist.title }}</p>
+    </a>
+  }
+</div>

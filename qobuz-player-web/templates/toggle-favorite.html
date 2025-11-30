@@ -1,5 +1,5 @@
 <button
-  class="button_class()"
+  class="button"
   id="toggle-favorite"
   hx-swap="outerHTML"
   hx-target="this"
@@ -8,7 +8,11 @@
   }}/@if(is_favorite){unset-favorite}@else{set-favorite}"
 >
   <span class="size-6">
-    <Star solid="is_favorite" />
+    @if (is_favorite) {
+      @include (icons/star-solid.html) {}
+    } @else {
+      @include (icons/star.html) {}
+    }
   </span>
   <span>Favorite</span>
 </button>

@@ -27,48 +27,4 @@ async fn index(State(state): State<Arc<AppState>>) -> ResponseResult {
             "discover": discover,
         }),
     ))
-
-    // let album_features = discover
-    //     .albums
-    //     .into_iter()
-    //     .map(|x| html! { <AlbumFeature albums=x.1 name=x.0 /> })
-    //     .collect::<Vec<_>>();
-
-    // let playlist_features = discover
-    //     .playlists
-    //     .into_iter()
-    //     .map(|x| html! { <PlaylistFeature playlists=x.1 name=x.0 /> })
-    //     .collect::<Vec<_>>();
-
-    // Ok(render(html! {
-    //     <Page active_page=Page::Discover current_status=*current_status tracklist=&tracklist>
-    //         <div class="flex flex-col gap-8 px-4">
-    //             <div class="flex sticky top-0 flex-col flex-grow gap-4 pb-2 max-h-full pt-safe-or-4 bg-black/80 backdrop-blur">
-    //                 <h1 class="text-2xl">Discover</h1>
-    //             </div>
-    //             {album_features}
-    //             {playlist_features}
-    //         </div>
-    //     </Page>
-    // }))
 }
-
-// #[component]
-// fn album_feature(albums: Vec<AlbumSimple>, name: String) -> impl IntoView {
-//     html! {
-//         <div class="flex flex-col gap-2">
-//             <h3 class="text-lg">{name}</h3>
-//             <ListAlbumsVertical albums=albums />
-//         </div>
-//     }
-// }
-
-// #[component]
-// fn playlist_feature(playlists: Vec<Playlist>, name: String) -> impl IntoView {
-//     html! {
-//         <div class="flex flex-col gap-2">
-//             <h3 class="text-lg">{name}</h3>
-//             <ListPlaylistsVertical playlists=playlists />
-//         </div>
-//     }
-// }

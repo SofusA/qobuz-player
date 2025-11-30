@@ -40,8 +40,10 @@ async fn top_tracks_partial(
 
 async fn play_top_track(
     State(state): State<Arc<AppState>>,
-    Path((artist_id, track_index)): Path<(u32, u32)>,
+    Path((artist_id, track_id)): Path<(u32, u32)>,
 ) -> impl IntoResponse {
+    // TODO: find track index
+    let track_index = track_id;
     state.controls.play_top_tracks(artist_id, track_index);
 }
 
@@ -90,9 +92,7 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
         ),
     )?;
 
-    let now_playing_id = state.tracklist_receiver.borrow().currently_playing();
     let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
-
     let is_favorite = favorites.artists.iter().any(|artist| artist.id == id);
 
     Ok(state.render(
@@ -102,7 +102,6 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
             "albums": albums,
             "is_favorite": is_favorite,
             "similar_artists": similar_artists,
-            "now_playing_id": now_playing_id,
         }),
     ))
 }

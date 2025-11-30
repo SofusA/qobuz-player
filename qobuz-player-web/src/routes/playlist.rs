@@ -89,11 +89,13 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
     let playlist = ok_or_error_component(&state, state.client.playlist(id).await)?;
     let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
+    let duration = playlist.duration_seconds / 60;
 
     Ok(state.render(
         "playlist.html",
         &json!({
             "playlist": playlist,
+            "duration": duration,
             "is_favorite": is_favorite,
             "rfid": state.rfid_state.is_some(),
         }),

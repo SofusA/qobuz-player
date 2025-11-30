@@ -15,3 +15,7 @@ html {
 .htmx-request.my-indicator {
   opacity: 1;
 }
+
+.button {
+  @apply flex gap-2 justify-center items-center py-2 px-4 w-full bg-blue-500 rounded cursor-pointer active:bg-blue-700 whitespace-nowrap;
+}
