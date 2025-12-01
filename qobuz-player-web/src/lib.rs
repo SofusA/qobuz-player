@@ -16,6 +16,7 @@ use qobuz_player_controls::{
 use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
 use serde_json::json;
+use skabelon::Templates;
 use std::{convert::Infallible, env, sync::Arc};
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
@@ -139,7 +140,7 @@ async fn create_router(
         tracklist_receiver: tracklist_receiver.clone(),
         volume_receiver: volume_receiver.clone(),
         status_receiver: status_receiver.clone(),
-        templates: templates_rx,
+        templates: templates_rx.clone(),
     });
 
     tokio::spawn(background_task(
@@ -149,6 +150,7 @@ async fn create_router(
         tracklist_receiver,
         volume_receiver,
         status_receiver,
+        templates_rx,
     ));
 
     axum::Router::new()
@@ -179,6 +181,7 @@ async fn background_task(
     mut tracklist: TracklistReceiver,
     mut volume: VolumeReceiver,
     mut status: StatusReceiver,
+    templates: watch::Receiver<Templates>,
 ) {
     loop {
         tokio::select! {
@@ -224,33 +227,39 @@ async fn background_task(
             }
             notification = receiver.recv() => {
                 tracing::info!("notification: {:?}", notification);
-                // if let Ok(message) = notification {
-                //     let toast = components::toast(message.clone()).to_html();
+                if let Ok(message) = notification {
+                        let (message_string, severity) = match &message {
+                            Notification::Error(message) => (message, 1),
+                            Notification::Warning(message) => (message, 2),
+                            Notification::Success(message) => (message, 3),
+                            Notification::Info(message) => (message, 4),
+                        };
 
-                //     let event = match message {
-                //         qobuz_player_controls::notification::Notification::Error(_) => ServerSentEvent {
-                //             event_name: "error".into(),
-                //             event_data: toast,
-                //         },
-                //         qobuz_player_controls::notification::Notification::Warning(_) => {
-                //             ServerSentEvent {
-                //                 event_name: "warn".into(),
-                //                 event_data: toast,
-                //             }
-                //         }
-                //         qobuz_player_controls::notification::Notification::Success(_) => {
-                //             ServerSentEvent {
-                //                 event_name: "success".into(),
-                //                 event_data: toast,
-                //             }
-                //         }
-                //         qobuz_player_controls::notification::Notification::Info(_) => ServerSentEvent {
-                //             event_name: "info".into(),
-                //             event_data: toast,
-                //         },
-                //     };
-                //     _ = tx.send(event);
-                // }
+                    let toast = templates.borrow().render("toast.html", &json!({"message": message_string, "severity": severity}));
+                    let event = match message {
+                        Notification::Error(_) => ServerSentEvent {
+                            event_name: "error".into(),
+                            event_data: toast,
+                        },
+                        Notification::Warning(_) => {
+                            ServerSentEvent {
+                                event_name: "warn".into(),
+                                event_data: toast,
+                            }
+                        }
+                        Notification::Success(_) => {
+                            ServerSentEvent {
+                                event_name: "success".into(),
+                                event_data: toast,
+                            }
+                        }
+                        Notification::Info(_) => ServerSentEvent {
+                            event_name: "info".into(),
+                            event_data: toast,
+                        },
+                    };
+                    _ = tx.send(event);
+                }
             }
         }
     }

@@ -1,6 +1,6 @@
 use tokio::sync::broadcast::{self, Receiver, Sender};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum Notification {
     Error(String),
     Warning(String),

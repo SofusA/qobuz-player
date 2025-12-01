@@ -84,6 +84,8 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> 
 
     let duration = album_data.album.duration_seconds / 60;
 
+    let click_string = format!("/album/{}/play/", album_data.album.id);
+
     Ok(state.render(
         "album.html",
         &json!({
@@ -92,6 +94,7 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> 
             "suggested_albums": album_data.suggested_albums,
             "is_favorite": is_favorite,
             "rfid": state.rfid_state.is_some(),
+            "click": click_string
         }),
     ))
 }
@@ -101,11 +104,13 @@ async fn album_tracks_partial(
     Path(id): Path<String>,
 ) -> ResponseResult {
     let album = ok_or_error_component(&state, state.client.album(&id).await)?;
+    let click_string = format!("/album/{}/play/", album.id);
 
     Ok(state.render(
         "album-tracks.html",
         &json!({
             "album": album,
+            "click": click_string
         }),
     ))
 }

@@ -3,8 +3,6 @@
   hx-trigger="tracklist"
   data-sse="tracklist"
   hx-target="this"
-  hx-preserve
-  id="controls"
 >
   <div class="h-16"></div>
   <div class="fixed right-0 left-0 bottom-14 px-safe-offset-2 py-safe">
@@ -32,7 +30,7 @@
           @include (previous.html) {}
         </span>
         <span class="flex w-8">
-          @include (player-state.html; status=playing_info.status) {}
+          @include (player-state.html; playing_info=playing_info) {}
         </span>
         <span class="flex w-8">
           @include (next.html) {}

@@ -1,11 +1,11 @@
 <button
   class="transition-colors cursor-pointer"
   hx-swap="none"
-  hx-put="@if (status == "Playing") {/api/pause} @else {/api/play}"
+  hx-put="@if (playing_info.status == "Playing") {/api/pause} @else {/api/play}"
 >
-  @if (status == "Playing") {
+  @if (playing_info.status == "Playing") {
     @include (icons/pause.html) {}
-  } @else if (status == "Buffering") {
+  } @else if (playing_info.status == "Buffering") {
     @include (icons/loading-spinner.html) {}
   } @else {
     @include (icons/play.html) {}

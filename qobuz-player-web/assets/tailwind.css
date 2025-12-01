@@ -19,3 +19,5 @@ html {
 .button {
   @apply flex gap-2 justify-center items-center py-2 px-4 w-full bg-blue-500 rounded cursor-pointer active:bg-blue-700 whitespace-nowrap;
 }
+
+@source inline("bg-red-500 bg-yellow-500 bg-blue-500 bg-teal-500");

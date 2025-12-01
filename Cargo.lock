@@ -3736,9 +3736,9 @@ dependencies = [
 
 [[package]]
 name = "skabelon"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd4395418a933193f5e7348e11759c13e97a9b7744cdc75af3b4ba6c496ff52f"
+checksum = "3c5c4b49e26b22114806fbd496081a6898ba09e793e15d2e7f466c6035f75db8"
 dependencies = [
  "glob",
  "pathdiff",

@@ -8,10 +8,10 @@
 >
   @include (
     list-tracks.html;
-    now_playing_id=now_playing_id;
+    now_playing_id=playing_info.now_playing_id;
     tracks=album.tracks;
     show_artist=false;
     show_track_cover=false;
-    click="/album/{{album_id}}/play/"
+    click=click
   ) {}
 </div>

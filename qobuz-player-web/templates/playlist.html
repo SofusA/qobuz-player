@@ -16,7 +16,11 @@
     </div>
 
     @include (button-group.html) {
-      <button class="button" hx-swap="none" hx-put="{{ playlist.id }}/play">
+      <button
+        class="button"
+        hx-swap="none"
+        hx-put="/playlist/{{ playlist.id }}/play"
+      >
         <span class="size-6">
           @include (icons/play.html) {}
         </span>
@@ -58,8 +62,9 @@
   <div class="sm:p-4">
     @include (
       playlist-tracks.html;
-      now_playing_id=now_playing_id;
+      playing_info=playing_info;
       playlist=playlist
+      click=click
     ) {}
   </div>
 </div>

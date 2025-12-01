@@ -60,9 +60,10 @@ impl AppState {
                 Some(tracklist.title.clone()),
                 Some(format!("/playlist/{}", tracklist.id)),
             ),
-            TracklistType::TopTracks(tracklist) => {
-                (None, Some(format!("/artist/{}", tracklist.id)))
-            }
+            TracklistType::TopTracks(tracklist) => (
+                Some(tracklist.artist_name.clone()),
+                Some(format!("/artist/{}", tracklist.id)),
+            ),
             TracklistType::Track(tracklist) => (
                 current_track
                     .as_ref()

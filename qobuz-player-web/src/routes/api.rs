@@ -48,7 +48,7 @@ async fn skip_to(
     State(state): State<Arc<AppState>>,
     Path(track_number): Path<u32>,
 ) -> impl IntoResponse {
-    state.controls.skip_to_position(track_number - 1, true);
+    state.controls.skip_to_position(track_number, true);
 }
 
 #[derive(serde::Deserialize, Clone, Copy)]

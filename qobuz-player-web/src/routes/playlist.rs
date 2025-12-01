@@ -90,6 +90,7 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
     let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
     let duration = playlist.duration_seconds / 60;
+    let click_string = format!("/playlist/{}/play/", playlist.id);
 
     Ok(state.render(
         "playlist.html",
@@ -98,17 +99,20 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
             "duration": duration,
             "is_favorite": is_favorite,
             "rfid": state.rfid_state.is_some(),
+            "click": click_string
         }),
     ))
 }
 
 async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
     let playlist = ok_or_broadcast(&state.broadcast, state.client.playlist(id).await)?;
+    let click_string = format!("/playlist/{}/play/", playlist.id);
 
     Ok(state.render(
         "playlist-tracks.html",
         &json!({
-            "playlist": playlist
+            "playlist": playlist,
+            "click": click_string
         }),
     ))
 }

@@ -3,7 +3,7 @@
     @include (list-item.html) {
       <button
         hx-swap="none"
-        hx-put="{{ click }}{{ track.number }}"
+        hx-put="{{ click }}{{ index }}"
         class="flex justify-between items-center w-full text-left cursor-pointer disabled:text-gray-500 disabled:cursor-default"
         @if(!track.available){disabled}
       >
