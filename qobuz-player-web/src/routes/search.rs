@@ -44,7 +44,7 @@ async fn index(
 
     Ok(state.render(
         "search.html",
-        &json!({"search_results": search_results, "tab": tab}),
+        &json!({"search_results": search_results, "tab": tab, "partial": false}),
     ))
 }
 
@@ -63,6 +63,6 @@ async fn search(
 
     Ok(state.render(
         "search.html",
-        &json!({"search_results": search_results, "tab": tab}),
+        &json!({"search_results": search_results, "tab": tab, "partial": true }),
     ))
 }

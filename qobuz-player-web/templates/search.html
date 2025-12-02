@@ -1,0 +1,132 @@
+@include (
+  base.html;
+  partial=partial;
+  active_page="Search";
+  playing_info=playing_info
+) {
+  <div id="search" class="flex flex-col">
+    <div
+      class="flex sticky top-0 flex-col grow gap-4 pb-2 max-h-full pt-safe-or-4 bg-black/80 backdrop-blur"
+    >
+      <div class="flex flex-row gap-4 items-center" id="search-form">
+        <input
+          id="query"
+          name="query"
+          class="p-2 w-full text-black bg-white rounded"
+          autocapitalize="off"
+          autocomplete="off"
+          autocorrect="off"
+          placeholder="Search"
+          spellcheck="false"
+          type="search"
+          oninput="setSearchQuery(this.value)"
+          hx-preserve
+          hx-post=""
+          hx-trigger="input changed delay:500ms, keyup[key=='Enter']"
+          hx-target="#search"
+          hx-swap="morph:innerHTML"
+        />
+        <span class="size-8">
+          @include (icons/magnifying-glass.html) {}
+        </span>
+        <script>
+          loadSearchInput();
+        </script>
+      </div>
+
+      <div
+        class="flex justify-between *:rounded-full *:px-2 *:py-1 *:transition-colors"
+      >
+        <button
+          hx-get="albums?query={{ search_results.query }}"
+          hx-target="#search"
+          hx-push-url="true"
+          class="@if(tab == 'albums'){bg-blue-800}"
+          preload="mouseover"
+          preload-images="true"
+        >
+          Albums
+        </button>
+        <button
+          hx-get="artists?query={{ search_results.query }}"
+          hx-target="#search"
+          hx-push-url="true"
+          class="@if(tab == 'artists'){bg-blue-800}"
+          preload="mouseover"
+          preload-images="true"
+        >
+          Artists
+        </button>
+        <button
+          hx-get="playlists?query={{ search_results.query }}"
+          hx-target="#search"
+          hx-push-url="true"
+          class="@if(tab == 'playlists'){bg-blue-800}"
+          preload="mouseover"
+          preload-images="true"
+        >
+          Playlists
+        </button>
+        <button
+          hx-get="tracks?query={{ search_results.query }}"
+          hx-target="#search"
+          hx-push-url="true"
+          class="@if(tab == 'tracks'){bg-blue-800}"
+          preload="mouseover"
+          preload-images="true"
+        >
+          Tracks
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-auto h-full">
+      @if (tab == "albums") {
+        @include (list-albums.html; albums=search_results.albums) {}
+      }
+
+      @if (tab == "artists") {
+        @include (list-artists.html; artists=search_results.artists) {}
+      }
+
+      @if (tab == "playlists") {
+        @include (list-playlists.html; playlists=search_results.playlists) {}
+      }
+
+      @if (tab == "tracks") {
+        @include (list.html) {
+          @for (track in search_results.tracks) {
+            @include (list-item.html) {
+              <button
+                class="flex gap-4 items-center w-full cursor-pointer"
+                hx-put="/api/play-track/{{ track.id }}"
+                hx-swap="none"
+              >
+                <img
+                  class="inline text-sm text-gray-500 bg-gray-800 rounded-md aspect-square size-12"
+                  alt="{{ track.title }}"
+                  src="{{ track.image_thumbnail }}"
+                />
+
+                <div class="overflow-hidden w-full">
+                  <div class="flex justify-between items-center">
+                    <h3 class="text-lg truncate">{{ track.title }}</h3>
+                    @include (
+                      info.html;
+                      explicit=track.explicit;
+                      hires_available=track.hires_available
+                    ) {}
+                  </div>
+
+                  <h4 class="flex gap-2 text-left text-gray-400">
+                    <span class="truncate">{{ track.artist_name }}</span>
+                  </h4>
+                </div>
+              </button>
+            }
+          }
+        }
+      }
+    </div>
+  </div>
+}
