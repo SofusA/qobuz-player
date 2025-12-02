@@ -30,7 +30,6 @@ clap = { version = "*", features = ["derive", "env"] }
 rust-embed = { version = "*", features = ["axum", "tokio", "mime_guess"] }
 dirs = "*"
 futures = "*"
-leptos = { version = "*", default-features = false, features = ["ssr"] }
 md5 = "*"
 mime = "*"
 mime_guess = "*"

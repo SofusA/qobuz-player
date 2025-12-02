@@ -2,12 +2,10 @@ use assets::static_handler;
 use axum::{
     Router,
     extract::State,
-    response::{Sse, sse::Event},
+    response::{Html, IntoResponse, Sse, sse::Event},
     routing::get,
 };
 use futures::stream::Stream;
-use leptos::*;
-use leptos::{html::*, prelude::RenderHtml};
 use qobuz_player_controls::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
@@ -15,27 +13,31 @@ use qobuz_player_controls::{
     error::Error,
     notification::{Notification, NotificationBroadcast},
 };
-use qobuz_player_models::{Album, AlbumSimple, Favorites, Playlist};
+use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
-use routes::{
-    album, artist, auth, controls, discover, favorites, now_playing, playlist, queue, search,
-};
-use std::{convert::Infallible, sync::Arc};
-use tokio::{
-    sync::broadcast::{self, Receiver, Sender},
-    try_join,
+use serde_json::json;
+use skabelon::Templates;
+use std::{convert::Infallible, env, sync::Arc};
+use tokio::sync::{
+    broadcast::{self, Receiver, Sender},
+    watch,
 };
 use tokio_stream::StreamExt as _;
 use tokio_stream::wrappers::BroadcastStream;
 
-use crate::view::render;
+use crate::{
+    app_state::AppState,
+    routes::{
+        album, api, artist, auth, controls, discover, favorites, now_playing, playlist, queue,
+        search,
+    },
+    views::templates,
+};
 
+mod app_state;
 mod assets;
-mod components;
-mod icons;
-mod page;
 mod routes;
-mod view;
+mod views;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn init(
@@ -86,6 +88,47 @@ async fn create_router(
 ) -> Router {
     let (tx, _rx) = broadcast::channel::<ServerSentEvent>(100);
     let broadcast_subscribe = broadcast.subscribe();
+
+    let template_path = {
+        let current_dir = env::current_dir().expect("Failed to get current directory");
+        current_dir.join("qobuz-player-web/templates")
+    };
+
+    let templates = templates(&template_path);
+
+    let (templates_tx, templates_rx) = watch::channel(templates);
+
+    let templates_clone = templates_rx.clone();
+
+    #[cfg(all(debug_assertions, target_os = "linux"))]
+    {
+        let watcher_sender = tx.clone();
+        let watcher = filesentry::Watcher::new().unwrap();
+        watcher.add_root(&template_path, true, |_| ()).unwrap();
+
+        watcher.add_handler(move |events| {
+            for event in &*events {
+                match event.ty {
+                    filesentry::EventType::Modified | filesentry::EventType::Create => {
+                        let mut templates = templates_clone.borrow().clone();
+                        templates.reload();
+                        templates_tx.send(templates).unwrap();
+
+                        let event = ServerSentEvent {
+                            event_name: "reload".into(),
+                            event_data: "template changed".into(),
+                        };
+
+                        _ = watcher_sender.send(event);
+                    }
+                    _ => (),
+                }
+            }
+            true
+        });
+        watcher.start();
+    }
+
     let shared_state = Arc::new(AppState {
         controls,
         web_secret,
@@ -97,7 +140,9 @@ async fn create_router(
         tracklist_receiver: tracklist_receiver.clone(),
         volume_receiver: volume_receiver.clone(),
         status_receiver: status_receiver.clone(),
+        templates: templates_rx.clone(),
     });
+
     tokio::spawn(background_task(
         tx,
         broadcast_subscribe,
@@ -105,17 +150,19 @@ async fn create_router(
         tracklist_receiver,
         volume_receiver,
         status_receiver,
+        templates_rx,
     ));
 
     axum::Router::new()
         .route("/sse", get(sse_handler))
         .merge(now_playing::routes())
+        .merge(queue::routes())
+        .merge(api::routes())
         .merge(search::routes())
         .merge(album::routes())
         .merge(artist::routes())
         .merge(playlist::routes())
         .merge(favorites::routes())
-        .merge(queue::routes())
         .merge(discover::routes())
         .merge(controls::routes())
         .layer(axum::middleware::from_fn_with_state(
@@ -134,6 +181,7 @@ async fn background_task(
     mut tracklist: TracklistReceiver,
     mut volume: VolumeReceiver,
     mut status: StatusReceiver,
+    templates: watch::Receiver<Templates>,
 ) {
     loop {
         tokio::select! {
@@ -178,27 +226,34 @@ async fn background_task(
                 _ = tx.send(event);
             }
             notification = receiver.recv() => {
+                tracing::info!("notification: {:?}", notification);
                 if let Ok(message) = notification {
-                    let toast = components::toast(message.clone()).to_html();
+                        let (message_string, severity) = match &message {
+                            Notification::Error(message) => (message, 1),
+                            Notification::Warning(message) => (message, 2),
+                            Notification::Success(message) => (message, 3),
+                            Notification::Info(message) => (message, 4),
+                        };
 
+                    let toast = templates.borrow().render("toast.html", &json!({"message": message_string, "severity": severity}));
                     let event = match message {
-                        qobuz_player_controls::notification::Notification::Error(_) => ServerSentEvent {
+                        Notification::Error(_) => ServerSentEvent {
                             event_name: "error".into(),
                             event_data: toast,
                         },
-                        qobuz_player_controls::notification::Notification::Warning(_) => {
+                        Notification::Warning(_) => {
                             ServerSentEvent {
                                 event_name: "warn".into(),
                                 event_data: toast,
                             }
                         }
-                        qobuz_player_controls::notification::Notification::Success(_) => {
+                        Notification::Success(_) => {
                             ServerSentEvent {
                                 event_name: "success".into(),
                                 event_data: toast,
                             }
                         }
-                        qobuz_player_controls::notification::Notification::Info(_) => ServerSentEvent {
+                        Notification::Info(_) => ServerSentEvent {
                             event_name: "info".into(),
                             event_data: toast,
                         },
@@ -230,40 +285,6 @@ async fn sse_handler(
     (headers, Sse::new(stream))
 }
 
-pub(crate) struct AppState {
-    tx: Sender<ServerSentEvent>,
-    pub(crate) web_secret: Option<String>,
-    pub(crate) rfid_state: Option<RfidState>,
-    pub(crate) broadcast: Arc<NotificationBroadcast>,
-    pub(crate) client: Arc<Client>,
-    pub(crate) controls: Controls,
-    pub(crate) position_receiver: PositionReceiver,
-    pub(crate) tracklist_receiver: TracklistReceiver,
-    pub(crate) status_receiver: StatusReceiver,
-    pub(crate) volume_receiver: VolumeReceiver,
-}
-
-impl AppState {
-    pub async fn get_favorites(&self) -> Result<Favorites> {
-        self.client.favorites().await
-    }
-
-    pub async fn get_album(&self, id: &str) -> Result<AlbumData> {
-        let (album, suggested_albums) =
-            try_join!(self.client.album(id), self.client.suggested_albums(id))?;
-
-        Ok(AlbumData {
-            album,
-            suggested_albums,
-        })
-    }
-
-    pub async fn is_album_favorite(&self, id: &str) -> Result<bool> {
-        let favorites = self.get_favorites().await?;
-        Ok(favorites.albums.iter().any(|album| album.id == id))
-    }
-}
-
 #[derive(Clone)]
 pub(crate) struct AlbumData {
     pub album: Album,
@@ -276,7 +297,7 @@ pub(crate) struct ServerSentEvent {
     event_data: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct Discover {
     pub albums: Vec<(String, Vec<AlbumSimple>)>,
     pub playlists: Vec<(String, Vec<Playlist>)>,
@@ -286,11 +307,21 @@ type ResponseResult = std::result::Result<axum::response::Response, axum::respon
 
 #[allow(clippy::result_large_err)]
 fn ok_or_error_component<T>(
+    state: &AppState,
     value: Result<T, qobuz_player_controls::error::Error>,
 ) -> Result<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
-        Err(err) => Err(render(html! { <div>{format!("{err}")}</div> })),
+        Err(err) => {
+            let err = format!("{err}");
+            Err(Html(
+                state
+                    .templates
+                    .borrow()
+                    .render("error.html", &json!({"error": err})),
+            )
+            .into_response())
+        }
     }
 }
 
@@ -304,7 +335,7 @@ fn ok_or_broadcast<T>(
         Err(err) => {
             broadcast.send(Notification::Error(format!("{err}")));
 
-            let mut response = render(html! { <div></div> });
+            let mut response = Html("<div></div>".to_string()).into_response();
             let headers = response.headers_mut();
             headers.insert("HX-Reswap", "none".try_into().expect("infallible"));
 

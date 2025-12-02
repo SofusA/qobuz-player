@@ -1,0 +1,83 @@
+use std::{sync::Arc, time::Duration};
+
+use axum::{
+    Router,
+    extract::{Path, State},
+    response::IntoResponse,
+    routing::{post, put},
+};
+
+use crate::AppState;
+
+pub(crate) fn routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/api/play", put(play))
+        .route("/api/pause", put(pause))
+        .route("/api/previous", put(previous))
+        .route("/api/next", put(next))
+        .route("/api/volume", post(set_volume))
+        .route("/api/position", post(set_position))
+        .route("/api/skip-to/{track_number}", put(skip_to))
+        .route("/api/play-track/{track_id}", put(play_track))
+}
+
+async fn play_track(
+    State(state): State<Arc<AppState>>,
+    Path(track_id): Path<u32>,
+) -> impl IntoResponse {
+    state.controls.play_track(track_id);
+}
+
+async fn play(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    state.controls.play();
+}
+
+async fn pause(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    state.controls.pause();
+}
+
+async fn previous(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    state.controls.previous();
+}
+
+async fn next(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    state.controls.next();
+}
+
+async fn skip_to(
+    State(state): State<Arc<AppState>>,
+    Path(track_number): Path<u32>,
+) -> impl IntoResponse {
+    state.controls.skip_to_position(track_number, true);
+}
+
+#[derive(serde::Deserialize, Clone, Copy)]
+struct SliderParameters {
+    value: i32,
+}
+async fn set_volume(
+    State(state): State<Arc<AppState>>,
+    axum::Form(parameters): axum::Form<SliderParameters>,
+) -> impl IntoResponse {
+    let mut volume = parameters.value;
+
+    if volume < 0 {
+        volume = 0;
+    };
+
+    if volume > 100 {
+        volume = 100;
+    };
+
+    let formatted_volume = volume as f32 / 100.0;
+
+    state.controls.set_volume(formatted_volume);
+}
+
+async fn set_position(
+    State(state): State<Arc<AppState>>,
+    axum::Form(parameters): axum::Form<SliderParameters>,
+) -> impl IntoResponse {
+    let time = Duration::from_millis(parameters.value as u64);
+    state.controls.seek(time);
+}

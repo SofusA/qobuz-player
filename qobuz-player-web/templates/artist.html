@@ -1,0 +1,69 @@
+<div class="flex flex-col">
+  <div class="self-center p-4 max-w-md">
+    <img
+      src="{{ artist.image }}"
+      alt="{{ artist.name }}"
+      class="object-contain rounded-lg size-full"
+    />
+  </div>
+
+  <div class="flex flex-col grow gap-4 items-center p-4 w-full">
+    <h1 class="text-2xl">{{ artist.name }}</h1>
+    @include (button-group.html) {
+      <button
+        class="button"
+        hx-swap="none"
+        hx-put="{{ artist.id }}/play-top-track/0"
+      >
+        <span class="size-6">
+          @include (icons/play.html) {}
+        </span>
+        <span>Play</span>
+      </button>
+
+      @include (
+        toggle-favorite.html;
+        id=artist.id;
+        is_favorite=is_favorite;
+        api="/artist"
+      ) {}
+    }
+  </div>
+
+  <div class="flex flex-col gap-4">
+    <div
+      data-sse="tracklist"
+      hx-trigger="tracklist"
+      hx-target="#top-tracks"
+      class="flex flex-col gap-2"
+      hx-get="{{ artist.id }}/top-tracks"
+    >
+      <h3 class="px-4 text-lg">Top tracks</h3>
+      <div
+        id="top-tracks"
+        class="flex overflow-x-auto flex-col flex-wrap gap-4 p-4 max-h-92"
+      >
+        @include (
+          artist-tracks.html;
+          artist=artist;
+          playing_info=playing_info
+        ) {}
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <h3 class="px-4 text-lg">Albums</h3>
+      @include (list-albums-vertical.html; albums=albums) {}
+    </div>
+    @if (similar_artists) {
+      <div class="flex flex-col gap-2">
+        <h3 class="px-4 text-lg">Similar artists</h3>
+        <ListArtistsVertical artists="similar_artists" />
+      </div>
+    }
+    @include (
+      description.html;
+      description=artist.description title=artist.name
+    ) {}
+  </div>
+</div>

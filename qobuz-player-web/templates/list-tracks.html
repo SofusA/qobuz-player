@@ -1,0 +1,48 @@
+@include (list.html) {
+  @for (track in tracks) {
+    @include (list-item.html) {
+      <button
+        hx-swap="none"
+        hx-put="{{ click }}{{ index }}"
+        class="flex justify-between items-center w-full text-left cursor-pointer disabled:text-gray-500 disabled:cursor-default"
+        @if(!track.available){disabled}
+      >
+        <div class="flex overflow-hidden gap-4 items-center w-full">
+          <div
+            class="flex justify-center items-center @if(show_track_cover) {size-12 aspect-square}"
+          >
+            @if (track.id == now_playing_id) {
+              <div class="text-blue-500 size-5">
+                @include (icons/play.html) {}
+              </div>
+            } @else if (show_track_cover) {
+              <div
+                class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-md aspect-square size-12"
+                style="background-image: url({{ track.image }});"
+              ></div>
+            } @else {
+              <span class="w-5 text-center text-gray-400">
+                {{ track.number }}
+              </span>
+            }
+          </div>
+          @if (show_artist && track.artist_name) {
+            <div class="flex overflow-hidden flex-col">
+              <h2 class="truncate">{{ track.title }}</h2>
+              <h3 class="text-sm text-gray-400 truncate">
+                {{ track.artist_name }}
+              </h3>
+            </div>
+          } @else {
+            <h2 class="w-full truncate">{{ track.title }}</h2>
+          }
+        </div>
+        @include (
+          info.html;
+          hires_available=track.hires_available;
+          explicit=track.explicit
+        ) {}
+      </button>
+    }
+  }
+}

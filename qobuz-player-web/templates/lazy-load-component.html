@@ -1,0 +1,8 @@
+@include (
+  base.html;
+  partial=partial;
+  active_page="None";
+  playing_info=playing_info
+) {
+  <div hx-get="{{ url }}" hx-target="this" hx-trigger="load"></div>
+}

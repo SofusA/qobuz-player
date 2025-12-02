@@ -6,22 +6,9 @@ use axum::{
     response::IntoResponse,
     routing::{get, put},
 };
-use leptos::prelude::*;
-use qobuz_player_models::{Playlist, Track};
+use serde_json::json;
 
-use crate::{
-    AppState, ResponseResult,
-    components::{
-        ButtonGroup, ToggleFavorite, button_class,
-        list::{ListTracks, TrackNumberDisplay},
-        parse_duration,
-    },
-    html,
-    icons::{Link, Play},
-    ok_or_broadcast, ok_or_error_component,
-    page::Page,
-    view::{LazyLoadComponent, render},
-};
+use crate::{AppState, ResponseResult, ok_or_broadcast, ok_or_error_component};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -69,9 +56,13 @@ async fn set_favorite(
 ) -> ResponseResult {
     ok_or_broadcast(
         &state.broadcast,
-        state.client.add_favorite_playlist(&id).await,
+        state.client.add_favorite_artist(&id).await,
     )?;
-    Ok(render(html! { <ToggleFavorite id=id is_favorite=true /> }))
+
+    Ok(state.render(
+        "toggle-favorite.html",
+        &json!({"api": "/playlist", "id": id, "is_favorite": true}),
+    ))
 }
 
 async fn unset_favorite(
@@ -80,161 +71,48 @@ async fn unset_favorite(
 ) -> ResponseResult {
     ok_or_broadcast(
         &state.broadcast,
-        state.client.remove_favorite_playlist(&id).await,
+        state.client.remove_favorite_artist(&id).await,
     )?;
-    Ok(render(html! { <ToggleFavorite id=id is_favorite=false /> }))
+
+    Ok(state.render(
+        "toggle-favorite.html",
+        &json!({"api": "/playlist", "id": id, "is_favorite": false}),
+    ))
 }
 
 async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
     let url = format!("/playlist/{id}/content");
-
-    let current_status = state.status_receiver.borrow();
-    let tracklist = state.tracklist_receiver.borrow();
-
-    render(html! {
-        <Page active_page=Page::None current_status=*current_status tracklist=&tracklist>
-            <LazyLoadComponent url=url />
-        </Page>
-    })
+    state.render("lazy-load-component.html", &json!({"url": url}))
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    let playlist = ok_or_error_component(state.client.playlist(id).await)?;
-    let favorites = ok_or_error_component(state.get_favorites().await)?;
+    let playlist = ok_or_error_component(&state, state.client.playlist(id).await)?;
+    let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
-    let currently_playing = state.tracklist_receiver.borrow().currently_playing();
+    let duration = playlist.duration_seconds / 60;
+    let click_string = format!("/playlist/{}/play/", playlist.id);
 
-    Ok(render(html! {
-        <Playlist
-            now_playing_id=currently_playing
-            playlist=playlist
-            is_favorite=is_favorite
-            rfid=state.rfid_state.is_some()
-        />
-    }))
-}
-
-async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    let playlist = ok_or_error_component(state.client.playlist(id).await)?;
-    let currently_playing = state.tracklist_receiver.borrow().currently_playing();
-
-    Ok(render(
-        html! { <Tracks tracks=playlist.tracks playlist_id=playlist.id now_playing_id=currently_playing /> },
+    Ok(state.render(
+        "playlist.html",
+        &json!({
+            "playlist": playlist,
+            "duration": duration,
+            "is_favorite": is_favorite,
+            "rfid": state.rfid_state.is_some(),
+            "click": click_string
+        }),
     ))
 }
 
-#[component]
-fn tracks(now_playing_id: Option<u32>, tracks: Vec<Track>, playlist_id: u32) -> impl IntoView {
-    html! {
-        <div
-            class="w-full"
-            hx-trigger="tracklist"
-            hx-target="this"
-            data-sse="tracklist"
-            hx-swap="morph:outerHTML"
-            hx-get=format!("/playlist/{}/tracks", playlist_id)
-        >
-            <ListTracks
-                track_number_display=TrackNumberDisplay::Cover
-                tracks=tracks
-                show_artist=true
-                dim_played=false
-                api_call=move |index: usize| format!("/playlist/{playlist_id}/play/{index}")
-                now_playing_id=now_playing_id
-            />
-        </div>
-    }
-}
+async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
+    let playlist = ok_or_broadcast(&state.broadcast, state.client.playlist(id).await)?;
+    let click_string = format!("/playlist/{}/play/", playlist.id);
 
-#[component]
-fn playlist(
-    now_playing_id: Option<u32>,
-    playlist: Playlist,
-    is_favorite: bool,
-    rfid: bool,
-) -> impl IntoView {
-    let duration = parse_duration(playlist.duration_seconds);
-
-    html! {
-        <div class="flex flex-wrap gap-4 justify-center items-end w-full p-safe-or-4 *:max-w-sm">
-            <img
-                src=playlist.image
-                alt=playlist.title.clone()
-                class="object-contain rounded-lg size-full"
-            />
-
-            <div class="flex flex-col flex-grow gap-4 items-center w-full">
-                <div class="flex flex-col gap-2 justify-center items-center w-full text-center">
-                    <span class="text-lg sm:text-xl">{playlist.title}</span>
-                    <span class="text-gray-400 sm:text-lg">
-                        {format!("{} minutes", duration.minutes)}
-                    </span>
-                </div>
-
-                {
-                    html! {
-                        <ButtonGroup>
-                            <button
-                                class=button_class()
-                                hx-swap="none"
-                                hx-put=format!("{}/play", playlist.id.clone())
-                            >
-                                <span class="size-6">
-                                    <Play />
-                                </span>
-                                <span>Play</span>
-                            </button>
-
-                            <button
-                                class=button_class()
-                                hx-swap="none"
-                                hx-put=format!("{}/play/shuffle", playlist.id.clone())
-                            >
-                                <span class="size-6">
-                                    <Play />
-                                </span>
-                                <span>Shuffle</span>
-                            </button>
-
-                            {(!playlist.is_owned)
-                                .then_some({
-                                    html! {
-                                        <ToggleFavorite
-                                            id=playlist.id.to_string()
-                                            is_favorite=is_favorite
-                                        />
-                                    }
-                                })}
-
-                            {rfid
-                                .then_some(
-                                    html! {
-                                        <button
-                                            class=button_class()
-                                            hx-swap="none"
-                                            hx-put=format!("{}/link", playlist.id.clone())
-                                        >
-                                            <span class="size-6">
-                                                <Link />
-                                            </span>
-                                            <span>Link RFID</span>
-                                        </button>
-                                    },
-                                )}
-
-                        </ButtonGroup>
-                    }
-                }
-            </div>
-        </div>
-        <div class="flex flex-col gap-4 w-full">
-            <div class="sm:p-4">
-                <Tracks
-                    now_playing_id=now_playing_id
-                    tracks=playlist.tracks
-                    playlist_id=playlist.id
-                />
-            </div>
-        </div>
-    }
+    Ok(state.render(
+        "playlist-tracks.html",
+        &json!({
+            "playlist": playlist,
+            "click": click_string
+        }),
+    ))
 }

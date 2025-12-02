@@ -1,4 +1,5 @@
 pub(crate) mod album;
+pub(crate) mod api;
 pub(crate) mod artist;
 pub(crate) mod auth;
 pub(crate) mod controls;

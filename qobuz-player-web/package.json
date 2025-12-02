@@ -1,13 +1,20 @@
 {
   "scripts": {
     "build": "tailwindcss -i assets/tailwind.css -o assets/styles.css --minify",
-    "watch": "tailwindcss -i assets/tailwind.css -o assets/styles.css --watch",
+    "watch": "tailwindcss -i assets/tailwind.css -o assets/styles.css --watch --minify",
     "build-assets": "pwa-asset-generator -m assets/manifest.json -i dummy-index.html -b black assets/favicon.svg assets/pwa"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.0.2",
     "tailwindcss": "^4.0.2",
     "tailwindcss-safe-area": "^0.8.0",
-    "pwa-asset-generator": "^8.1.2"
+    "pwa-asset-generator": "^8.1.2",
+    "prettier": "^3.0.0",
+    "prettier-plugin-jinja-template": "^2.1.0"
+  },
+  "prettier": {
+    "plugins": [
+      "prettier-plugin-jinja-template"
+    ]
   }
 }

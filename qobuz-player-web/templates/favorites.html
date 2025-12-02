@@ -1,0 +1,49 @@
+@include (base.html; active_page="Favorites"; playing_info=playing_info) {
+  <div class="flex flex-col px-4">
+    <div
+      class="flex sticky top-0 flex-col grow gap-4 pb-2 max-h-full pt-safe-or-4 bg-black/80 backdrop-blur"
+    >
+      <h1 class="text-2xl">Favorites</h1>
+      <div
+        class="flex justify-between group *:rounded-full *:px-2 *:py-1 *:transition-colors"
+      >
+        <a
+          href="albums"
+          class="@if (tab=='albums') {bg-blue-800}"
+          preload="mouseover"
+          preload-images="true"
+        >
+          Albums
+        </a>
+        <a
+          href="artists"
+          class="@if (tab=='artists') {bg-blue-800}"
+          preload="mouseover"
+          preload-images="true"
+        >
+          Artists
+        </a>
+        <a
+          href="playlists"
+          class="@if (tab=='playlists') {bg-blue-800}"
+          preload="mouseover"
+          preload-images="true"
+        >
+          Playlists
+        </a>
+      </div>
+
+      @if (tab == "albums") {
+        @include (list-albums.html; albums=favorites.albums) {}
+      }
+
+      @if (tab == "artists") {
+        @include (list-artists.html; artists=favorites.artists) {}
+      }
+
+      @if (tab == "playlists") {
+        @include (list-playlists.html; playlists=favorites.playlists) {}
+      }
+    </div>
+  </div>
+}

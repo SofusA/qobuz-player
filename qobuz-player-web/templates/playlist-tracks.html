@@ -1,0 +1,17 @@
+<div
+  class="w-full"
+  hx-trigger="tracklist"
+  hx-target="this"
+  data-sse="tracklist"
+  hx-swap="morph:outerHTML"
+  hx-get="/playlist/{{ playlist.id }}/tracks"
+>
+  @include (
+    list-tracks.html;
+    now_playing_id=playing_info.now_playing_id;
+    tracks=playlist.tracks;
+    show_artist=true;
+    show_track_cover=true;
+    click=click
+  ) {}
+</div>

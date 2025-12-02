@@ -1,0 +1,26 @@
+@include (base.html; active_page="Discover"; playing_info=playing_info) {
+  <div class="flex flex-col gap-8 px-4">
+    <div
+      class="flex sticky top-0 flex-col grow gap-4 pb-2 max-h-full pt-safe-or-4 bg-black/80 backdrop-blur"
+    >
+      <h1 class="text-2xl">Discover</h1>
+    </div>
+
+    @for (album_feature in discover.albums) {
+      <div class="flex flex-col gap-2">
+        <h3 class="text-lg">{{ album_feature[0] }}</h3>
+        @include (list-albums-vertical.html; albums=album_feature[1]) {}
+      </div>
+    }
+
+    @for (playlist_feature in discover.playlists) {
+      <div class="flex flex-col gap-2">
+        <h3 class="text-lg">{{ playlist_feature[0] }}</h3>
+        @include (
+          list-playlists-vertical.html;
+          playlists=playlist_feature[1]
+        ) {}
+      </div>
+    }
+  </div>
+}

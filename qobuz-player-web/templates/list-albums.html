@@ -1,0 +1,36 @@
+@include (list.html) {
+  @for (album in albums) {
+    @include (list-item.html) {
+      <a
+        class="flex gap-4 items-center w-full"
+        hx-push-url="true"
+        href="/album/{{ album.id }}"
+        preload="mousedown"
+        preload-images="true"
+      >
+        <img
+          class="inline text-sm text-gray-500 bg-gray-800 rounded-md aspect-square size-12"
+          alt="{{ album.title }}"
+          src="{{ album.image_thumbnail }}"
+        />
+
+        <div class="overflow-hidden w-full">
+          <div class="flex justify-between">
+            <h3 class="text-lg truncate">{{ album.title }}</h3>
+            @include (
+              info.html;
+              hires_available=album.hires_available;
+              explicit=album.explicit
+            ) {}
+          </div>
+
+          <h4 class="flex gap-2 text-left text-gray-400">
+            <span class="truncate">{{ album.artist.name }}</span>
+            <span>•</span>
+            <span>{{ album.release_year }}</span>
+          </h4>
+        </div>
+      </a>
+    }
+  }
+}

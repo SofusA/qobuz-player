@@ -1,0 +1,34 @@
+@for (track in artist.top_tracks) {
+  <button
+    class="flex gap-4 items-center w-5/6 max-w-lg rounded cursor-pointer"
+    hx-put="/artist/{{ artist.id }}/play-top-track/{{ track.id }}"
+    hx-swap="none"
+  >
+    <img
+      class="inline text-sm text-gray-500 bg-gray-800 rounded-md aspect-square size-12"
+      alt="{{ track.title }}"
+      src="{{ track.image }}"
+    />
+
+    <div class="overflow-hidden w-full">
+      <div class="flex gap-2 items-center">
+        <h3 class="text-lg truncate">{{ track.title }}</h3>
+        @include (
+          info.html;
+          explicit=track.explicit;
+          hires_available=track.hires_available
+        ) {}
+
+        @if (track.id == playing_info.now_playing_id) {
+          <div class="text-blue-500 size-6">
+            @include (icons/play.html) {}
+          </div>
+        }
+      </div>
+
+      <h4 class="flex gap-2 text-left text-gray-400">
+        <span class="truncate">{{ track.album.title }}</span>
+      </h4>
+    </div>
+  </button>
+}

@@ -1,4 +1,0 @@
-[[language]]
-name = "rust"
-formatter = { command = "leptosfmt", args = ["--stdin", "--override-macro-names", "html", "--experimental-tailwind", "--rustfmt"] }
-language-servers = ["rust-analyzer", "typos", "tailwindcss-ls"]

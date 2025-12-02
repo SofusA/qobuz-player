@@ -1,4 +1,4 @@
-use crate::{AppState, components::button_class, html, page::UnauthorizedPage, view::render};
+use crate::AppState;
 use axum::{
     Form, Router,
     body::Body,
@@ -11,8 +11,8 @@ use axum_extra::extract::{
     CookieJar,
     cookie::{Cookie, SameSite},
 };
-use leptos::prelude::*;
 use serde::Deserialize;
+use serde_json::json;
 use std::sync::Arc;
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
@@ -68,25 +68,8 @@ fn set_auth_cookie(jar: CookieJar, secret: String) -> CookieJar {
     jar.add(cookie)
 }
 
-async fn index() -> impl IntoResponse {
-    render(html! {
-        <UnauthorizedPage>
-            <div class="flex justify-center items-center w-full h-full">
-                <form class="flex flex-col gap-4" action="/auth/login" method="post">
-                    <input
-                        class="p-2 w-full text-black bg-white rounded"
-                        type="password"
-                        id="secret"
-                        name="secret"
-                        placeholder="Secret"
-                    />
-                    <button class=button_class() type="submit">
-                        Submit
-                    </button>
-                </form>
-            </div>
-        </UnauthorizedPage>
-    })
+async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    state.render("unauthorized-page.html", &json!({}));
 }
 
 #[derive(Deserialize)]
