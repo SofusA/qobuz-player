@@ -96,12 +96,12 @@ async fn create_router(
 
     let templates = templates(&template_path);
 
+    #[allow(unused_variables)]
     let (templates_tx, templates_rx) = watch::channel(templates);
-
-    let templates_clone = templates_rx.clone();
 
     #[cfg(all(debug_assertions, target_os = "linux"))]
     {
+        let templates_clone = templates_rx.clone();
         let watcher_sender = tx.clone();
         let watcher = filesentry::Watcher::new().unwrap();
         watcher.add_root(&template_path, true, |_| ()).unwrap();
