@@ -21,6 +21,8 @@ use crate::{
     tracklist::{self, Tracklist},
 };
 
+const INTERVAL_MS: u64 = 500;
+
 pub struct Player {
     broadcast: Arc<NotificationBroadcast>,
     tracklist_tx: Sender<Tracklist>,
@@ -423,7 +425,7 @@ impl Player {
         if let Some(duration) = duration {
             let position = position.as_secs();
 
-            if (duration as i16) <= (position as i16) {
+            if duration as i16 <= position as i16 {
                 self.track_finished().await?;
                 return Ok(());
             }
@@ -532,7 +534,7 @@ impl Player {
     }
 
     pub async fn player_loop(&mut self) -> Result<()> {
-        let mut interval = tokio::time::interval(Duration::from_millis(500));
+        let mut interval = tokio::time::interval(Duration::from_millis(INTERVAL_MS));
 
         loop {
             select! {

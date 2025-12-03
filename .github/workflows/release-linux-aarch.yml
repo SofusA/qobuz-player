@@ -50,10 +50,6 @@ jobs:
         working-directory: qobuz-player-web
         run: npm run build
 
-      - name: Build assets
-        working-directory: qobuz-player-web
-        run: npm run build-assets
-
       - name: Build player
         run:  cargo build --release --target aarch64-unknown-linux-gnu
 

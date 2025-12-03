@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license-file.workspace = true
 repository.workspace = true
+description.workspace = true
 
 [features]
 gpio = ["qobuz-player-gpio/gpio"]
@@ -17,11 +18,11 @@ qobuz-player-tui = { version = "*", path = "../qobuz-player-tui" }
 qobuz-player-rfid = { version = "*", path = "../qobuz-player-rfid" }
 qobuz-player-gpio = { version = "*", path = "../qobuz-player-gpio", optional = true }
 
-clap = { workspace = true }
-snafu = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-ratatui = { workspace = true }
-tokio_schedule = { workspace = true }
-time = { workspace = true }
+clap.workspace = true
+snafu.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+ratatui.workspace = true
+tokio_schedule.workspace = true
+time.workspace = true

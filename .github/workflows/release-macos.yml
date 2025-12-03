@@ -26,10 +26,6 @@ jobs:
         working-directory: qobuz-player-web
         run: npm run build
 
-      - name: Build assets
-        working-directory: qobuz-player-web
-        run: npm run build-assets
-
       - name: Build player ${{ matrix.arch }} 
         run: cargo build --release --target aarch64-apple-darwin
 

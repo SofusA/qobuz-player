@@ -11,5 +11,5 @@ gpio = ["rppal"]
 [dependencies]
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
 
-tracing = { workspace = true }
+tracing.workspace = true
 rppal = { workspace = true, optional = true }

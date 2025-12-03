@@ -35,12 +35,24 @@ Read more [in the wiki](https://github.com/SofusA/qobuz-player/wiki/RFID-player)
 
 Download the tar.gz file for your supported OS from the releases page, extract the file and execute `qobuz-player` or copy it to your `$PATH`.
 
+### Installation with cargo
+```
+cargo install qobuz-player
+```
+
 ### Build from source
 
 Linux dependencies: `alsa-sys-devel`, `just`.
+```
+cargo build
+```
 
-1. `just build-all`
-2. Move build executable to somewhere on `PATH`
+## Development
+1. Setup sqlx: `just create-env-file`. Only needed once. 
+2. Init sqlite database: `init-database`.
+3. For webui development in `qobuz-player-web`:
+  - `npm i`. Install npm dependencies. 
+  - `npm run watch`. Watch for style changes. 
 
 ## Get started
 
@@ -63,10 +75,9 @@ qobuz-player open --web
 
 ## Web UI
 
-The player can start an embedded web interface. This is disabled by default and must be started with the `--web` argument. It also listens on `0.0.0.0:9888` by default,
-but an interface can be specified with the `--interface` argument.
+The player can start an embedded web interface. This is disabled by default and must be started with the `--web` argument. It also listens on `0.0.0.0:9888` by default. Change port with `--port` argument.
 
-Go to `http://<ip>:9888` to view the UI.
+Go to `http://localhost:9888` to view the UI.
 
 ## Contribution
 Feature requests, issues and contributions are very welcome.

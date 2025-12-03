@@ -8,5 +8,5 @@ repository.workspace = true
 [dependencies]
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
 
-tokio = { workspace = true }
-tracing = { workspace = true }
+tokio.workspace = true
+tracing.workspace = true

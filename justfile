@@ -15,6 +15,8 @@ create-env-file:
     echo 'DATABASE_URL="sqlite:///tmp/qobuz-player.db"' > .env
 
 build-all:
+    just create-env-file
+    just init-database
     just build-styles
     just build-assets
     cargo build --release

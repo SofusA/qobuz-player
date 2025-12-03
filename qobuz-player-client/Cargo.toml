@@ -8,15 +8,15 @@ repository.workspace = true
 [dependencies]
 qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
-base64 = { workspace = true }
-time = { workspace = true }
-md5 = { workspace = true }
-regex = { workspace = true }
-reqwest = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-snafu = { workspace = true }
-tracing = { workspace = true }
-url = { workspace = true }
-clap = { workspace = true }
-tokio = { workspace = true }
+base64.workspace = true
+time.workspace = true
+md5.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+snafu.workspace = true
+tracing.workspace = true
+url.workspace = true
+clap.workspace = true
+tokio.workspace = true
