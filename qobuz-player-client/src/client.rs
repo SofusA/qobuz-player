@@ -116,11 +116,11 @@ enum Endpoint {
     Track,
     TrackURL,
     Playlist,
-    // PlaylistCreate,
-    // PlaylistDelete,
-    // PlaylistAddTracks,
-    // PlaylistDeleteTracks,
-    // PlaylistUpdatePosition,
+    PlaylistCreate,
+    PlaylistDelete,
+    PlaylistAddTracks,
+    PlaylistDeleteTracks,
+    PlaylistUpdatePosition,
     Search,
     Favorites,
     FavoriteAdd,
@@ -142,11 +142,11 @@ impl Display for Endpoint {
             Endpoint::SimilarArtists => "artist/getSimilarArtists",
             Endpoint::Login => "user/login",
             Endpoint::Playlist => "playlist/get",
-            // Endpoint::PlaylistCreate => "playlist/create",
-            // Endpoint::PlaylistDelete => "playlist/delete",
-            // Endpoint::PlaylistAddTracks => "playlist/addTracks",
-            // Endpoint::PlaylistDeleteTracks => "playlist/deleteTracks",
-            // Endpoint::PlaylistUpdatePosition => "playlist/updateTracksPosition",
+            Endpoint::PlaylistCreate => "playlist/create",
+            Endpoint::PlaylistDelete => "playlist/delete",
+            Endpoint::PlaylistAddTracks => "playlist/addTracks",
+            Endpoint::PlaylistDeleteTracks => "playlist/deleteTracks",
+            Endpoint::PlaylistUpdatePosition => "playlist/updateTracksPosition",
             Endpoint::Search => "catalog/search",
             Endpoint::Track => "track/get",
             Endpoint::TrackURL => "track/getFileUrl",
@@ -294,100 +294,115 @@ impl Client {
         ))
     }
 
-    // pub async fn create_playlist(
-    //     &self,
-    //     name: String,
-    //     is_public: bool,
-    //     description: Option<String>,
-    //     is_collaborative: Option<bool>,
-    // ) -> Result<Playlist> {
-    //     let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistCreate);
+    pub async fn create_playlist(
+        &self,
+        name: String,
+        is_public: bool,
+        description: String,
+        is_collaborative: Option<bool>,
+    ) -> Result<qobuz_player_models::Playlist> {
+        let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistCreate);
 
-    //     let mut form_data = HashMap::new();
-    //     form_data.insert("name", name.as_str());
+        let mut form_data = HashMap::new();
+        form_data.insert("name", name.as_str());
 
-    //     let is_collaborative = if !is_public || is_collaborative.is_none() {
-    //         "false".to_string()
-    //     } else if let Some(is_collaborative) = is_collaborative {
-    //         is_collaborative.to_string()
-    //     } else {
-    //         "false".to_string()
-    //     };
+        let is_collaborative = is_collaborative.unwrap_or(false);
 
-    //     form_data.insert("is_collaborative", is_collaborative.as_str());
+        let is_collaborative = if !is_public {
+            false.to_string()
+        } else {
+            is_collaborative.to_string()
+        };
 
-    //     let is_public = is_public.to_string();
-    //     form_data.insert("is_public", is_public.as_str());
+        form_data.insert("is_collaborative", is_collaborative.as_str());
 
-    //     let description = if let Some(description) = description {
-    //         description
-    //     } else {
-    //         "".to_string()
-    //     };
-    //     form_data.insert("description", description.as_str());
+        let is_public = is_public.to_string();
+        form_data.insert("is_public", is_public.as_str());
+        form_data.insert("description", description.as_str());
 
-    //     post!(self, &endpoint, form_data)
-    // }
+        let response = post!(self, &endpoint, form_data)?;
+        Ok(parse_playlist(
+            response,
+            self.user_id,
+            &self.max_audio_quality,
+        ))
+    }
 
-    // pub async fn delete_playlist(&self, playlist_id: String) -> Result<SuccessfulResponse> {
-    //     let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDelete);
+    pub async fn delete_playlist(&self, playlist_id: u32) -> Result<SuccessfulResponse> {
+        let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDelete);
 
-    //     let mut form_data = HashMap::new();
-    //     form_data.insert("playlist_id", playlist_id.as_str());
+        let mut form_data = HashMap::new();
+        let playlist_id = playlist_id.to_string();
+        form_data.insert("playlist_id", playlist_id.as_str());
 
-    //     post!(self, &endpoint, form_data)
-    // }
+        post!(self, &endpoint, form_data)
+    }
 
-    // pub async fn playlist_add_track(
-    //     &self,
-    //     playlist_id: &str,
-    //     track_ids: Vec<&str>,
-    // ) -> Result<Playlist> {
-    //     let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistAddTracks);
+    pub async fn playlist_add_track(
+        &self,
+        playlist_id: &str,
+        track_ids: Vec<&str>,
+    ) -> Result<qobuz_player_models::Playlist> {
+        let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistAddTracks);
 
-    //     let track_ids = track_ids.join(",");
+        let track_ids = track_ids.join(",");
 
-    //     let mut form_data = HashMap::new();
-    //     form_data.insert("playlist_id", playlist_id);
-    //     form_data.insert("track_ids", track_ids.as_str());
-    //     form_data.insert("no_duplicate", "true");
+        let mut form_data = HashMap::new();
+        form_data.insert("playlist_id", playlist_id);
+        form_data.insert("track_ids", track_ids.as_str());
+        // form_data.insert("no_duplicate", "true");
 
-    //     post!(self, &endpoint, form_data)
-    // }
+        let response = post!(self, &endpoint, form_data)?;
+        Ok(parse_playlist(
+            response,
+            self.user_id,
+            &self.max_audio_quality,
+        ))
+    }
 
-    // pub async fn playlist_delete_track(
-    //     &self,
-    //     playlist_id: String,
-    //     playlist_track_ids: Vec<String>,
-    // ) -> Result<Playlist> {
-    //     let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDeleteTracks);
+    pub async fn playlist_delete_track(
+        &self,
+        playlist_id: String,
+        playlist_track_ids: Vec<String>,
+    ) -> Result<qobuz_player_models::Playlist> {
+        let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDeleteTracks);
 
-    //     let playlist_track_ids = playlist_track_ids.join(",");
+        let playlist_track_ids = playlist_track_ids.join(",");
 
-    //     let mut form_data = HashMap::new();
-    //     form_data.insert("playlist_id", playlist_id.as_str());
-    //     form_data.insert("playlist_track_ids", playlist_track_ids.as_str());
+        let mut form_data = HashMap::new();
+        form_data.insert("playlist_id", playlist_id.as_str());
+        form_data.insert("playlist_track_ids", playlist_track_ids.as_str());
 
-    //     post!(self, &endpoint, form_data)
-    // }
+        let response = post!(self, &endpoint, form_data)?;
+        Ok(parse_playlist(
+            response,
+            self.user_id,
+            &self.max_audio_quality,
+        ))
+    }
 
-    // pub async fn update_playlist_track_position(
-    //     &self,
-    //     index: usize,
-    //     playlist_id: &str,
-    //     track_id: &str,
-    // ) -> Result<Playlist> {
-    //     let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
+    pub async fn update_playlist_track_position(
+        &self,
+        index: usize,
+        playlist_id: &str,
+        track_id: &str,
+    ) -> Result<qobuz_player_models::Playlist> {
+        let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
 
-    //     let index = index.to_string();
+        let index = index.to_string();
 
-    //     let mut form_data = HashMap::new();
-    //     form_data.insert("playlist_id", playlist_id);
-    //     form_data.insert("playlist_track_ids", track_id);
-    //     form_data.insert("insert_before", index.as_str());
+        let mut form_data = HashMap::new();
+        form_data.insert("playlist_id", playlist_id);
+        form_data.insert("playlist_track_ids", track_id);
+        form_data.insert("insert_before", index.as_str());
 
-    //     post!(self, &endpoint, form_data)
-    // }
+        let response = post!(self, &endpoint, form_data)?;
+        Ok(parse_playlist(
+            response,
+            self.user_id,
+            &self.max_audio_quality,
+        ))
+    }
 
     pub async fn track_url(&self, track_id: u32) -> Result<TrackURL> {
         track_url(

@@ -58,6 +58,11 @@
     }
 
     @if (tab == "playlists") {
+      <a class="button button-primary w-fit" href="/playlist/create">
+        @defer (icons/plus.html) {}
+        Create playlist
+      </a>
+
       @defer (list-playlists.html; playlists=favorites.playlists) {}
     }
 

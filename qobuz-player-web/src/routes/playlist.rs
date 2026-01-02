@@ -3,16 +3,19 @@ use std::sync::Arc;
 use axum::{
     Router,
     extract::{Path, State},
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::{get, put},
 };
+use axum_extra::extract::Form;
+use serde::Deserialize;
 use serde_json::json;
 
-use crate::{AppState, ResponseResult, ok_or_broadcast, ok_or_error_component};
+use crate::{AppState, ResponseResult, hx_redirect, ok_or_broadcast, ok_or_error_component};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
-        .route("/playlist/{id}", get(index))
+        .route("/playlist/create", get(create).post(create_form))
+        .route("/playlist/{id}", get(index).delete(delete))
         .route("/playlist/{id}/content", get(content))
         .route("/playlist/{id}/tracks", get(tracks_partial))
         .route("/playlist/{id}/set-favorite", put(set_favorite))
@@ -21,6 +24,60 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
         .route("/playlist/{id}/play/shuffle", put(shuffle))
         .route("/playlist/{id}/play/{track_position}", put(play_track))
         .route("/playlist/{id}/link", put(link))
+}
+
+async fn create(State(state): State<Arc<AppState>>) -> ResponseResult {
+    Ok(state.render("create-playlist.html", &json!({})))
+}
+
+#[derive(Deserialize)]
+struct CreatePlaylist {
+    name: String,
+    description: String,
+    is_public: Option<bool>,
+    is_collaborative: Option<bool>,
+}
+
+async fn create_form(
+    State(state): State<Arc<AppState>>,
+    Form(req): Form<CreatePlaylist>,
+) -> axum::response::Response {
+    let is_public = req.is_public.unwrap_or(false);
+
+    match state
+        .client
+        .create_playlist(req.name, is_public, req.description, req.is_collaborative)
+        .await
+    {
+        Ok(res) => hx_redirect(&format!("/playlist/{}", res.id)),
+        Err(_) => {
+            return Html(
+                state
+                    .templates
+                    .borrow()
+                    .render("error.html", &json!({"error": "Unable to create playlist"})),
+            )
+            .into_response();
+        }
+    }
+}
+
+async fn delete(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<u32>,
+) -> axum::response::Response {
+    match state.client.delete_playlist(id).await {
+        Ok(_) => hx_redirect("/favorites/playlists"),
+        Err(_) => {
+            return Html(
+                state
+                    .templates
+                    .borrow()
+                    .render("error.html", &json!({"error": "Unable to delete playlist"})),
+            )
+            .into_response();
+        }
+    }
 }
 
 async fn play_track(

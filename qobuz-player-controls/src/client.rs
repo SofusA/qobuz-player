@@ -303,4 +303,58 @@ impl Client {
         self.favorites_cache.set(favorites.clone()).await;
         Ok(favorites)
     }
+
+    pub async fn create_playlist(
+        &self,
+        name: String,
+        is_public: bool,
+        description: String,
+        is_collaborative: Option<bool>,
+    ) -> Result<Playlist> {
+        let client = self.get_client().await?;
+        let playlist = client
+            .create_playlist(name, is_public, description, is_collaborative)
+            .await?;
+        self.favorites_cache.clear().await;
+        Ok(playlist)
+    }
+
+    pub async fn delete_playlist(&self, playlist_id: u32) -> Result<()> {
+        let client = self.get_client().await?;
+        client.delete_playlist(playlist_id).await?;
+        self.favorites_cache.clear().await;
+        Ok(())
+    }
+
+    pub async fn playlist_add_track(
+        &self,
+        playlist_id: &str,
+        track_ids: Vec<&str>,
+    ) -> Result<Playlist> {
+        let client = self.get_client().await?;
+        Ok(client.playlist_add_track(playlist_id, track_ids).await?)
+    }
+
+    pub async fn playlist_delete_track(
+        &self,
+        playlist_id: String,
+        playlist_track_ids: Vec<String>,
+    ) -> Result<Playlist> {
+        let client = self.get_client().await?;
+        Ok(client
+            .playlist_delete_track(playlist_id, playlist_track_ids)
+            .await?)
+    }
+
+    pub async fn update_playlist_track_position(
+        &self,
+        index: usize,
+        playlist_id: &str,
+        track_id: &str,
+    ) -> Result<Playlist> {
+        let client = self.get_client().await?;
+        Ok(client
+            .update_playlist_track_position(index, playlist_id, track_id)
+            .await?)
+    }
 }

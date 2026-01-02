@@ -2,7 +2,8 @@ use assets::static_handler;
 use axum::{
     Router,
     extract::State,
-    response::{Html, IntoResponse, Sse, sse::Event},
+    http::{HeaderMap, StatusCode},
+    response::{Html, IntoResponse, Response, Sse, sse::Event},
     routing::get,
 };
 use futures::stream::Stream;
@@ -342,4 +343,10 @@ fn ok_or_broadcast<T>(
             Err(response)
         }
     }
+}
+
+pub fn hx_redirect(url: &str) -> Response {
+    let mut headers = HeaderMap::new();
+    headers.insert("HX-Redirect", url.parse().unwrap());
+    (StatusCode::OK, headers).into_response()
 }
