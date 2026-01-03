@@ -4,13 +4,13 @@ use axum::{
     Router,
     extract::{Path, State},
     response::{Html, IntoResponse},
-    routing::{get, put},
+    routing::{get, post, put},
 };
 use axum_extra::extract::Form;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::{AppState, ResponseResult, hx_redirect, ok_or_broadcast, ok_or_error_component};
+use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -24,6 +24,65 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
         .route("/playlist/{id}/play/shuffle", put(shuffle))
         .route("/playlist/{id}/play/{track_position}", put(play_track))
         .route("/playlist/{id}/link", put(link))
+        .route("/playlist/add-track/{id}", get(add_track_to_playlist_page))
+        .route("/playlist/add-track", post(add_track_to_playlist_action))
+}
+
+#[derive(Deserialize)]
+struct AddTrackParameters {
+    track_id: u32,
+    playlist_id: u32,
+}
+
+async fn add_track_to_playlist_action(
+    State(state): State<Arc<AppState>>,
+    Form(req): Form<AddTrackParameters>,
+) -> axum::response::Response {
+    let res = state
+        .client
+        .playlist_add_track(req.playlist_id, &[req.track_id])
+        .await;
+
+    match res {
+        Ok(res) => {
+            state
+                .broadcast
+                .send(qobuz_player_controls::notification::Notification::Success(
+                    format!("Added to {}", res.title),
+                ));
+            "Ok".into_response()
+        }
+        Err(_) => {
+            return Html(
+                state
+                    .templates
+                    .borrow()
+                    .render("error.html", &json!({"error": "Unable to add to playlist"})),
+            )
+            .into_response();
+        }
+    }
+}
+
+async fn add_track_to_playlist_page(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<u32>,
+) -> ResponseResult {
+    let track = state.client.track(id).await;
+    let track = ok_or_send_error_toast(&state, track)?;
+
+    let playlists = state.get_favorites().await;
+    let playlists = ok_or_send_error_toast(&state, playlists)?;
+    let playlists: Vec<_> = playlists
+        .playlists
+        .into_iter()
+        .filter(|x| x.is_owned)
+        .collect();
+
+    Ok(state.render(
+        "add-track-to-playlist.html",
+        &json!({"track": track, "playlists": playlists}),
+    ))
 }
 
 async fn create(State(state): State<Arc<AppState>>) -> ResponseResult {
@@ -108,10 +167,7 @@ async fn shuffle(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> imp
 }
 
 async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    ok_or_broadcast(
-        &state.broadcast,
-        state.client.add_favorite_playlist(id).await,
-    )?;
+    ok_or_send_error_toast(&state, state.client.add_favorite_playlist(id).await)?;
 
     Ok(state.render(
         "toggle-favorite.html",
@@ -120,10 +176,7 @@ async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -
 }
 
 async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    ok_or_broadcast(
-        &state.broadcast,
-        state.client.remove_favorite_playlist(id).await,
-    )?;
+    ok_or_send_error_toast(&state, state.client.remove_favorite_playlist(id).await)?;
 
     Ok(state.render(
         "toggle-favorite.html",
@@ -137,8 +190,8 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl 
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    let playlist = ok_or_error_component(&state, state.client.playlist(id).await)?;
-    let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
+    let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
+    let favorites = ok_or_send_error_toast(&state, state.get_favorites().await)?;
     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
     let duration = playlist.duration_seconds / 60;
     let click_string = format!("/playlist/{}/play/", playlist.id);
@@ -156,7 +209,7 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
 }
 
 async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    let playlist = ok_or_broadcast(&state.broadcast, state.client.playlist(id).await)?;
+    let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
     let click_string = format!("/playlist/{}/play/", playlist.id);
 
     Ok(state.render(

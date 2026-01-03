@@ -10,7 +10,7 @@ use axum_extra::extract::Form;
 use qobuz_player_controls::notification::Notification;
 use serde::Deserialize;
 
-use crate::{AppState, ResponseResult, ok_or_broadcast};
+use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -37,6 +37,7 @@ enum TrackAction {
     RemoveFavorite,
     AddToQueue,
     PlayNext,
+    AddToPlaylist,
 }
 #[derive(Deserialize)]
 struct TrackActionParammeters {
@@ -49,16 +50,13 @@ async fn track_action(
 ) -> ResponseResult {
     match req.action {
         TrackAction::AddFavorite => {
-            ok_or_broadcast(
-                &state.broadcast,
-                state.client.add_favorite_track(req.track_id).await,
-            )?;
+            ok_or_send_error_toast(&state, state.client.add_favorite_track(req.track_id).await)?;
             state.send_sse("tracklist".into(), "New favorite track".into());
             Ok(state.send_toast(Notification::Info("Track added to favorites".into())))
         }
         TrackAction::RemoveFavorite => {
-            ok_or_broadcast(
-                &state.broadcast,
+            ok_or_send_error_toast(
+                &state,
                 state.client.remove_favorite_track(req.track_id).await,
             )?;
             state.send_sse("tracklist".into(), "Removed favorite track".into());
@@ -74,6 +72,10 @@ async fn track_action(
             state.send_sse("tracklist".into(), "Track queued next".into());
             Ok(state.send_toast(Notification::Info("Track queued next".into())))
         }
+        TrackAction::AddToPlaylist => Ok(hx_redirect(&format!(
+            "/playlist/add-track/{}",
+            req.track_id
+        ))),
     }
 }
 

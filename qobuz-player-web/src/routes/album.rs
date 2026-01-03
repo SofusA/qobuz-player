@@ -8,7 +8,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{AppState, ResponseResult, ok_or_broadcast, ok_or_error_component};
+use crate::{AppState, ResponseResult, ok_or_send_error_toast};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -33,7 +33,7 @@ async fn set_favorite(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> ResponseResult {
-    ok_or_broadcast(&state.broadcast, state.client.add_favorite_album(&id).await)?;
+    ok_or_send_error_toast(&state, state.client.add_favorite_album(&id).await)?;
 
     Ok(state.render(
         "toggle-favorite.html",
@@ -45,10 +45,7 @@ async fn unset_favorite(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> ResponseResult {
-    ok_or_broadcast(
-        &state.broadcast,
-        state.client.remove_favorite_album(&id).await,
-    )?;
+    ok_or_send_error_toast(&state, state.client.remove_favorite_album(&id).await)?;
 
     Ok(state.render(
         "toggle-favorite.html",
@@ -79,8 +76,8 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> im
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> ResponseResult {
-    let album_data = ok_or_error_component(&state, state.get_album(&id).await)?;
-    let is_favorite = ok_or_error_component(&state, state.is_album_favorite(&id).await)?;
+    let album_data = ok_or_send_error_toast(&state, state.get_album(&id).await)?;
+    let is_favorite = ok_or_send_error_toast(&state, state.is_album_favorite(&id).await)?;
 
     let duration = album_data.album.duration_seconds / 60;
 
@@ -103,7 +100,7 @@ async fn album_tracks_partial(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> ResponseResult {
-    let album = ok_or_error_component(&state, state.client.album(&id).await)?;
+    let album = ok_or_send_error_toast(&state, state.client.album(&id).await)?;
     let click_string = format!("/album/{}/play/", album.id);
 
     Ok(state.render(

@@ -7,7 +7,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{AppState, ResponseResult, ok_or_error_component};
+use crate::{AppState, ResponseResult, ok_or_error_page};
 
 #[derive(Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -23,7 +23,7 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
 }
 
 async fn index(State(state): State<Arc<AppState>>, Path(tab): Path<Tab>) -> ResponseResult {
-    let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
+    let favorites = ok_or_error_page(&state, state.get_favorites().await)?;
 
     Ok(state.render(
         "favorites.html",

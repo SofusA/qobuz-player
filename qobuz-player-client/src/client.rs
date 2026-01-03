@@ -340,15 +340,21 @@ impl Client {
 
     pub async fn playlist_add_track(
         &self,
-        playlist_id: &str,
-        track_ids: Vec<&str>,
+        playlist_id: u32,
+        track_ids: &[u32],
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistAddTracks);
 
-        let track_ids = track_ids.join(",");
+        let track_ids = track_ids
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let playlist_id = playlist_id.to_string();
 
         let mut form_data = HashMap::new();
-        form_data.insert("playlist_id", playlist_id);
+        form_data.insert("playlist_id", playlist_id.as_str());
         form_data.insert("track_ids", track_ids.as_str());
         // form_data.insert("no_duplicate", "true");
 
@@ -362,12 +368,13 @@ impl Client {
 
     pub async fn playlist_delete_track(
         &self,
-        playlist_id: String,
+        playlist_id: u32,
         playlist_track_ids: Vec<String>,
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDeleteTracks);
 
         let playlist_track_ids = playlist_track_ids.join(",");
+        let playlist_id = playlist_id.to_string();
 
         let mut form_data = HashMap::new();
         form_data.insert("playlist_id", playlist_id.as_str());
@@ -384,15 +391,16 @@ impl Client {
     pub async fn update_playlist_track_position(
         &self,
         index: usize,
-        playlist_id: &str,
+        playlist_id: u32,
         track_id: &str,
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
 
         let index = index.to_string();
+        let playlist_id = playlist_id.to_string();
 
         let mut form_data = HashMap::new();
-        form_data.insert("playlist_id", playlist_id);
+        form_data.insert("playlist_id", playlist_id.as_str());
         form_data.insert("playlist_track_ids", track_id);
         form_data.insert("insert_before", index.as_str());
 
