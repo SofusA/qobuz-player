@@ -18,7 +18,7 @@ pub(crate) enum Tab {
     Tracks,
 }
 
-use crate::{AppState, ResponseResult, ok_or_broadcast};
+use crate::{AppState, ResponseResult, ok_or_error_page, ok_or_send_error_toast};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/search/{tab}", get(index).post(search))
@@ -38,7 +38,7 @@ async fn index(
         .query
         .and_then(|s| if s.is_empty() { None } else { Some(s) });
     let search_results = match query {
-        Some(query) => ok_or_broadcast(&state.broadcast, state.client.search(query).await)?,
+        Some(query) => ok_or_error_page(&state, state.client.search(query).await)?,
         None => SearchResults::default(),
     };
 
@@ -57,7 +57,7 @@ async fn search(
         .query
         .and_then(|s| if s.is_empty() { None } else { Some(s) });
     let search_results = match query {
-        Some(query) => ok_or_broadcast(&state.broadcast, state.client.search(query).await)?,
+        Some(query) => ok_or_send_error_toast(&state, state.client.search(query).await)?,
         None => SearchResults::default(),
     };
 

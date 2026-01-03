@@ -1,0 +1,80 @@
+@defer (base.html; playing_info=playing_info) {
+  <div class="flex flex-col gap-8 px-4">
+    <div
+      class="flex sticky top-0 flex-col grow gap-4 pb-2 max-h-full pt-safe-or-4 bg-black/80 backdrop-blur"
+    >
+      <h1 class="text-2xl">Create playlist</h1>
+    </div>
+
+    <form
+      hx-post="/playlist/create"
+      hx-trigger="submit"
+      hx-swap="none"
+      class="max-w-md mx-auto p-6 bg-gray-900 text-gray-100 rounded-xl shadow-lg space-y-4"
+    >
+      <div>
+        <label for="name" class="block font-semibold">Playlist Name</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          required
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label for="description" class="block font-semibold">
+          Description
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          rows="3"
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        ></textarea>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          id="is_public"
+          name="is_public"
+          class="h-4 w-4 text-indigo-500 bg-gray-800 border-gray-600 rounded"
+        />
+        <label for="is_public" class="font-medium">Public Playlist</label>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          id="is_collaborative"
+          name="is_collaborative"
+          disabled
+          class="h-4 w-4 text-indigo-500 bg-gray-800 border-gray-600 rounded disabled:opacity-40"
+        />
+        <label for="is_collaborative" class="font-medium">
+          Collaborative (only if public)
+        </label>
+      </div>
+
+      <button type="submit" class="button button-primary w-full">
+        Create Playlist
+      </button>
+    </form>
+  </div>
+}
+
+<script>
+  const isPublic = document.getElementById("is_public");
+  const isCollaborative = document.getElementById("is_collaborative");
+
+  isPublic.addEventListener("change", () => {
+    if (isPublic.checked) {
+      isCollaborative.disabled = false;
+    } else {
+      isCollaborative.checked = false;
+      isCollaborative.disabled = true;
+    }
+  });
+</script>

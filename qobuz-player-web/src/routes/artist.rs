@@ -9,7 +9,7 @@ use axum::{
 use serde_json::json;
 use tokio::try_join;
 
-use crate::{AppState, ResponseResult, ok_or_broadcast, ok_or_error_component};
+use crate::{AppState, ResponseResult, ok_or_send_error_toast};
 
 pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -28,7 +28,7 @@ async fn top_tracks_partial(
     State(state): State<Arc<AppState>>,
     Path(id): Path<u32>,
 ) -> ResponseResult {
-    let artist = ok_or_error_component(&state, state.client.artist_page(id).await)?;
+    let artist = ok_or_send_error_toast(&state, state.client.artist_page(id).await)?;
     let click_string = format!("/artist/{}/play-top-track/", artist.id);
     let now_playing_id = state.tracklist_receiver.borrow().currently_playing();
 
@@ -52,7 +52,7 @@ async fn play_top_track(
 }
 
 async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    ok_or_broadcast(&state.broadcast, state.client.add_favorite_artist(id).await)?;
+    ok_or_send_error_toast(&state, state.client.add_favorite_artist(id).await)?;
 
     Ok(state.render(
         "toggle-favorite.html",
@@ -61,10 +61,7 @@ async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -
 }
 
 async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    ok_or_broadcast(
-        &state.broadcast,
-        state.client.remove_favorite_artist(id).await,
-    )?;
+    ok_or_send_error_toast(&state, state.client.remove_favorite_artist(id).await)?;
 
     Ok(state.render(
         "toggle-favorite.html",
@@ -78,7 +75,7 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl 
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    let (artist, albums, similar_artists) = ok_or_error_component(
+    let (artist, albums, similar_artists) = ok_or_send_error_toast(
         &state,
         try_join!(
             state.client.artist_page(id),
@@ -87,7 +84,7 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
         ),
     )?;
 
-    let favorites = ok_or_error_component(&state, state.get_favorites().await)?;
+    let favorites = ok_or_send_error_toast(&state, state.get_favorites().await)?;
     let is_favorite = favorites.artists.iter().any(|artist| artist.id == id);
     let click_string = format!("/artist/{}/play-top-track/", artist.id);
 

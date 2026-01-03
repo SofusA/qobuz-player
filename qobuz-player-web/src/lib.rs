@@ -2,7 +2,8 @@ use assets::static_handler;
 use axum::{
     Router,
     extract::State,
-    response::{Html, IntoResponse, Sse, sse::Event},
+    http::{HeaderMap, StatusCode},
+    response::{Html, IntoResponse, Response, Sse, sse::Event},
     routing::get,
 };
 use futures::stream::Stream;
@@ -306,7 +307,7 @@ pub(crate) struct Discover {
 type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;
 
 #[allow(clippy::result_large_err)]
-fn ok_or_error_component<T>(
+fn ok_or_send_error_toast<T>(
     state: &AppState,
     value: Result<T, qobuz_player_controls::error::Error>,
 ) -> Result<T, axum::response::Response> {
@@ -314,18 +315,30 @@ fn ok_or_error_component<T>(
         Ok(value) => Ok(value),
         Err(err) => {
             let err = format!("{err}");
-            Err(Html(
-                state
-                    .templates
-                    .borrow()
-                    .render("error.html", &json!({"error": err})),
-            )
-            .into_response())
+            Err(state.send_toast(Notification::Error(err)))
         }
     }
 }
 
 #[allow(clippy::result_large_err)]
+fn ok_or_error_page<T>(
+    state: &AppState,
+    value: Result<T, qobuz_player_controls::error::Error>,
+) -> Result<T, axum::response::Response> {
+    match value {
+        Ok(value) => Ok(value),
+        Err(err) => {
+            let err = format!("{err}");
+            Err(state
+                .templates
+                .borrow()
+                .render("error-page.html", &json!({"error": err}))
+                .into_response())
+        }
+    }
+}
+
+#[allow(clippy::result_large_err, unused)]
 fn ok_or_broadcast<T>(
     broadcast: &NotificationBroadcast,
     value: Result<T, qobuz_player_controls::error::Error>,
@@ -342,4 +355,10 @@ fn ok_or_broadcast<T>(
             Err(response)
         }
     }
+}
+
+pub fn hx_redirect(url: &str) -> Response {
+    let mut headers = HeaderMap::new();
+    headers.insert("HX-Redirect", url.parse().unwrap());
+    (StatusCode::OK, headers).into_response()
 }

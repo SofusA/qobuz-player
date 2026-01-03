@@ -1,0 +1,71 @@
+@defer (base.html; playing_info=playing_info) {
+  <div class="flex flex-col gap-8 px-4">
+    <div
+      class="flex sticky top-0 flex-col grow gap-4 pb-2 max-h-full pt-safe-or-4 bg-black/80 backdrop-blur"
+    >
+      <h1 class="text-2xl">Add {{ track.title }} to playlist</h1>
+    </div>
+
+    <form
+      hx-post="/playlist/add-track"
+      hx-trigger="submit"
+      hx-swap="none"
+      class="w-full p-6 bg-gray-900 text-gray-100 space-y-4 sm:w-fit sm:self-center rounded-xl shadow-lg"
+    >
+      <div class="flex flex-col sm:flex-row items-center sm:items-center gap-4">
+        <img
+          src="{{ track.image }}"
+          alt="{{ track.title }}"
+          class="mx-auto sm:mx-0 rounded-lg object-cover aspect-square w-30 md:w-64"
+        />
+        <div
+          class="flex min-w-0 flex-col gap-1 w-full sm:w-auto text-center sm:text-left"
+        >
+          <span
+            class="text-gray-300 truncate whitespace-nowrap overflow-hidden max-w-full sm:max-w-88 md:max-w-md"
+          >
+            {{ track.artist_name }}
+          </span>
+          <span
+            class="text-lg font-semibold text-gray-100 truncate whitespace-nowrap overflow-hidden max-w-full sm:max-w-88 md:max-w-md"
+          >
+            {{ track.title }}
+          </span>
+          <span
+            class="text-gray-400 truncate whitespace-nowrap overflow-hidden max-w-full sm:max-w-88 md:max-w-md"
+          >
+            {{ track.album_title }}
+          </span>
+          @defer (
+            info.html;
+            hires_available=track.hires_available;
+            explicit=track.explicit
+          ) {}
+        </div>
+      </div>
+
+      <div>
+        <label for="playlist_id" class="font-semibold">Select playlist</label>
+        <select
+          id="playlist_id"
+          name="playlist_id"
+          required
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-gray-100"
+        >
+          <option value="" disabled selected class="text-gray-400">
+            Choose a playlist
+          </option>
+          @for (playlist in playlists) {
+            <option value="{{ playlist.id }}">{{ playlist.title }}</option>
+          }
+        </select>
+      </div>
+
+      <input type="hidden" name="track_id" value="{{ track.id }}" />
+
+      <button type="submit" class="button button-primary w-full">
+        Add to Playlist
+      </button>
+    </form>
+  </div>
+}
