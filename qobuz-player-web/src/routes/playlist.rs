@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post, put},
 };
 use axum_extra::extract::Form;
+use qobuz_player_controls::notification::Notification;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -18,6 +19,7 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
         .route("/playlist/{id}", get(index).delete(delete))
         .route("/playlist/{id}/content", get(content))
         .route("/playlist/{id}/tracks", get(tracks_partial))
+        .route("/playlist/{id}/tracks/edit", get(edit_tracks_partial))
         .route("/playlist/{id}/set-favorite", put(set_favorite))
         .route("/playlist/{id}/unset-favorite", put(unset_favorite))
         .route("/playlist/{id}/play", put(play))
@@ -25,18 +27,22 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
         .route("/playlist/{id}/play/{track_position}", put(play_track))
         .route("/playlist/{id}/link", put(link))
         .route("/playlist/add-track/{id}", get(add_track_to_playlist_page))
+        .route(
+            "/playlist/remove-track",
+            post(remove_track_from_playlist_action),
+        )
         .route("/playlist/add-track", post(add_track_to_playlist_action))
 }
 
 #[derive(Deserialize)]
-struct AddTrackParameters {
+struct ModifyTrackParameters {
     track_id: u32,
     playlist_id: u32,
 }
 
 async fn add_track_to_playlist_action(
     State(state): State<Arc<AppState>>,
-    Form(req): Form<AddTrackParameters>,
+    Form(req): Form<ModifyTrackParameters>,
 ) -> axum::response::Response {
     let res = state
         .client
@@ -44,14 +50,30 @@ async fn add_track_to_playlist_action(
         .await;
 
     match res {
-        Ok(res) => {
-            state
-                .broadcast
-                .send(qobuz_player_controls::notification::Notification::Success(
-                    format!("Added to {}", res.title),
-                ));
-            "Ok".into_response()
+        Ok(res) => state.send_toast(Notification::Success(format!("Added to {}", res.title))),
+        Err(_) => {
+            return Html(
+                state
+                    .templates
+                    .borrow()
+                    .render("error.html", &json!({"error": "Unable to add to playlist"})),
+            )
+            .into_response();
         }
+    }
+}
+
+async fn remove_track_from_playlist_action(
+    State(state): State<Arc<AppState>>,
+    Form(req): Form<ModifyTrackParameters>,
+) -> axum::response::Response {
+    let res = state
+        .client
+        .playlist_delete_track(req.playlist_id, &[req.track_id])
+        .await;
+
+    match res {
+        Ok(res) => state.send_toast(Notification::Success(format!("Removed from {}", res.title))),
         Err(_) => {
             return Html(
                 state
@@ -217,6 +239,20 @@ async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>)
         &json!({
             "playlist": playlist,
             "click": click_string
+        }),
+    ))
+}
+
+async fn edit_tracks_partial(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<u32>,
+) -> ResponseResult {
+    let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
+
+    Ok(state.render(
+        "playlist-edit-tracks.html",
+        &json!({
+            "playlist": playlist,
         }),
     ))
 }
