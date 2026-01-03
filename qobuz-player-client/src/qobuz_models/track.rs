@@ -41,6 +41,7 @@ pub struct Track {
     pub title: String,
     pub track_number: u32,
     pub version: Option<String>,
+    pub playlist_track_id: Option<u64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

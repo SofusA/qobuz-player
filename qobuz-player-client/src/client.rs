@@ -341,11 +341,11 @@ impl Client {
     pub async fn playlist_add_track(
         &self,
         playlist_id: u32,
-        track_ids: &[u32],
+        playlist_track_ids: &[u32],
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistAddTracks);
 
-        let track_ids = track_ids
+        let track_ids = playlist_track_ids
             .iter()
             .map(|x| x.to_string())
             .collect::<Vec<_>>()
@@ -369,16 +369,20 @@ impl Client {
     pub async fn playlist_delete_track(
         &self,
         playlist_id: u32,
-        playlist_track_ids: Vec<String>,
+        playlist_track_ids: &[u64],
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDeleteTracks);
 
-        let playlist_track_ids = playlist_track_ids.join(",");
+        let track_ids = playlist_track_ids
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
         let playlist_id = playlist_id.to_string();
 
         let mut form_data = HashMap::new();
         form_data.insert("playlist_id", playlist_id.as_str());
-        form_data.insert("playlist_track_ids", playlist_track_ids.as_str());
+        form_data.insert("playlist_track_ids", track_ids.as_str());
 
         let response = post!(self, &endpoint, form_data)?;
         Ok(parse_playlist(
@@ -392,16 +396,17 @@ impl Client {
         &self,
         index: usize,
         playlist_id: u32,
-        track_id: &str,
+        playlist_track_id: u32,
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
 
         let index = index.to_string();
         let playlist_id = playlist_id.to_string();
+        let track_id = playlist_track_id.to_string();
 
         let mut form_data = HashMap::new();
         form_data.insert("playlist_id", playlist_id.as_str());
-        form_data.insert("playlist_track_ids", track_id);
+        form_data.insert("playlist_track_ids", track_id.as_str());
         form_data.insert("insert_before", index.as_str());
 
         let response = post!(self, &endpoint, form_data)?;
@@ -1129,6 +1134,7 @@ fn parse_album(
                 artist_id: Some(value.artist.id),
                 album_title: Some(value.title.clone()),
                 album_id: Some(value.id.clone()),
+                playlist_track_id: None,
             })
             .collect()
     });
@@ -1215,6 +1221,7 @@ fn parse_artist_page(value: artist_page::ArtistPage) -> qobuz_player_models::Art
                     artist_id: Some(value.id),
                     album_title: Some(t.album.title),
                     album_id: Some(t.album.id),
+                    playlist_track_id: None,
                 }
             })
             .collect(),
@@ -1294,6 +1301,7 @@ fn parse_track(
         artist_id: artist.as_ref().map(move |a| a.id),
         album_title: value.album.as_ref().map(|a| a.title.clone()),
         album_id: value.album.as_ref().map(|a| a.id.clone()),
+        playlist_track_id: value.playlist_track_id,
     }
 }
 

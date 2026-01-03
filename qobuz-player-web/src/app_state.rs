@@ -73,9 +73,9 @@ impl AppState {
 
         let context = merge_serialized(&playing_info, context).unwrap();
         let templates = self.templates.borrow();
-        let result = templates.render(view, &context);
+        let render = templates.render(view, &context);
 
-        Html(result).into_response()
+        Html(render).into_response()
     }
 
     pub(crate) fn send_toast(&self, message: Notification) -> Response {

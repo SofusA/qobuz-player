@@ -333,30 +333,34 @@ impl Client {
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
         let res = client.playlist_add_track(playlist_id, track_ids).await?;
-        self.favorites_cache.clear().await;
+        self.playlist_cache.invalidate(&playlist_id).await;
         Ok(res)
     }
 
     pub async fn playlist_delete_track(
         &self,
         playlist_id: u32,
-        playlist_track_ids: Vec<String>,
+        playlist_track_ids: &[u64],
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
-        Ok(client
+        let res = client
             .playlist_delete_track(playlist_id, playlist_track_ids)
-            .await?)
+            .await?;
+        self.playlist_cache.invalidate(&playlist_id).await;
+        Ok(res)
     }
 
     pub async fn update_playlist_track_position(
         &self,
         index: usize,
         playlist_id: u32,
-        track_id: &str,
+        track_id: u32,
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
-        Ok(client
+        let res = client
             .update_playlist_track_position(index, playlist_id, track_id)
-            .await?)
+            .await?;
+        self.playlist_cache.invalidate(&playlist_id).await;
+        Ok(res)
     }
 }

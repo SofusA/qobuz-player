@@ -1,0 +1,79 @@
+<div>
+  <div class="w-full justify-end flex">
+    <button
+      class="button button-primary"
+      hx-get="/playlist/{{ playlist.id }}/tracks"
+      hx-target="#tracks"
+      hx-swap="outerHTML"
+    >
+      @defer (icons/arrow-uturn-left.html) {}
+    </button>
+  </div>
+  @defer (list.html) {
+    <div class="sortable">
+      @for (track in playlist.tracks) {
+        @defer (list-item.html) {
+          <div class="flex gap-4">
+            <div class="flex overflow-hidden gap-4 items-center w-full">
+              <div
+                class="flex justify-center items-center @if(show_track_cover) {size-12 aspect-square}"
+              >
+                <div
+                  class="flex justify-center items-center size-12 aspect-square"
+                >
+                  <div class="overflow-hidden rounded-md size-12 aspect-square">
+                    <div
+                      class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-md w-full h-full"
+                      style="background-image: url({{ track.image }});"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              @if (track.artist_name) {
+                <div class="flex overflow-hidden flex-col">
+                  <h2 class="truncate">{{ track.title }}</h2>
+                  <h3 class="text-sm text-gray-400 truncate">
+                    {{ track.artist_name }}
+                  </h3>
+                </div>
+              } @else {
+                <h2 class="w-full truncate">{{ track.title }}</h2>
+              }
+            </div>
+            @defer (
+              info.html;
+              hires_available=track.hires_available;
+              explicit=track.explicit
+            ) {}
+
+            <form
+              class="inline-flex"
+              hx-post="/playlist/remove-track"
+              hx-trigger="submit"
+              hx-target="#tracks"
+            >
+              <input
+                type="hidden"
+                name="track_id"
+                value="{{ track.playlist_track_id }}"
+              />
+              <input
+                type="hidden"
+                name="playlist_id"
+                value="{{ playlist.id }}"
+              />
+
+              <button type="submit" class="button button-danger size-12">
+                @defer (icons/x-circle.html) {}
+              </button>
+            </form>
+
+            <span class="handle button">
+              @defer (icons/bars-2.html) {}
+            </span>
+          </div>
+        }
+      }
+    </div>
+  }
+</div>

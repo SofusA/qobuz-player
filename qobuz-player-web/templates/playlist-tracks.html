@@ -5,7 +5,17 @@
   data-sse="tracklist"
   hx-swap="morph:outerHTML"
   hx-get="/playlist/{{ playlist.id }}/tracks"
+  id="tracks"
 >
+  <div class="w-full justify-end flex">
+    <button
+      class="button button-primary"
+      hx-get="/playlist/{{ playlist.id }}/tracks/edit"
+      hx-target="#tracks"
+    >
+      @defer (icons/pencil-square.html) {}
+    </button>
+  </div>
   @defer (
     list-tracks.html;
     now_playing_id=playing_info.now_playing_id;
