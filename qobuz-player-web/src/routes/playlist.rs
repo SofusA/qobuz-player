@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post, put},
 };
 use axum_extra::extract::Form;
-use qobuz_player_controls::notification::Notification;
+use qobuz_player_controls::{error::Error, notification::Notification};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -32,6 +32,7 @@ pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
             post(remove_track_from_playlist_action),
         )
         .route("/playlist/add-track", post(add_track_to_playlist_action))
+        .route("/playlist/reorder", post(reorder_tracks))
 }
 
 #[derive(Deserialize)]
@@ -61,6 +62,49 @@ async fn remove_track_from_playlist_action(
         .client
         .playlist_delete_track(req.playlist_id, &[req.track_id])
         .await;
+    let res = ok_or_send_error_toast(&state, res)?;
+    let res = state.client.playlist(res.id).await;
+    let res = ok_or_send_error_toast(&state, res)?;
+
+    Ok(state.render("playlist-edit-tracks.html", &json!({"playlist": res,})))
+}
+
+#[derive(Deserialize)]
+struct ReorderPlaylistParameters {
+    new_order: Vec<usize>,
+    playlist_id: u32,
+}
+
+async fn reorder_tracks(
+    State(state): State<Arc<AppState>>,
+    Form(req): Form<ReorderPlaylistParameters>,
+) -> ResponseResult {
+    let playlist = state.client.playlist(req.playlist_id).await;
+    let playlist = ok_or_send_error_toast(&state, playlist)?;
+
+    let moved_output = moved_index(&req.new_order).ok_or(Error::PlaylistReorderError);
+    let moved_output = ok_or_send_error_toast(&state, moved_output)?;
+
+    let moved_track = playlist
+        .tracks
+        .get(moved_output.moved_index)
+        .ok_or(Error::PlaylistReorderError);
+    let moved_track = ok_or_send_error_toast(&state, moved_track)?;
+
+    let moved_track_playlist_id = moved_track
+        .playlist_track_id
+        .ok_or(Error::PlaylistReorderError);
+    let moved_track_playlist_id = ok_or_send_error_toast(&state, moved_track_playlist_id)?;
+
+    let res = state
+        .client
+        .update_playlist_track_position(
+            moved_output.insert_before,
+            req.playlist_id,
+            moved_track_playlist_id,
+        )
+        .await;
+
     let res = ok_or_send_error_toast(&state, res)?;
     let res = state.client.playlist(res.id).await;
     let res = ok_or_send_error_toast(&state, res)?;
@@ -217,4 +261,84 @@ async fn edit_tracks_partial(
             "playlist": playlist,
         }),
     ))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MovedIndexOutput {
+    pub moved_index: usize,
+    pub insert_before: usize,
+}
+
+pub fn moved_index(perm: &[usize]) -> Option<MovedIndexOutput> {
+    if perm.iter().enumerate().all(|(i, &v)| i == v) {
+        return None;
+    }
+
+    let n = perm.len();
+    let mut inv = vec![0; n];
+    for (new_pos, &old_idx) in perm.iter().enumerate() {
+        inv[old_idx] = new_pos;
+    }
+    let mut moved = None;
+    for old_idx in 0..n {
+        let disp = inv[old_idx] as i64 - old_idx as i64;
+        let ad = disp.abs();
+        let better = match moved {
+            None => true,
+            Some(m) => {
+                let cur = inv[m] as i64 - m as i64;
+                ad > cur.abs() || (ad == cur.abs() && disp > 0 && cur <= 0)
+            }
+        };
+        if better {
+            moved = Some(old_idx);
+        }
+    }
+    let m = moved.unwrap();
+    let p = inv[m];
+    let insert_before = if p + 1 < n { perm[p + 1] + 1 } else { n + 1 };
+    Some(MovedIndexOutput {
+        moved_index: m,
+        insert_before,
+    })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_1() {
+        let perm = &[0, 1, 2, 3, 4, 5];
+        let output = moved_index(perm);
+
+        assert_eq!(output, None);
+    }
+
+    #[test]
+    fn test_2() {
+        let perm = &[1, 2, 3, 4, 5, 0];
+        let output = moved_index(perm).unwrap();
+
+        assert_eq!(output.moved_index, 0);
+        assert_eq!(output.insert_before, 7);
+    }
+
+    #[test]
+    fn test_3() {
+        let perm = &[2, 0, 1, 3, 4, 5];
+        let output = moved_index(perm).unwrap();
+
+        assert_eq!(output.moved_index, 2);
+        assert_eq!(output.insert_before, 1);
+    }
+
+    #[test]
+    fn test_4() {
+        let perm = &[0, 1, 2, 4, 3, 5];
+        let output = moved_index(perm).unwrap();
+
+        assert_eq!(output.moved_index, 3);
+        assert_eq!(output.insert_before, 6);
+    }
 }

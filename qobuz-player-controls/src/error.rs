@@ -53,6 +53,8 @@ pub enum Error {
     PortInUse {
         port: u16,
     },
+    #[snafu(display("Unable to reorder playlist"))]
+    PlaylistReorderError,
 }
 
 impl From<sqlx::migrate::MigrateError> for Error {

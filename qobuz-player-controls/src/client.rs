@@ -354,11 +354,11 @@ impl Client {
         &self,
         index: usize,
         playlist_id: u32,
-        track_id: u32,
+        playlist_track_id: u64,
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
         let res = client
-            .update_playlist_track_position(index, playlist_id, track_id)
+            .update_playlist_track_position(index, playlist_id, playlist_track_id)
             .await?;
         self.playlist_cache.invalidate(&playlist_id).await;
         Ok(res)

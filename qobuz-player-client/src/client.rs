@@ -396,7 +396,7 @@ impl Client {
         &self,
         index: usize,
         playlist_id: u32,
-        playlist_track_id: u32,
+        playlist_track_id: u64,
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
 
