@@ -11,7 +11,7 @@ use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
     app::{FilteredListState, Output, PlayOutcome, QueueOutcome},
-    popup::{ArtistPopupState, PlaylistPopupState, Popup},
+    popup::{ArtistPopupState, NewPlaylistPopupState, PlaylistPopupState, Popup},
     ui::{album_table, basic_list_table, render_input, track_table},
 };
 
@@ -98,10 +98,12 @@ impl FavoritesState {
                         .map(|artist| Row::new(Line::from(artist.name.clone())))
                         .collect::<Vec<_>>(),
                     title.as_str(),
+                    true,
                 ),
                 &mut self.artists.state,
             ),
             SubTab::Playlists => (
+                // TODO: Render owned
                 basic_list_table(
                     self.playlists
                         .filter
@@ -109,11 +111,12 @@ impl FavoritesState {
                         .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                         .collect::<Vec<_>>(),
                     title.as_str(),
+                    true,
                 ),
                 &mut self.playlists.state,
             ),
             SubTab::Tracks => (
-                track_table(&self.tracks.filter, &title),
+                track_table(&self.tracks.filter, Some(&title)),
                 &mut self.tracks.state,
             ),
         };
@@ -146,6 +149,30 @@ impl FavoritesState {
                             self.current_list_state().select_previous();
                             Output::Consumed
                         }
+                        KeyCode::Char('C') => match self.sub_tab {
+                            SubTab::Playlists => {
+                                Output::Popup(Popup::NewPlaylist(NewPlaylistPopupState {
+                                    name: Default::default(),
+                                    client: self.client.clone(),
+                                }))
+                            }
+                            _ => Output::NotConsumed,
+                        },
+                        KeyCode::Char('a') => match self.sub_tab {
+                            SubTab::Tracks => {
+                                let index = self.tracks.state.selected();
+
+                                let track = index.and_then(|index| self.tracks.filter.get(index));
+
+                                if let Some(id) = track {
+                                    return Output::PlayOutcome(PlayOutcome::AddTrackToPlaylist(
+                                        id.clone(),
+                                    ));
+                                }
+                                Output::Consumed
+                            }
+                            _ => Output::NotConsumed,
+                        },
                         KeyCode::Char('N') => {
                             if self.sub_tab != SubTab::Tracks {
                                 return Output::Consumed;
@@ -203,8 +230,18 @@ impl FavoritesState {
                                     index.and_then(|index| self.playlists.filter.get(index));
 
                                 if let Some(selected) = selected {
-                                    _ = self.client.remove_favorite_playlist(selected.id).await;
+                                    match selected.is_owned {
+                                        // TODO: Add confirmation
+                                        true => _ = self.client.delete_playlist(selected.id).await,
+                                        false => {
+                                            _ = self
+                                                .client
+                                                .remove_favorite_playlist(selected.id)
+                                                .await
+                                        }
+                                    }
                                 }
+
                                 Output::UpdateFavorites
                             }
                             SubTab::Tracks => {
@@ -261,10 +298,16 @@ impl FavoritesState {
                                     return Output::Consumed;
                                 };
 
+                                let playlist = match self.client.playlist(selected.id).await {
+                                    Ok(res) => res,
+                                    Err(err) => return Output::Error(format!("{err}")),
+                                };
+
                                 Output::Popup(Popup::Playlist(PlaylistPopupState {
-                                    playlist_name: selected.title.clone(),
-                                    playlist_id: selected.id,
+                                    playlist,
                                     shuffle: false,
+                                    state: Default::default(),
+                                    client: self.client.clone(),
                                 }))
                             }
                             SubTab::Tracks => {

@@ -172,6 +172,11 @@ fn render_help(frame: &mut Frame) {
         ["Move down in queue", "d"],
         ["Remove from favorites", "D"],
         ["Add to favorites", "A"],
+        ["Create playlist", "C (playlist page)"],
+        ["Delete playlist", "D (playlist page)"],
+        ["Add track to playlist", "a"],
+        ["Move playlist track up", "u"],
+        ["Move playlist track down", "d"],
         ["Exit", "q"],
     ];
 
@@ -289,13 +294,17 @@ pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple], title: &'a str) -> Ta
     table
 }
 
-pub(crate) fn basic_list_table<'a>(rows: Vec<Row<'a>>, title: &'a str) -> Table<'a> {
+pub(crate) fn basic_list_table<'a>(
+    rows: Vec<Row<'a>>,
+    title: &'a str,
+    selectable: bool,
+) -> Table<'a> {
     Table::new(rows, [Constraint::Min(1)])
-        .block(block(title, true))
+        .block(block(title, selectable))
         .row_highlight_style(ROW_HIGHLIGHT_STYLE)
 }
 
-pub(crate) fn track_table<'a>(rows: &[Track], title: &'a str) -> Table<'a> {
+pub(crate) fn track_table<'a>(rows: &[Track], block_title: Option<&'a str>) -> Table<'a> {
     let rows: Vec<_> = rows
         .iter()
         .map(|track| {
@@ -316,8 +325,11 @@ pub(crate) fn track_table<'a>(rows: &[Track], title: &'a str) -> Table<'a> {
             Constraint::Ratio(1, 3),
         ],
     )
-    .block(block(title, true))
     .row_highlight_style(ROW_HIGHLIGHT_STYLE);
+
+    if let Some(title) = block_title {
+        table = table.block(block(title, true));
+    }
 
     if !is_empty {
         table = table.header(Row::new(["Title", "Artist", "Album"]).add_modifier(Modifier::BOLD));

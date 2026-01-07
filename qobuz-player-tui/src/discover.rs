@@ -45,6 +45,7 @@ impl DiscoverState {
                             .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                             .collect::<Vec<_>>(),
                         &list_state.0,
+                        true,
                     ),
                     &mut list_state.1.state,
                 )
@@ -104,9 +105,10 @@ impl DiscoverState {
                                     let playlist = &items[selected_index];
 
                                     return Output::Popup(Popup::Playlist(PlaylistPopupState {
-                                        playlist_name: playlist.title.clone(),
-                                        playlist_id: playlist.id,
+                                        playlist: playlist.clone(),
                                         shuffle: false,
+                                        state: Default::default(),
+                                        client: self.client.clone(),
                                     }));
                                 }
                             }

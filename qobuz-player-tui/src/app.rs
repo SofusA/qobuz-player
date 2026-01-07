@@ -1,6 +1,10 @@
 use crate::{
-    discover::DiscoverState, favorites::FavoritesState, now_playing::NowPlayingState, popup::Popup,
-    queue::QueueState, search::SearchState,
+    discover::DiscoverState,
+    favorites::FavoritesState,
+    now_playing::NowPlayingState,
+    popup::{Popup, TrackPopupState},
+    queue::QueueState,
+    search::SearchState,
 };
 use core::fmt;
 use image::load_from_memory;
@@ -11,6 +15,7 @@ use qobuz_player_controls::{
     notification::{Notification, NotificationBroadcast},
     tracklist::Tracklist,
 };
+use qobuz_player_models::Track;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
@@ -41,7 +46,8 @@ pub(crate) struct App {
     pub(crate) disable_tui_album_cover: bool,
 }
 
-#[derive(Default, PartialEq)]
+#[allow(clippy::large_enum_variant)] // TODO remove
+#[derive(Default)]
 pub(crate) enum AppState {
     #[default]
     Normal,
@@ -69,9 +75,11 @@ pub(crate) enum QueueOutcome {
 
 pub(crate) enum PlayOutcome {
     Album(String),
-    Playlist((u32, bool)),
+    Playlist((u32, bool, usize)),
     Track(u32),
     SkipToPosition(usize),
+    AddTrackToPlaylist(Track),
+    Consumed,
 }
 
 #[derive(Default, PartialEq)]
@@ -185,8 +193,9 @@ impl App {
                             return Ok(());
                         }
 
-                        if let Some(outcome) = popup.handle_event(key_event.code).await {
-                            self.handle_playoutcome(outcome);
+                        if let Some(outcome) = popup.handle_event(event).await
+                            && self.handle_playoutcome(outcome).await
+                        {
                             self.app_state = AppState::Normal;
                         };
 
@@ -235,7 +244,7 @@ impl App {
                         return Ok(());
                     }
                     Output::PlayOutcome(outcome) => {
-                        self.handle_playoutcome(outcome);
+                        self.handle_playoutcome(outcome).await;
                     }
                     Output::Error(err) => {
                         self.broadcast.send_error(err);
@@ -345,24 +354,51 @@ impl App {
         Ok(())
     }
 
-    fn handle_playoutcome(&mut self, outcome: PlayOutcome) {
+    async fn handle_playoutcome(&mut self, outcome: PlayOutcome) -> bool {
         match outcome {
             PlayOutcome::Album(id) => {
                 self.controls.play_album(&id, 0);
             }
-
             PlayOutcome::Playlist(outcome) => {
-                self.controls.play_playlist(outcome.0, 0, outcome.1);
+                self.controls.play_playlist(outcome.0, outcome.2, outcome.1);
             }
-
             PlayOutcome::Track(id) => {
                 self.controls.play_track(id);
             }
-
             PlayOutcome::SkipToPosition(index) => {
                 self.controls.skip_to_position(index, true);
             }
+            PlayOutcome::AddTrackToPlaylist(track) => {
+                let playlists = self.client.favorites().await.map(|favs| {
+                    favs.playlists
+                        .into_iter()
+                        .filter(|p| p.is_owned)
+                        .collect::<Vec<_>>()
+                });
+
+                if let Ok(playlists) = playlists {
+                    self.app_state = AppState::Popup(Popup::Track(TrackPopupState {
+                        playlists,
+                        track,
+                        state: Default::default(),
+                        client: self.client.clone(),
+                    }));
+                    return false;
+                }
+            }
+            PlayOutcome::Consumed => {
+                let favorites = self.client.favorites().await;
+
+                if let Ok(favorites) = favorites {
+                    let playlists = favorites.playlists;
+
+                    self.favorites.playlists.all_items = playlists.clone();
+                    self.favorites.playlists.filter = playlists;
+                    self.should_draw = true;
+                }
+            }
         }
+        true
     }
 
     fn navigate_to_favorites(&mut self) {

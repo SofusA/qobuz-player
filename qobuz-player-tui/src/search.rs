@@ -98,6 +98,7 @@ impl SearchState {
                         .map(|artist| Row::new(Line::from(artist.name.clone())))
                         .collect::<Vec<_>>(),
                     &title,
+                    true,
                 ),
                 &mut self.artists.state,
             ),
@@ -109,11 +110,12 @@ impl SearchState {
                         .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                         .collect::<Vec<_>>(),
                     &title,
+                    true,
                 ),
                 &mut self.playlists.state,
             ),
             SubTab::Tracks => (
-                track_table(&self.tracks.items, &title),
+                track_table(&self.tracks.items, Some(&title)),
                 &mut self.tracks.state,
             ),
         };
@@ -227,6 +229,21 @@ impl SearchState {
                                 Output::Consumed
                             }
                         },
+                        KeyCode::Char('a') => match self.sub_tab {
+                            SubTab::Tracks => {
+                                let index = self.tracks.state.selected();
+
+                                let track = index.and_then(|index| self.tracks.items.get(index));
+
+                                if let Some(id) = track {
+                                    return Output::PlayOutcome(PlayOutcome::AddTrackToPlaylist(
+                                        id.clone(),
+                                    ));
+                                }
+                                Output::Consumed
+                            }
+                            _ => Output::NotConsumed,
+                        },
                         KeyCode::Enter => match self.sub_tab {
                             SubTab::Albums => {
                                 let index = self.albums.state.selected();
@@ -270,10 +287,16 @@ impl SearchState {
                                     return Output::Consumed;
                                 };
 
+                                let playlist = match self.client.playlist(selected.id).await {
+                                    Ok(res) => res,
+                                    Err(err) => return Output::Error(format!("{err}")),
+                                };
+
                                 Output::Popup(Popup::Playlist(PlaylistPopupState {
-                                    playlist_name: selected.title.clone(),
-                                    playlist_id: selected.id,
+                                    playlist,
                                     shuffle: false,
+                                    state: Default::default(),
+                                    client: self.client.clone(),
                                 }))
                             }
                             SubTab::Tracks => {

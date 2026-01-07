@@ -45,7 +45,8 @@ impl QueueState {
                     ]))
                 })
                 .collect(),
-            " Queue ",
+            "Queue",
+            false,
         );
 
         frame.render_stateful_widget(table, area, &mut self.queue.state);
