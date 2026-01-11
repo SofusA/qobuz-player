@@ -7,6 +7,7 @@ use std::time::Duration;
 use rodio::Source;
 use rodio::cpal::traits::HostTrait;
 use rodio::{decoder::DecoderBuilder, queue::queue};
+use tokio::sync::watch::{self, Receiver, Sender};
 
 use crate::error::Error;
 use crate::{Result, VolumeReceiver};
@@ -16,16 +17,23 @@ pub struct Sink {
     sink: Option<rodio::Sink>,
     sender: Option<Arc<rodio::queue::SourcesQueueInput>>,
     volume: VolumeReceiver,
+    track_finished: Sender<()>,
 }
 
 impl Sink {
     pub fn new(volume: VolumeReceiver) -> Result<Self> {
+        let (track_finished, _) = watch::channel(());
         Ok(Self {
             sink: Default::default(),
             stream_handle: Default::default(),
             sender: Default::default(),
             volume,
+            track_finished,
         })
+    }
+
+    pub fn track_finished(&self) -> Receiver<()> {
+        self.track_finished.subscribe()
     }
 
     pub async fn clear(&mut self) -> Result<()> {
@@ -91,7 +99,14 @@ impl Sink {
             self.stream_handle = Some(stream_handle);
         }
 
-        self.sender.as_ref().unwrap().append(source);
+        let track_finished = self.track_finished.clone();
+        let signal = self.sender.as_ref().unwrap().append_with_signal(source);
+
+        tokio::task::spawn_blocking(move || {
+            if signal.recv().is_ok() {
+                track_finished.send(()).expect("infallible");
+            }
+        });
 
         let same_sample_rate =
             sample_rate == self.stream_handle.as_ref().unwrap().config().sample_rate();
