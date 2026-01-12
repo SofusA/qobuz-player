@@ -1,10 +1,10 @@
 use std::fs;
-use std::io::Cursor;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use rodio::Source;
 use rodio::cpal::traits::HostTrait;
 use rodio::{decoder::DecoderBuilder, queue::queue};
@@ -14,7 +14,7 @@ use crate::error::Error;
 use crate::{Result, VolumeReceiver};
 
 pub struct Sink {
-    stream_handle: Option<rodio::OutputStream>,
+    output_stream: Option<rodio::OutputStream>,
     sink: Option<rodio::Sink>,
     sender: Option<Arc<rodio::queue::SourcesQueueInput>>,
     volume: VolumeReceiver,
@@ -28,7 +28,7 @@ impl Sink {
         let (track_finished, _) = watch::channel(());
         Ok(Self {
             sink: Default::default(),
-            stream_handle: Default::default(),
+            output_stream: Default::default(),
             sender: Default::default(),
             volume,
             track_finished,
@@ -48,28 +48,13 @@ impl Sink {
             .map(|sink| sink.get_pos())
             .unwrap_or_default();
 
-        let duration_played = self
-            .duration_played
-            .lock()
-            .map(|lock| lock.unwrap_or_default())
-            .unwrap_or_default();
+        let duration_played = self.duration_played.lock().unwrap_or_default();
 
         if position < duration_played {
             return Default::default();
         }
 
         position - duration_played
-    }
-
-    pub async fn clear(&mut self) -> Result<()> {
-        self.clear_queue()?;
-        self.sink = None;
-        self.sender = None;
-        self.stream_handle = None;
-        self.track_handle = None;
-        *self.duration_played.lock()? = None;
-
-        Ok(())
     }
 
     pub fn play(&self) {
@@ -88,7 +73,7 @@ impl Sink {
         if let Some(sink) = &self.sink {
             match sink.try_seek(duration) {
                 Ok(_) => {
-                    *self.duration_played.lock()? = None;
+                    *self.duration_played.lock() = None;
                 }
                 Err(err) => return Err(err.into()),
             };
@@ -97,9 +82,23 @@ impl Sink {
         Ok(())
     }
 
+    pub fn clear(&mut self) -> Result<()> {
+        self.clear_queue()?;
+        self.sink = None;
+        self.sender = None;
+        self.output_stream = None;
+        *self.duration_played.lock() = None;
+
+        Ok(())
+    }
+
     pub fn clear_queue(&mut self) -> Result<()> {
+        // if let Some(handle) = self.track_handle.take() {
+        //     let _ = handle.join();
+        // }
         self.track_handle = None;
-        *self.duration_played.lock()? = None;
+
+        *self.duration_played.lock() = None;
 
         if let Some(sender) = self.sender.as_ref() {
             sender.clear();
@@ -108,22 +107,29 @@ impl Sink {
     }
 
     pub fn query_track(&mut self, track_url: &Path) -> Result<QueryTrackResult> {
-        let bytes = fs::read(track_url).map_err(|_| Error::StreamError {
-            message: "File not found".into(),
+        let file = fs::File::open(track_url).map_err(|err| Error::StreamError {
+            message: format!("Failed to read file: {track_url:?}: {err}"),
         })?;
-
-        let cursor = Cursor::new(bytes);
         let source = DecoderBuilder::new()
-            .with_data(cursor)
+            .with_data(file)
             .with_seekable(true)
-            .build()
-            .map_err(|_| Error::StreamError {
-                message: "Unable to decode audio file".into(),
-            })?;
+            .build()?;
 
         let sample_rate = source.sample_rate();
+        let same_sample_rate = self
+            .output_stream
+            .as_ref()
+            .map(|stream| stream.config().sample_rate() == sample_rate)
+            .unwrap_or(true);
 
-        if self.stream_handle.is_none() || self.sink.is_none() || self.sender.is_none() {
+        if !same_sample_rate {
+            return Ok(QueryTrackResult::RecreateStreamRequired);
+        }
+
+        let needs_stream =
+            self.output_stream.is_none() || self.sink.is_none() || self.sender.is_none();
+
+        if needs_stream {
             let mut stream_handle = open_default_stream(sample_rate)?;
             stream_handle.log_on_drop(false);
 
@@ -131,15 +137,16 @@ impl Sink {
             let sink = rodio::Sink::connect_new(stream_handle.mixer());
             sink.append(receiver);
             set_volume(&sink, &self.volume.borrow());
+
             self.sink = Some(sink);
             self.sender = Some(sender);
-            self.stream_handle = Some(stream_handle);
+            self.output_stream = Some(stream_handle);
         }
 
         let track_finished = self.track_finished.clone();
 
         let track_duration = {
-            let previously_played = self.duration_played.lock()?.unwrap_or_default();
+            let previously_played = self.duration_played.lock().unwrap_or_default();
 
             source
                 .total_duration()
@@ -151,22 +158,14 @@ impl Sink {
 
         let track_handle = std::thread::spawn(move || {
             if signal.recv().is_ok() {
-                if let Ok(mut duration_played) = duration_played.lock() {
-                    *duration_played = track_duration;
-                };
+                *duration_played.lock() = track_duration;
                 track_finished.send(()).expect("infallible");
             }
         });
 
         self.track_handle = Some(track_handle);
 
-        let same_sample_rate =
-            sample_rate == self.stream_handle.as_ref().unwrap().config().sample_rate();
-
-        Ok(match same_sample_rate {
-            true => QueryTrackResult::Queued,
-            false => QueryTrackResult::NotQueued,
-        })
+        Ok(QueryTrackResult::Queued)
     }
 
     pub fn sync_volume(&self) {
@@ -199,5 +198,11 @@ fn open_default_stream(sample_rate: u32) -> Result<rodio::OutputStream> {
 
 pub enum QueryTrackResult {
     Queued,
-    NotQueued,
+    RecreateStreamRequired,
+}
+
+impl Drop for Sink {
+    fn drop(&mut self) {
+        self.clear().unwrap();
+    }
 }

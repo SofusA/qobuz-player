@@ -52,3 +52,4 @@ ratatui-image = { version = "10", default-features = false, features = ["image-d
 tui-input = "0.15"
 image = "0.25"
 skabelon = "0.1.18"
+parking_lot = "0.12.5"

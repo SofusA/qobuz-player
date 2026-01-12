@@ -3299,6 +3299,7 @@ dependencies = [
  "dirs",
  "md5",
  "moka",
+ "parking_lot",
  "qobuz-player-client",
  "qobuz-player-models",
  "rand 0.9.2",

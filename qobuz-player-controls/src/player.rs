@@ -233,7 +233,7 @@ impl Player {
             self.new_queue(tracklist).await?;
         } else {
             tracklist.reset();
-            self.sink.clear().await?;
+            self.sink.clear()?;
             self.next_track_is_queried = false;
             self.set_target_status(Status::Paused);
             self.position.send(Default::default())?;
@@ -256,7 +256,7 @@ impl Player {
     }
 
     async fn new_queue(&mut self, tracklist: Tracklist) -> Result<()> {
-        self.sink.clear().await?;
+        self.sink.clear()?;
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
         self.set_target_status(Status::Buffering);
@@ -509,7 +509,7 @@ impl Player {
         match next_track {
             Some(next_track) => {
                 if !self.next_track_in_sink_queue {
-                    self.sink.clear().await?;
+                    self.sink.clear()?;
                     self.query_track(next_track).await?;
                 }
 
@@ -522,7 +522,7 @@ impl Player {
                 tracklist.reset();
                 self.set_target_status(Status::Paused);
                 self.sink.pause();
-                self.sink.clear().await?;
+                self.sink.clear()?;
             }
         }
         self.next_track_is_queried = false;
@@ -538,7 +538,7 @@ impl Player {
         let next_track_has_other_sample_rate = self.sink.query_track(&path)?;
         self.next_track_in_sink_queue = match next_track_has_other_sample_rate {
             QueryTrackResult::Queued => true,
-            QueryTrackResult::NotQueued => false,
+            QueryTrackResult::RecreateStreamRequired => false,
         };
         Ok(())
     }
