@@ -14,7 +14,6 @@ pub mod notification;
 pub mod player;
 pub(crate) mod simple_cache;
 pub(crate) mod sink;
-pub(crate) mod timer;
 pub mod tracklist;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

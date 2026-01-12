@@ -16,7 +16,6 @@ use crate::{
     downloader::Downloader,
     notification::NotificationBroadcast,
     sink::QueryTrackResult,
-    timer::Timer,
     tracklist::{SingleTracklist, TracklistType},
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
@@ -37,7 +36,6 @@ pub struct Player {
     client: Arc<Client>,
     sink: Sink,
     volume: Sender<f32>,
-    position_timer: Timer,
     position: Sender<Duration>,
     track_finished: Receiver<()>,
     done_buffering: Receiver<PathBuf>,
@@ -83,7 +81,6 @@ impl Player {
             client,
             sink,
             volume,
-            position_timer: Default::default(),
             position,
             track_finished,
             done_buffering,
@@ -125,34 +122,6 @@ impl Player {
         Ok(())
     }
 
-    fn start_timer(&mut self) {
-        self.position_timer.start();
-        self.position
-            .send(self.position_timer.elapsed())
-            .expect("infallible");
-    }
-
-    fn pause_timer(&mut self) {
-        self.position_timer.pause();
-        self.position
-            .send(self.position_timer.elapsed())
-            .expect("infallible");
-    }
-
-    fn stop_timer(&mut self) {
-        self.position_timer.stop();
-        self.position
-            .send(self.position_timer.elapsed())
-            .expect("infallible");
-    }
-
-    fn set_timer(&mut self, duration: Duration) {
-        self.position_timer.set_time(duration);
-        self.position
-            .send(self.position_timer.elapsed())
-            .expect("infallible");
-    }
-
     async fn play(&mut self) -> Result<()> {
         let track = self.tracklist_rx.borrow().current_track().cloned();
 
@@ -165,14 +134,12 @@ impl Player {
 
         self.set_target_status(Status::Playing);
         self.sink.play();
-        self.start_timer();
         Ok(())
     }
 
     fn pause(&mut self) {
         self.set_target_status(Status::Paused);
         self.sink.pause();
-        self.pause_timer();
     }
 
     fn set_target_status(&self, status: Status) {
@@ -202,8 +169,9 @@ impl Player {
     }
 
     fn seek(&mut self, duration: Duration) -> Result<()> {
-        self.set_timer(duration);
-        self.sink.seek(duration)
+        self.sink.seek(duration)?;
+        self.position.send(self.sink.position())?;
+        Ok(())
     }
 
     fn jump_forward(&mut self) -> Result<()> {
@@ -215,7 +183,7 @@ impl Player {
 
         if let Some(duration) = duration {
             let ten_seconds = Duration::from_secs(10);
-            let next_position = self.position_timer.elapsed() + ten_seconds;
+            let next_position = self.sink.position() + ten_seconds;
 
             if next_position < duration {
                 self.seek(next_position)?;
@@ -228,7 +196,7 @@ impl Player {
     }
 
     fn jump_backward(&mut self) -> Result<()> {
-        let current_position = self.position_timer.elapsed();
+        let current_position = self.sink.position();
 
         if current_position.as_millis() < 10000 {
             self.seek(Duration::default())?;
@@ -257,14 +225,12 @@ impl Player {
             return Ok(());
         }
 
-        self.stop_timer();
         self.set_target_status(Status::Buffering);
 
         self.position.send(Default::default())?;
 
         if tracklist.skip_to_track(new_position).is_some() {
             self.new_queue(tracklist).await?;
-            self.start_timer();
         } else {
             tracklist.reset();
             self.sink.clear().await?;
@@ -290,9 +256,7 @@ impl Player {
     }
 
     async fn new_queue(&mut self, tracklist: Tracklist) -> Result<()> {
-        self.stop_timer();
         self.sink.clear().await?;
-        self.sink.clear_queue();
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
         self.set_target_status(Status::Buffering);
@@ -308,7 +272,7 @@ impl Player {
 
     async fn update_queue(&mut self, tracklist: Tracklist) -> Result<()> {
         self.next_track_is_queried = false;
-        self.sink.clear_queue();
+        self.sink.clear_queue()?;
         self.broadcast_tracklist(tracklist).await?;
         Ok(())
     }
@@ -450,8 +414,7 @@ impl Player {
             return Ok(());
         }
 
-        let position = self.position_timer.elapsed();
-
+        let position = self.sink.position();
         self.position.send(position)?;
 
         let duration = self
@@ -520,7 +483,6 @@ impl Player {
                 self.jump_backward()?;
             }
             ControlCommand::Seek { time } => {
-                self.set_timer(time);
                 self.seek(time)?;
             }
             ControlCommand::SetVolume { volume } => {
@@ -537,7 +499,6 @@ impl Player {
     }
 
     async fn track_finished(&mut self) -> Result<()> {
-        self.stop_timer();
         let mut tracklist = self.tracklist_rx.borrow().clone();
 
         let current_position = tracklist.current_position();
@@ -553,7 +514,6 @@ impl Player {
                 }
 
                 if self.next_track_is_queried {
-                    self.start_timer();
                 } else {
                     self.set_target_status(Status::Buffering);
                 }
@@ -562,7 +522,6 @@ impl Player {
                 tracklist.reset();
                 self.set_target_status(Status::Paused);
                 self.sink.pause();
-                self.position_timer.stop();
                 self.sink.clear().await?;
             }
         }
@@ -573,8 +532,6 @@ impl Player {
 
     fn done_buffering(&mut self, path: PathBuf) -> Result<()> {
         if *self.target_status.borrow() != Status::Playing {
-            self.position_timer.reset();
-            self.start_timer();
             self.set_target_status(Status::Playing);
         }
 

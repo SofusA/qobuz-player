@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -20,6 +20,7 @@ pub struct Sink {
     volume: VolumeReceiver,
     track_finished: Sender<()>,
     track_handle: Option<JoinHandle<()>>,
+    duration_played: Arc<Mutex<Option<Duration>>>,
 }
 
 impl Sink {
@@ -32,6 +33,7 @@ impl Sink {
             volume,
             track_finished,
             track_handle: Default::default(),
+            duration_played: Default::default(),
         })
     }
 
@@ -39,11 +41,33 @@ impl Sink {
         self.track_finished.subscribe()
     }
 
+    pub fn position(&self) -> Duration {
+        let position = self
+            .sink
+            .as_ref()
+            .map(|sink| sink.get_pos())
+            .unwrap_or_default();
+
+        let duration_played = self
+            .duration_played
+            .lock()
+            .map(|lock| lock.unwrap_or_default())
+            .unwrap_or_default();
+
+        if position < duration_played {
+            return Default::default();
+        }
+
+        position - duration_played
+    }
+
     pub async fn clear(&mut self) -> Result<()> {
+        self.clear_queue()?;
         self.sink = None;
         self.sender = None;
         self.stream_handle = None;
         self.track_handle = None;
+        *self.duration_played.lock()? = None;
 
         Ok(())
     }
@@ -62,18 +86,25 @@ impl Sink {
 
     pub fn seek(&self, duration: Duration) -> Result<()> {
         if let Some(sink) = &self.sink {
-            sink.try_seek(duration)?;
+            match sink.try_seek(duration) {
+                Ok(_) => {
+                    *self.duration_played.lock()? = None;
+                }
+                Err(err) => return Err(err.into()),
+            };
         }
 
         Ok(())
     }
 
-    pub fn clear_queue(&mut self) {
+    pub fn clear_queue(&mut self) -> Result<()> {
         self.track_handle = None;
+        *self.duration_played.lock()? = None;
 
         if let Some(sender) = self.sender.as_ref() {
             sender.clear();
-        }
+        };
+        Ok(())
     }
 
     pub fn query_track(&mut self, track_url: &Path) -> Result<QueryTrackResult> {
@@ -106,10 +137,23 @@ impl Sink {
         }
 
         let track_finished = self.track_finished.clone();
+
+        let track_duration = {
+            let previously_played = self.duration_played.lock()?.unwrap_or_default();
+
+            source
+                .total_duration()
+                .map(|duration| duration + previously_played)
+        };
+
+        let duration_played = self.duration_played.clone();
         let signal = self.sender.as_ref().unwrap().append_with_signal(source);
 
         let track_handle = std::thread::spawn(move || {
             if signal.recv().is_ok() {
+                if let Ok(mut duration_played) = duration_played.lock() {
+                    *duration_played = track_duration;
+                };
                 track_finished.send(()).expect("infallible");
             }
         });
