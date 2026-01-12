@@ -292,6 +292,7 @@ impl Player {
     async fn new_queue(&mut self, tracklist: Tracklist) -> Result<()> {
         self.stop_timer();
         self.sink.clear().await?;
+        self.sink.clear_queue();
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
         self.set_target_status(Status::Buffering);
