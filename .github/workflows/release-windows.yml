@@ -1,0 +1,32 @@
+name: Create release, build and upload artifacts (Windows)
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - v[0-9]+.*
+
+jobs:
+  create-build-upload:
+    name: Build, package and publish
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install Rust target
+        run: rustup target add x86_64-pc-windows-msvc
+
+      - name: Build player (Windows)
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Zip qobuz-player-x86_64-pc-windows-msvc.zip
+        run: |
+          powershell Compress-Archive -Path target/x86_64-pc-windows-msvc/release/qobuz-player.exe -DestinationPath qobuz-player-x86_64-pc-windows-msvc.zip
+
+      - name: Release artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          files: qobuz-player-x86_64-pc-windows-msvc.zip
