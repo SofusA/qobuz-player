@@ -148,9 +148,13 @@ impl Player {
 
     async fn query_track(&mut self, track: &Track) -> Result<()> {
         let track_url = self.client.track_url(track.id).await?;
-        self.downloader
+        if let Some(track_path) = self
+            .downloader
             .ensure_track_is_downloaded(track_url, track)
-            .await;
+            .await
+        {
+            self.sink.query_track(&track_path)?;
+        }
 
         Ok(())
     }

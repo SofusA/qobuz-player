@@ -41,7 +41,11 @@ impl Downloader {
         self.done_buffering_tx.subscribe()
     }
 
-    pub async fn ensure_track_is_downloaded(&mut self, track_url: TrackURL, track: &Track) {
+    pub async fn ensure_track_is_downloaded(
+        &mut self,
+        track_url: TrackURL,
+        track: &Track,
+    ) -> Option<PathBuf> {
         tracing::info!("Downloading: {}", track.title);
 
         if let Some(handle) = &self.download_handle {
@@ -49,27 +53,27 @@ impl Downloader {
             self.download_handle = None;
         };
 
-        let done_buffering = self.done_buffering_tx.clone();
-        let track = track.clone();
-        let broadcast = self.broadcast.clone();
-
-        let cache_path = cache_path(&track, &track_url.mime_type, &self.audio_cache_dir);
+        let cache_path = cache_path(track, &track_url.mime_type, &self.audio_cache_dir);
         self.database.set_cache_entry(cache_path.as_path()).await;
 
         if cache_path.exists() {
-            done_buffering.send(cache_path).expect("infallible");
-            return;
+            return Some(cache_path);
         }
+
+        let done_buffering = self.done_buffering_tx.clone();
+        let broadcast = self.broadcast.clone();
 
         let handle = tokio::spawn(async move {
             let Ok(resp) = reqwest::get(&track_url.url).await else {
                 broadcast.send_error("Unable to get track audio file".to_string());
                 return;
             };
+
             let Ok(body) = resp.bytes().await else {
                 broadcast.send_error("Unable to get audio file bytes".to_string());
                 return;
             };
+
             let bytes = body.to_vec();
 
             if let Some(parent) = cache_path.parent()
@@ -90,6 +94,7 @@ impl Downloader {
         });
 
         self.download_handle = Some(handle);
+        None
     }
 }
 

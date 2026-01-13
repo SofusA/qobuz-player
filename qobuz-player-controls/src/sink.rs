@@ -106,9 +106,9 @@ impl Sink {
         Ok(())
     }
 
-    pub fn query_track(&mut self, track_url: &Path) -> Result<QueryTrackResult> {
-        let file = fs::File::open(track_url).map_err(|err| Error::StreamError {
-            message: format!("Failed to read file: {track_url:?}: {err}"),
+    pub fn query_track(&mut self, track_path: &Path) -> Result<QueryTrackResult> {
+        let file = fs::File::open(track_path).map_err(|err| Error::StreamError {
+            message: format!("Failed to read file: {track_path:?}: {err}"),
         })?;
         let source = DecoderBuilder::new()
             .with_data(file)
