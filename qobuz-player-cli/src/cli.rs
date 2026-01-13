@@ -133,8 +133,24 @@ pub async fn run() -> Result<(), Error> {
 
     let database = Arc::new(Database::new().await?);
 
+    let verbosity = match &cli.command {
+        Some(Commands::Open {
+            disable_tui,
+            rfid,
+            web,
+            ..
+        }) => {
+            if cli.verbosity.is_none() && *disable_tui && !*rfid && *web {
+                Some(tracing::Level::INFO)
+            } else {
+                cli.verbosity
+            }
+        }
+        _ => cli.verbosity,
+    };
+
     tracing_subscriber::fmt()
-        .with_max_level(cli.verbosity)
+        .with_max_level(verbosity)
         .with_target(false)
         .compact()
         .init();

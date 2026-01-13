@@ -42,6 +42,8 @@ impl Downloader {
     }
 
     pub async fn ensure_track_is_downloaded(&mut self, track_url: TrackURL, track: &Track) {
+        tracing::info!("Downloading: {}", track.title);
+
         if let Some(handle) = &self.download_handle {
             handle.abort();
             self.download_handle = None;

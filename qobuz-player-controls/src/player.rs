@@ -535,6 +535,8 @@ impl Player {
             self.set_target_status(Status::Playing);
         }
 
+        tracing::info!("Querying track: {}", path.to_string_lossy());
+
         let next_track_has_other_sample_rate = self.sink.query_track(&path)?;
         self.next_track_in_sink_queue = match next_track_has_other_sample_rate {
             QueryTrackResult::Queued => true,
