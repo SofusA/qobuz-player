@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use std::thread::JoinHandle;
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -9,6 +8,8 @@ use rodio::Source;
 use rodio::cpal::traits::HostTrait;
 use rodio::{decoder::DecoderBuilder, queue::queue};
 use tokio::sync::watch::{self, Receiver, Sender};
+use tokio::task::JoinHandle;
+use tokio::time::sleep;
 
 use crate::error::Error;
 use crate::{Result, VolumeReceiver};
@@ -20,7 +21,7 @@ pub struct Sink {
     volume: VolumeReceiver,
     track_finished: Sender<()>,
     track_handle: Option<JoinHandle<()>>,
-    duration_played: Arc<Mutex<Option<Duration>>>,
+    duration_played: Arc<Mutex<Duration>>,
 }
 
 impl Sink {
@@ -48,7 +49,7 @@ impl Sink {
             .map(|sink| sink.get_pos())
             .unwrap_or_default();
 
-        let duration_played = self.duration_played.lock().unwrap_or_default();
+        let duration_played = *self.duration_played.lock();
 
         if position < duration_played {
             return Default::default();
@@ -73,7 +74,7 @@ impl Sink {
         if let Some(sink) = &self.sink {
             match sink.try_seek(duration) {
                 Ok(_) => {
-                    *self.duration_played.lock() = None;
+                    *self.duration_played.lock() = Default::default();
                 }
                 Err(err) => return Err(err.into()),
             };
@@ -87,18 +88,17 @@ impl Sink {
         self.sink = None;
         self.sender = None;
         self.output_stream = None;
-        *self.duration_played.lock() = None;
+        *self.duration_played.lock() = Default::default();
 
         Ok(())
     }
 
     pub fn clear_queue(&mut self) -> Result<()> {
-        // if let Some(handle) = self.track_handle.take() {
-        //     let _ = handle.join();
-        // }
-        self.track_handle = None;
+        if let Some(handle) = self.track_handle.take() {
+            handle.abort();
+        }
 
-        *self.duration_played.lock() = None;
+        *self.duration_played.lock() = Default::default();
 
         if let Some(sender) = self.sender.as_ref() {
             sender.clear();
@@ -144,22 +144,19 @@ impl Sink {
         }
 
         let track_finished = self.track_finished.clone();
-
-        let track_duration = {
-            let previously_played = self.duration_played.lock().unwrap_or_default();
-
-            source
-                .total_duration()
-                .map(|duration| duration + previously_played)
-        };
+        let track_duration = source.total_duration().unwrap_or_default();
 
         let duration_played = self.duration_played.clone();
         let signal = self.sender.as_ref().unwrap().append_with_signal(source);
 
-        let track_handle = std::thread::spawn(move || {
-            if signal.recv().is_ok() {
-                *duration_played.lock() = track_duration;
-                track_finished.send(()).expect("infallible");
+        let track_handle = tokio::spawn(async move {
+            loop {
+                if signal.try_recv().is_ok() {
+                    *duration_played.lock() += track_duration;
+                    track_finished.send(()).expect("infallible");
+                    break;
+                }
+                sleep(Duration::from_millis(200)).await;
             }
         });
 
