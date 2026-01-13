@@ -1,4 +1,4 @@
-name: On Pull Request To Main (Linux)
+name: On Pull Request To Main
 on:
   pull_request:
     branches:
@@ -29,14 +29,6 @@ jobs:
 
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y librust-alsa-dev
-
-      - name: npm install
-        working-directory: qobuz-player-web
-        run: npm install
-
-      - name: Build styles
-        working-directory: qobuz-player-web
-        run: npm run build
 
       - name: Test ${{ matrix.arch }}
         run: cargo test
