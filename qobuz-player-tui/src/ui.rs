@@ -153,6 +153,31 @@ pub(crate) fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -
     area
 }
 
+pub(crate) fn centered_rect_fixed(width: u16, height: u16, area: Rect) -> Rect {
+    let w = width.min(area.width);
+    let h = height.min(area.height);
+
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(area.height.saturating_sub(h) / 2),
+            Constraint::Length(h),
+            Constraint::Min(0),
+        ])
+        .split(area);
+
+    let horizontal = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(area.width.saturating_sub(w) / 2),
+            Constraint::Length(w),
+            Constraint::Min(0),
+        ])
+        .split(vertical[1]);
+
+    horizontal[1]
+}
+
 fn render_help(frame: &mut Frame) {
     let rows = [
         ["Toggle focus mode", "F"],

@@ -11,7 +11,10 @@ use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
     app::PlayOutcome,
-    ui::{basic_list_table, block, center, mark_explicit_and_hifi, render_input, track_table},
+    ui::{
+        basic_list_table, block, center, centered_rect_fixed, mark_explicit_and_hifi, render_input,
+        track_table,
+    },
 };
 
 #[derive(PartialEq)]
@@ -128,31 +131,43 @@ impl Popup {
                 frame.render_stateful_widget(list, area, &mut artist.state);
             }
             Popup::Playlist(playlist_state) => {
-                let area = center(
-                    frame.area(),
-                    Constraint::Percentage(75),
-                    Constraint::Percentage(50),
-                );
+                let visible_rows = playlist_state.playlist.tracks.len().min(15) as u16;
 
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Min(1), Constraint::Length(3)])
-                    .split(area);
+                let inner_content_height = visible_rows + 2;
+                let block_border_height = 2;
 
-                let tabs = Tabs::new(["Play", "Shuffle"])
+                let popup_height = (inner_content_height + block_border_height)
+                    .clamp(4, frame.area().height.saturating_sub(2));
+
+                let popup_width = (frame.area().width * 75 / 100).max(30);
+
+                let area = centered_rect_fixed(popup_width, popup_height, frame.area());
+
+                let buttons = Tabs::new(["Play", "Shuffle"])
                     .not_underlined()
                     .highlight_style(Style::default().bg(Color::Blue))
-                    .select(if playlist_state.shuffle { 1 } else { 0 })
-                    .divider(symbols::line::VERTICAL);
+                    .select(if playlist_state.shuffle { 1 } else { 0 });
 
                 let tracks = track_table(&playlist_state.playlist.tracks, None);
 
                 let block = block(&playlist_state.playlist.title, false);
 
                 frame.render_widget(Clear, area);
-                block.render(area.outer(Margin::new(1, 1)), frame.buffer_mut());
+
+                let inner = block.inner(area);
+                frame.render_widget(block, area);
+
+                let chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Min(1),
+                        Constraint::Length(1),
+                        Constraint::Length(1),
+                    ])
+                    .split(inner);
+
                 frame.render_stateful_widget(tracks, chunks[0], &mut playlist_state.state);
-                frame.render_widget(tabs, chunks[1]);
+                frame.render_widget(buttons, chunks[2]);
             }
             Popup::Track(track_state) => {
                 let area = center(
