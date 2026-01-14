@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use qobuz_player_controls::client::Client;
-use qobuz_player_models::{AlbumSimple, Playlist, Track};
+use qobuz_player_models::{Album, AlbumSimple, Playlist, Track};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
@@ -19,6 +19,27 @@ pub(crate) struct ArtistPopupState {
     pub artist_name: String,
     pub albums: Vec<AlbumSimple>,
     pub state: ListState,
+}
+
+#[derive(PartialEq)]
+pub(crate) struct AlbumPopupState {
+    pub album: Album,
+    pub state: TableState,
+}
+
+impl AlbumPopupState {
+    pub fn new(album: Album) -> Self {
+        let is_empty = album.tracks.is_empty();
+        let mut state = Self {
+            album,
+            state: Default::default(),
+        };
+
+        if !is_empty {
+            state.state.select(Some(0));
+        }
+        state
+    }
 }
 
 pub(crate) struct PlaylistPopupState {
@@ -42,6 +63,7 @@ pub(crate) struct NewPlaylistPopupState {
 
 pub(crate) enum Popup {
     Artist(ArtistPopupState),
+    Album(AlbumPopupState),
     Playlist(PlaylistPopupState),
     Track(TrackPopupState),
     NewPlaylist(NewPlaylistPopupState),
@@ -50,6 +72,33 @@ pub(crate) enum Popup {
 impl Popup {
     pub(crate) fn render(&mut self, frame: &mut Frame) {
         match self {
+            Popup::Album(state) => {
+                let area = center(
+                    frame.area(),
+                    Constraint::Percentage(50),
+                    Constraint::Length(state.album.tracks.len() as u16 + 2),
+                );
+
+                let table = basic_list_table(
+                    state
+                        .album
+                        .tracks
+                        .iter()
+                        .map(|track| {
+                            Row::new(vec![mark_explicit_and_hifi(
+                                track.title.clone(),
+                                track.explicit,
+                                track.hires_available,
+                            )])
+                        })
+                        .collect(),
+                    &state.album.title,
+                    false,
+                );
+
+                frame.render_widget(Clear, area);
+                frame.render_stateful_widget(table, area, &mut state.state);
+            }
             Popup::Artist(artist) => {
                 let area = center(
                     frame.area(),
@@ -142,6 +191,26 @@ impl Popup {
     pub(crate) async fn handle_event(&mut self, event: Event) -> Option<PlayOutcome> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self {
+                Popup::Album(album_state) => match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        album_state.state.select_previous();
+                        None
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        album_state.state.select_next();
+                        None
+                    }
+                    KeyCode::Enter => {
+                        let index = album_state.state.selected();
+
+                        if let Some(index) = index {
+                            return Some(PlayOutcome::Album(album_state.album.id.clone(), index));
+                        }
+
+                        None
+                    }
+                    _ => None,
+                },
                 Popup::Artist(artist_popup_state) => match key_event.code {
                     KeyCode::Up | KeyCode::Char('k') => {
                         artist_popup_state.state.select_previous();
@@ -158,7 +227,8 @@ impl Popup {
                             .map(|album| album.id.clone());
 
                         if let Some(id) = id {
-                            return Some(PlayOutcome::Album(id));
+                            // TODO change this to a popup
+                            return Some(PlayOutcome::Album(id, 0));
                         }
 
                         None

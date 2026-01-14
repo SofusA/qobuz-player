@@ -9,8 +9,8 @@ use ratatui::{
 };
 
 use crate::{
-    app::{Output, PlayOutcome, UnfilteredListState},
-    popup::{PlaylistPopupState, Popup},
+    app::{Output, UnfilteredListState},
+    popup::{AlbumPopupState, PlaylistPopupState, Popup},
     ui::{album_simple_table, basic_list_table},
 };
 
@@ -94,7 +94,14 @@ impl DiscoverState {
                                         return Output::NotConsumed;
                                     };
 
-                                    return Output::PlayOutcome(PlayOutcome::Album(id));
+                                    let album = match self.client.album(&id).await {
+                                        Ok(res) => res,
+                                        Err(err) => return Output::Error(format!("{err}")),
+                                    };
+
+                                    return Output::Popup(Popup::Album(AlbumPopupState::new(
+                                        album,
+                                    )));
                                 }
                                 false => {
                                     let items = &self.featured_playlists

@@ -11,7 +11,7 @@ use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
     app::{Output, PlayOutcome, QueueOutcome, UnfilteredListState},
-    popup::{ArtistPopupState, PlaylistPopupState, Popup},
+    popup::{AlbumPopupState, ArtistPopupState, PlaylistPopupState, Popup},
     ui::{album_table, basic_list_table, render_input, track_table},
 };
 
@@ -253,7 +253,14 @@ impl SearchState {
                                     .map(|album| album.id.clone());
 
                                 if let Some(id) = id {
-                                    return Output::PlayOutcome(PlayOutcome::Album(id));
+                                    let album = match self.client.album(&id).await {
+                                        Ok(res) => res,
+                                        Err(err) => return Output::Error(format!("{err}")),
+                                    };
+
+                                    return Output::Popup(Popup::Album(AlbumPopupState::new(
+                                        album,
+                                    )));
                                 }
                                 Output::Consumed
                             }

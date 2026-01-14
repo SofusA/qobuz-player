@@ -74,7 +74,7 @@ pub(crate) enum QueueOutcome {
 }
 
 pub(crate) enum PlayOutcome {
-    Album(String),
+    Album(String, usize),
     Playlist((u32, bool, usize)),
     Track(u32),
     SkipToPosition(usize),
@@ -356,8 +356,8 @@ impl App {
 
     async fn handle_playoutcome(&mut self, outcome: PlayOutcome) -> bool {
         match outcome {
-            PlayOutcome::Album(id) => {
-                self.controls.play_album(&id, 0);
+            PlayOutcome::Album(id, index) => {
+                self.controls.play_album(&id, index);
             }
             PlayOutcome::Playlist(outcome) => {
                 self.controls.play_playlist(outcome.0, outcome.2, outcome.1);
