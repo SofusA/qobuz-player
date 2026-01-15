@@ -84,8 +84,10 @@ impl App {
             Tab::Discover => self.discover.render(frame, tab_content_area),
         }
 
-        if let AppState::Popup(popup) = &mut self.app_state {
-            popup.render(frame);
+        if let AppState::Popup(popups) = &mut self.app_state {
+            for popup in popups {
+                popup.render(frame);
+            }
         }
     }
 

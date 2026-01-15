@@ -11,7 +11,10 @@ use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
     app::{FilteredListState, Output, PlayOutcome, QueueOutcome},
-    popup::{AlbumPopupState, ArtistPopupState, NewPlaylistPopupState, PlaylistPopupState, Popup},
+    popup::{
+        AlbumPopupState, ArtistPopupState, DeletePlaylistPopupstate, NewPlaylistPopupState,
+        PlaylistPopupState, Popup,
+    },
     ui::{album_table, basic_list_table, render_input, track_table},
 };
 
@@ -231,8 +234,16 @@ impl FavoritesState {
 
                                 if let Some(selected) = selected {
                                     match selected.is_owned {
-                                        // TODO: Add confirmation
-                                        true => _ = self.client.delete_playlist(selected.id).await,
+                                        true => {
+                                            return Output::Popup(Popup::DeletePlaylist(
+                                                DeletePlaylistPopupstate {
+                                                    title: selected.title.clone(),
+                                                    id: selected.id,
+                                                    confirm: false,
+                                                    client: self.client.clone(),
+                                                },
+                                            ));
+                                        }
                                         false => {
                                             _ = self
                                                 .client
@@ -266,7 +277,7 @@ impl FavoritesState {
                                 if let Some(id) = id {
                                     let album = match self.client.album(&id).await {
                                         Ok(res) => res,
-                                        Err(err) => return Output::Error(format!("{err}")),
+                                        Err(err) => return Output::Error(err.to_string()),
                                     };
 
                                     return Output::Popup(Popup::Album(AlbumPopupState::new(
@@ -287,13 +298,14 @@ impl FavoritesState {
                                 let artist_albums =
                                     match self.client.artist_albums(selected.id).await {
                                         Ok(res) => res,
-                                        Err(err) => return Output::Error(format!("{err}")),
+                                        Err(err) => return Output::Error(err.to_string()),
                                     };
 
                                 Output::Popup(Popup::Artist(ArtistPopupState {
                                     artist_name: selected.name.clone(),
                                     albums: artist_albums,
                                     state: Default::default(),
+                                    client: self.client.clone(),
                                 }))
                             }
                             SubTab::Playlists => {
@@ -307,7 +319,7 @@ impl FavoritesState {
 
                                 let playlist = match self.client.playlist(selected.id).await {
                                     Ok(res) => res,
-                                    Err(err) => return Output::Error(format!("{err}")),
+                                    Err(err) => return Output::Error(err.to_string()),
                                 };
 
                                 Output::Popup(Popup::Playlist(PlaylistPopupState {

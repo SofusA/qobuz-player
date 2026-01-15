@@ -255,7 +255,7 @@ impl SearchState {
                                 if let Some(id) = id {
                                     let album = match self.client.album(&id).await {
                                         Ok(res) => res,
-                                        Err(err) => return Output::Error(format!("{err}")),
+                                        Err(err) => return Output::Error(err.to_string()),
                                     };
 
                                     return Output::Popup(Popup::Album(AlbumPopupState::new(
@@ -276,13 +276,14 @@ impl SearchState {
                                 let artist_albums =
                                     match self.client.artist_albums(selected.id).await {
                                         Ok(res) => res,
-                                        Err(err) => return Output::Error(format!("{err}")),
+                                        Err(err) => return Output::Error(err.to_string()),
                                     };
 
                                 Output::Popup(Popup::Artist(ArtistPopupState {
                                     artist_name: selected.name.clone(),
                                     albums: artist_albums,
                                     state: Default::default(),
+                                    client: self.client.clone(),
                                 }))
                             }
                             SubTab::Playlists => {
@@ -296,7 +297,7 @@ impl SearchState {
 
                                 let playlist = match self.client.playlist(selected.id).await {
                                     Ok(res) => res,
-                                    Err(err) => return Output::Error(format!("{err}")),
+                                    Err(err) => return Output::Error(err.to_string()),
                                 };
 
                                 Output::Popup(Popup::Playlist(PlaylistPopupState {
@@ -325,7 +326,7 @@ impl SearchState {
                         KeyCode::Esc | KeyCode::Enter => {
                             self.stop_editing();
                             if let Err(err) = self.update_search().await {
-                                return Output::Error(format!("{err}"));
+                                return Output::Error(err.to_string());
                             };
                             Output::Consumed
                         }

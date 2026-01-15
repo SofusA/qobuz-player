@@ -96,7 +96,7 @@ impl DiscoverState {
 
                                     let album = match self.client.album(&id).await {
                                         Ok(res) => res,
-                                        Err(err) => return Output::Error(format!("{err}")),
+                                        Err(err) => return Output::Error(err.to_string()),
                                     };
 
                                     return Output::Popup(Popup::Album(AlbumPopupState::new(

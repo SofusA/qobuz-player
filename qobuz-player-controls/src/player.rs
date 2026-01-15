@@ -584,26 +584,26 @@ impl Player {
             select! {
                 _ = interval.tick() => {
                     if let Err(err) = self.tick().await {
-                        self.broadcast.send_error(format!("{err}"));
+                        self.broadcast.send_error(err.to_string());
                     };
                 }
 
                 Some(notification) = self.controls_rx.recv() => {
                     if let Err(err) = self.handle_message(notification).await {
-                        self.broadcast.send_error(format!("{err}"));
+                        self.broadcast.send_error(err.to_string());
                     };
                 }
 
                 Ok(_) = self.track_finished.changed() => {
                     if let Err(err) = self.track_finished().await {
-                        self.broadcast.send_error(format!("{err}"));
+                        self.broadcast.send_error(err.to_string());
                     };
                 }
 
                 Ok(_) = self.done_buffering.changed() => {
                     let path = self.done_buffering.borrow_and_update().clone();
                     if let Err(err) = self.done_buffering(path) {
-                        self.broadcast.send_error(format!("{err}"));
+                        self.broadcast.send_error(err.to_string());
                     };
                 }
                 Ok(exit) = exit_receiver.recv() => {

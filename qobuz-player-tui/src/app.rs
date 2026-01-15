@@ -51,15 +51,17 @@ pub(crate) struct App {
 pub(crate) enum AppState {
     #[default]
     Normal,
-    Popup(Popup),
+    Popup(Vec<Popup>),
     Help,
 }
 
 pub(crate) enum Output {
     Consumed,
-    UpdateFavorites,
     NotConsumed,
+    UpdateFavorites,
     Popup(Popup),
+    PopPopup,
+    PopPoputUpdateFavorites,
     PlayOutcome(PlayOutcome),
     Error(String),
     Queue(QueueOutcome),
@@ -79,7 +81,6 @@ pub(crate) enum PlayOutcome {
     Track(u32),
     SkipToPosition(usize),
     AddTrackToPlaylist(Track),
-    Consumed,
 }
 
 #[derive(Default, PartialEq)]
@@ -175,6 +176,116 @@ impl App {
         Ok(())
     }
 
+    async fn update_favorites(&mut self) {
+        let favorites = self.client.favorites().await;
+        let Ok(favorites) = favorites else {
+            return;
+        };
+
+        self.favorites.albums.all_items = favorites.albums;
+        self.favorites.albums.filter = self.favorites.albums.all_items.clone();
+        self.favorites.artists.all_items = favorites.artists;
+        self.favorites.artists.filter = self.favorites.artists.all_items.clone();
+        self.favorites.playlists.all_items = favorites.playlists;
+        self.favorites.playlists.filter = self.favorites.playlists.all_items.clone();
+        self.favorites.tracks.all_items = favorites.tracks;
+        self.favorites.tracks.filter = self.favorites.tracks.all_items.clone();
+        self.favorites.filter.reset();
+    }
+
+    async fn handle_output(&mut self, output: Output) {
+        match output {
+            Output::Consumed => {
+                self.should_draw = true;
+            }
+            Output::UpdateFavorites => {
+                self.update_favorites().await;
+                self.should_draw = true;
+            }
+            Output::NotConsumed => {}
+            Output::Popup(popup) => {
+                let mut popups = match std::mem::take(&mut self.app_state) {
+                    AppState::Popup(popups) => popups,
+                    _ => Vec::new(),
+                };
+
+                popups.push(popup);
+
+                self.app_state = AppState::Popup(popups);
+                self.should_draw = true;
+            }
+            Output::PlayOutcome(outcome) => {
+                self.handle_playoutcome(outcome).await;
+            }
+            Output::Error(err) => {
+                self.broadcast.send_error(err);
+            }
+            Output::Queue(queue_outcome) => match queue_outcome {
+                QueueOutcome::MoveIndexUp(index) => {
+                    if index == 0 {
+                        return;
+                    }
+                    let mut order: Vec<_> = self
+                        .queue
+                        .queue
+                        .items
+                        .iter()
+                        .enumerate()
+                        .map(|x| x.0)
+                        .collect();
+
+                    order.swap(index, index - 1);
+                    self.controls.reorder_queue(order);
+                }
+                QueueOutcome::MoveIndexDown(index) => {
+                    if index == self.queue.queue.items.len() - 1 {
+                        return;
+                    }
+
+                    let mut order: Vec<_> = self
+                        .queue
+                        .queue
+                        .items
+                        .iter()
+                        .enumerate()
+                        .map(|x| x.0)
+                        .collect();
+
+                    order.swap(index, index + 1);
+                    self.controls.reorder_queue(order);
+                }
+                QueueOutcome::RemoveIndex(index) => {
+                    self.controls.remove_index_from_queue(index);
+                }
+                QueueOutcome::PlayTrackNext(id) => {
+                    self.controls.play_track_next(id);
+                }
+                QueueOutcome::AddTrackToQueue(id) => {
+                    self.controls.add_track_to_queue(id);
+                }
+            },
+            Output::PopPopup => {
+                if let AppState::Popup(popups) = &mut self.app_state {
+                    popups.pop();
+                    if popups.is_empty() {
+                        self.app_state = AppState::Normal;
+                    }
+                    self.should_draw = true;
+                }
+            }
+            Output::PopPoputUpdateFavorites => {
+                if let AppState::Popup(popups) = &mut self.app_state {
+                    popups.pop();
+                    if popups.is_empty() {
+                        self.app_state = AppState::Normal;
+                    }
+                    self.update_favorites().await;
+                    self.should_draw = true;
+                }
+            }
+        }
+    }
+
     async fn handle_events(&mut self) -> io::Result<()> {
         let event = event::read()?;
 
@@ -186,18 +297,29 @@ impl App {
                         self.should_draw = true;
                         return Ok(());
                     }
-                    AppState::Popup(popup) => {
+                    AppState::Popup(popups) => {
                         if key_event.code == KeyCode::Esc {
-                            self.app_state = AppState::Normal;
+                            _ = popups.pop();
+                            if popups.is_empty() {
+                                self.app_state = AppState::Normal;
+                            }
                             self.should_draw = true;
                             return Ok(());
                         }
 
-                        if let Some(outcome) = popup.handle_event(event).await
-                            && self.handle_playoutcome(outcome).await
-                        {
-                            self.app_state = AppState::Normal;
+                        let outcome_opt = {
+                            if let AppState::Popup(popups) = &mut self.app_state {
+                                if let Some(popup) = popups.last_mut() {
+                                    popup.handle_event(event).await
+                                } else {
+                                    Output::NotConsumed
+                                }
+                            } else {
+                                Output::NotConsumed
+                            }
                         };
+
+                        self.handle_output(outcome_opt).await;
 
                         self.should_draw = true;
                         return Ok(());
@@ -212,88 +334,7 @@ impl App {
                     Tab::Discover => self.discover.handle_events(event).await,
                 };
 
-                match screen_output {
-                    Output::Consumed => {
-                        self.should_draw = true;
-                        return Ok(());
-                    }
-                    Output::UpdateFavorites => {
-                        let favorites = self.client.favorites().await;
-                        let Ok(favorites) = favorites else {
-                            return Ok(());
-                        };
-
-                        self.favorites.albums.all_items = favorites.albums;
-                        self.favorites.albums.filter = self.favorites.albums.all_items.clone();
-                        self.favorites.artists.all_items = favorites.artists;
-                        self.favorites.artists.filter = self.favorites.artists.all_items.clone();
-                        self.favorites.playlists.all_items = favorites.playlists;
-                        self.favorites.playlists.filter =
-                            self.favorites.playlists.all_items.clone();
-                        self.favorites.tracks.all_items = favorites.tracks;
-                        self.favorites.tracks.filter = self.favorites.tracks.all_items.clone();
-                        self.favorites.filter.reset();
-
-                        self.should_draw = true;
-                        return Ok(());
-                    }
-                    Output::NotConsumed => {}
-                    Output::Popup(popup) => {
-                        self.app_state = AppState::Popup(popup);
-                        self.should_draw = true;
-                        return Ok(());
-                    }
-                    Output::PlayOutcome(outcome) => {
-                        self.handle_playoutcome(outcome).await;
-                    }
-                    Output::Error(err) => {
-                        self.broadcast.send_error(err);
-                    }
-                    Output::Queue(queue_outcome) => match queue_outcome {
-                        QueueOutcome::MoveIndexUp(index) => {
-                            if index == 0 {
-                                return Ok(());
-                            }
-                            let mut order: Vec<_> = self
-                                .queue
-                                .queue
-                                .items
-                                .iter()
-                                .enumerate()
-                                .map(|x| x.0)
-                                .collect();
-
-                            order.swap(index, index - 1);
-                            self.controls.reorder_queue(order);
-                        }
-                        QueueOutcome::MoveIndexDown(index) => {
-                            if index == self.queue.queue.items.len() - 1 {
-                                return Ok(());
-                            }
-
-                            let mut order: Vec<_> = self
-                                .queue
-                                .queue
-                                .items
-                                .iter()
-                                .enumerate()
-                                .map(|x| x.0)
-                                .collect();
-
-                            order.swap(index, index + 1);
-                            self.controls.reorder_queue(order);
-                        }
-                        QueueOutcome::RemoveIndex(index) => {
-                            self.controls.remove_index_from_queue(index);
-                        }
-                        QueueOutcome::PlayTrackNext(id) => {
-                            self.controls.play_track_next(id);
-                        }
-                        QueueOutcome::AddTrackToQueue(id) => {
-                            self.controls.add_track_to_queue(id);
-                        }
-                    },
-                }
+                self.handle_output(screen_output).await;
 
                 match key_event.code {
                     KeyCode::Char('?') => {
@@ -369,32 +410,31 @@ impl App {
                 self.controls.skip_to_position(index, true);
             }
             PlayOutcome::AddTrackToPlaylist(track) => {
-                let playlists = self.client.favorites().await.map(|favs| {
+                let playlists_res = self.client.favorites().await.map(|favs| {
                     favs.playlists
                         .into_iter()
                         .filter(|p| p.is_owned)
                         .collect::<Vec<_>>()
                 });
 
-                if let Ok(playlists) = playlists {
-                    self.app_state = AppState::Popup(Popup::Track(TrackPopupState {
+                if let Ok(playlists) = playlists_res {
+                    let mut popups = match std::mem::take(&mut self.app_state) {
+                        AppState::Popup(v) => v,
+                        other => {
+                            self.app_state = other;
+                            Vec::new()
+                        }
+                    };
+
+                    popups.push(Popup::Track(TrackPopupState {
                         playlists,
                         track,
                         state: Default::default(),
                         client: self.client.clone(),
                     }));
+
+                    self.app_state = AppState::Popup(popups);
                     return false;
-                }
-            }
-            PlayOutcome::Consumed => {
-                let favorites = self.client.favorites().await;
-
-                if let Ok(favorites) = favorites {
-                    let playlists = favorites.playlists;
-
-                    self.favorites.playlists.all_items = playlists.clone();
-                    self.favorites.playlists.filter = playlists;
-                    self.should_draw = true;
                 }
             }
         }

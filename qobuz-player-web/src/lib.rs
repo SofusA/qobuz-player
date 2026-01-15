@@ -313,10 +313,7 @@ fn ok_or_send_error_toast<T>(
 ) -> Result<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
-        Err(err) => {
-            let err = format!("{err}");
-            Err(state.send_toast(Notification::Error(err)))
-        }
+        Err(err) => Err(state.send_toast(Notification::Error(err.to_string()))),
     }
 }
 
@@ -327,14 +324,11 @@ fn ok_or_error_page<T>(
 ) -> Result<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
-        Err(err) => {
-            let err = format!("{err}");
-            Err(state
-                .templates
-                .borrow()
-                .render("error-page.html", &json!({"error": err}))
-                .into_response())
-        }
+        Err(err) => Err(state
+            .templates
+            .borrow()
+            .render("error-page.html", &json!({"error": err.to_string()}))
+            .into_response()),
     }
 }
 
@@ -346,7 +340,7 @@ fn ok_or_broadcast<T>(
     match value {
         Ok(value) => Ok(value),
         Err(err) => {
-            broadcast.send(Notification::Error(format!("{err}")));
+            broadcast.send(Notification::Error(err.to_string()));
 
             let mut response = Html("<div></div>".to_string()).into_response();
             let headers = response.headers_mut();
