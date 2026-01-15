@@ -128,8 +128,7 @@ impl Player {
         if !self.next_track_is_queried
             && let Some(current_track) = track
         {
-            self.set_target_status(Status::Buffering);
-            self.query_track(&current_track).await?;
+            self.query_track(&current_track, false).await?;
         }
 
         self.set_target_status(Status::Playing);
@@ -146,14 +145,42 @@ impl Player {
         self.target_status.send(status).expect("infallible");
     }
 
-    async fn query_track(&mut self, track: &Track) -> Result<()> {
+    async fn query_track(&mut self, track: &Track, next_track: bool) -> Result<()> {
+        tracing::info!(
+            "Querying {} track: {}",
+            if next_track { "next" } else { "current" },
+            &track.title
+        );
+
         let track_url = self.client.track_url(track.id).await?;
         if let Some(track_path) = self
             .downloader
             .ensure_track_is_downloaded(track_url, track)
             .await
         {
-            self.sink.query_track(&track_path)?;
+            let query_result = self.sink.query_track(&track_path)?;
+
+            if next_track {
+                self.next_track_in_sink_queue = match query_result {
+                    QueryTrackResult::Queued => {
+                        tracing::info!("In queue");
+                        true
+                    }
+                    QueryTrackResult::RecreateStreamRequired => {
+                        tracing::info!("Not in queue");
+                        false
+                    }
+                };
+            } else {
+                self.set_target_status(Status::Playing);
+            }
+        } else {
+            tracing::info!("Buffering track: {}", &track.title);
+            self.set_target_status(Status::Buffering);
+        }
+
+        if next_track {
+            self.next_track_is_queried = true;
         }
 
         Ok(())
@@ -229,8 +256,6 @@ impl Player {
             return Ok(());
         }
 
-        self.set_target_status(Status::Buffering);
-
         self.position.send(Default::default())?;
 
         if tracklist.skip_to_track(new_position).is_some() {
@@ -263,10 +288,9 @@ impl Player {
         self.sink.clear()?;
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
-        self.set_target_status(Status::Buffering);
 
         if let Some(first_track) = tracklist.current_track() {
-            self.query_track(first_track).await?;
+            self.query_track(first_track, false).await?;
         }
 
         self.broadcast_tracklist(tracklist).await?;
@@ -436,8 +460,7 @@ impl Player {
                 let tracklist = self.tracklist_rx.borrow().clone();
 
                 if let Some(next_track) = tracklist.next_track() {
-                    self.query_track(next_track).await?;
-                    self.next_track_is_queried = true;
+                    self.query_track(next_track, true).await?;
                 }
             }
         }
@@ -514,12 +537,7 @@ impl Player {
             Some(next_track) => {
                 if !self.next_track_in_sink_queue {
                     self.sink.clear()?;
-                    self.query_track(next_track).await?;
-                }
-
-                if self.next_track_is_queried {
-                } else {
-                    self.set_target_status(Status::Buffering);
+                    self.query_track(next_track, false).await?;
                 }
             }
             None => {
@@ -539,10 +557,9 @@ impl Player {
             self.set_target_status(Status::Playing);
         }
 
-        tracing::info!("Querying track: {}", path.to_string_lossy());
+        tracing::info!("Done buffering track: {}", path.to_string_lossy());
 
-        let next_track_has_other_sample_rate = self.sink.query_track(&path)?;
-        self.next_track_in_sink_queue = match next_track_has_other_sample_rate {
+        self.next_track_in_sink_queue = match self.sink.query_track(&path)? {
             QueryTrackResult::Queued => true,
             QueryTrackResult::RecreateStreamRequired => false,
         };

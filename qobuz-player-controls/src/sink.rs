@@ -84,6 +84,7 @@ impl Sink {
     }
 
     pub fn clear(&mut self) -> Result<()> {
+        tracing::info!("Clearing sink");
         self.clear_queue()?;
         self.sink = None;
         self.sender = None;
@@ -94,6 +95,7 @@ impl Sink {
     }
 
     pub fn clear_queue(&mut self) -> Result<()> {
+        tracing::info!("Clearing sink queue");
         if let Some(handle) = self.track_handle.take() {
             handle.abort();
         }

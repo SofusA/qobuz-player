@@ -46,8 +46,6 @@ impl Downloader {
         track_url: TrackURL,
         track: &Track,
     ) -> Option<PathBuf> {
-        tracing::info!("Downloading: {}", track.title);
-
         if let Some(handle) = &self.download_handle {
             handle.abort();
             self.download_handle = None;
@@ -63,6 +61,7 @@ impl Downloader {
         let done_buffering = self.done_buffering_tx.clone();
         let broadcast = self.broadcast.clone();
 
+        tracing::info!("Downloading: {}", track.title);
         let handle = tokio::spawn(async move {
             let Ok(resp) = reqwest::get(&track_url.url).await else {
                 broadcast.send_error("Unable to get track audio file".to_string());
