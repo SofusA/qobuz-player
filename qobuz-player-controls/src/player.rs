@@ -156,6 +156,10 @@ impl Player {
             &track.title
         );
 
+        if next_track {
+            self.next_track_is_queried = true;
+        }
+
         let track_url = self.client.track_url(track.id).await?;
         if let Some(track_path) = self
             .downloader
@@ -165,7 +169,6 @@ impl Player {
             let query_result = self.sink.query_track(&track_path)?;
 
             if next_track {
-                self.next_track_is_queried = true;
                 self.next_track_in_sink_queue = match query_result {
                     QueryTrackResult::Queued => {
                         tracing::info!("In queue");
@@ -292,6 +295,7 @@ impl Player {
             tracing::info!("New queue starting with: {}", first_track.title);
             self.query_track(first_track, false).await?;
             self.sink.play();
+            self.set_target_status(Status::Playing);
         }
 
         self.broadcast_tracklist(tracklist).await?;
@@ -458,9 +462,12 @@ impl Player {
             let track_about_to_finish = (duration as i16 - position as i16) < 60;
 
             if track_about_to_finish && !self.next_track_is_queried {
+                tracing::info!("Track about to finish");
+
                 let tracklist = self.tracklist_rx.borrow().clone();
 
                 if let Some(next_track) = tracklist.next_track() {
+                    tracing::info!("Query next track: {} from tick", &next_track.title);
                     self.query_track(next_track, true).await?;
                 }
             }
@@ -537,6 +544,9 @@ impl Player {
         match next_track {
             Some(next_track) => {
                 if !self.next_track_in_sink_queue {
+                    tracing::info!(
+                        "Track finished and next track is not in queue. Resetting queue"
+                    );
                     self.sink.clear()?;
                     self.query_track(next_track, false).await?;
                 }

@@ -113,6 +113,8 @@ impl Sink {
     }
 
     pub fn query_track(&mut self, track_path: &Path) -> Result<QueryTrackResult> {
+        tracing::info!("Sink query track: {}", track_path.to_string_lossy());
+
         let file = fs::File::open(track_path).map_err(|err| Error::StreamError {
             message: format!("Failed to read file: {track_path:?}: {err}"),
         })?;
