@@ -289,6 +289,7 @@ impl Player {
 
         if let Some(first_track) = tracklist.current_track() {
             self.query_track(first_track, false).await?;
+            self.play().await?;
         }
 
         self.broadcast_tracklist(tracklist).await?;
