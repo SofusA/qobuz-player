@@ -108,6 +108,10 @@ impl Sink {
         Ok(())
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.sink.is_some()
+    }
+
     pub fn query_track(&mut self, track_path: &Path) -> Result<QueryTrackResult> {
         let file = fs::File::open(track_path).map_err(|err| Error::StreamError {
             message: format!("Failed to read file: {track_path:?}: {err}"),

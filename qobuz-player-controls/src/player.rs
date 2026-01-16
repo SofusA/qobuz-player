@@ -125,7 +125,7 @@ impl Player {
     async fn play(&mut self) -> Result<()> {
         let track = self.tracklist_rx.borrow().current_track().cloned();
 
-        if !self.next_track_is_queried
+        if self.sink.is_empty()
             && let Some(current_track) = track
         {
             self.query_track(&current_track, false).await?;
