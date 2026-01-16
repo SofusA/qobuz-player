@@ -112,7 +112,11 @@ impl Tracklist {
     }
 
     pub fn current_track(&self) -> Option<&Track> {
-        self.queue.iter().find(|t| t.status == TrackStatus::Playing)
+        self.queue
+            .iter()
+            .filter(|t| t.available)
+            .find(|t| t.status == TrackStatus::Playing)
+            .or_else(|| self.queue.iter().find(|t| t.available))
     }
 
     pub fn entity_playing(&self) -> Entity {

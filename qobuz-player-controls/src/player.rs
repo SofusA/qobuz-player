@@ -130,6 +130,7 @@ impl Player {
         if self.sink.is_empty()
             && let Some(current_track) = track
         {
+            tracing::info!("Sink is empty. Query track from play");
             self.set_target_status(Status::Buffering);
             self.query_track(&current_track, false).await?;
         }
@@ -288,8 +289,9 @@ impl Player {
         self.next_track_in_sink_queue = false;
 
         if let Some(first_track) = tracklist.current_track() {
+            tracing::info!("New queue starting with: {}", first_track.title);
             self.query_track(first_track, false).await?;
-            self.play().await?;
+            self.sink.play();
         }
 
         self.broadcast_tracklist(tracklist).await?;
