@@ -109,7 +109,7 @@ impl Sink {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.sink.is_some()
+        self.sink.is_none()
     }
 
     pub fn query_track(&mut self, track_path: &Path) -> Result<QueryTrackResult> {

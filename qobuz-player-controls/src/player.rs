@@ -123,11 +123,14 @@ impl Player {
     }
 
     async fn play(&mut self) -> Result<()> {
+        tracing::info!("Play");
+
         let track = self.tracklist_rx.borrow().current_track().cloned();
 
         if self.sink.is_empty()
             && let Some(current_track) = track
         {
+            self.set_target_status(Status::Buffering);
             self.query_track(&current_track, false).await?;
         }
 
@@ -161,6 +164,7 @@ impl Player {
             let query_result = self.sink.query_track(&track_path)?;
 
             if next_track {
+                self.next_track_is_queried = true;
                 self.next_track_in_sink_queue = match query_result {
                     QueryTrackResult::Queued => {
                         tracing::info!("In queue");
@@ -171,16 +175,10 @@ impl Player {
                         false
                     }
                 };
-            } else {
-                self.set_target_status(Status::Playing);
             }
         } else {
             tracing::info!("Buffering track: {}", &track.title);
             self.set_target_status(Status::Buffering);
-        }
-
-        if next_track {
-            self.next_track_is_queried = true;
         }
 
         Ok(())
