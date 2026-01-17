@@ -391,3 +391,19 @@ pub fn mark_explicit_and_hifi(
 
     Line::from(parts)
 }
+
+pub fn mark_as_owned(title: String, owned: bool) -> Line<'static> {
+    let mut parts: Vec<Span<'static>> = Vec::new();
+
+    parts.push(Span::raw(title));
+
+    if owned {
+        parts.push(Span::raw(" "));
+        parts.push(Span::styled(
+            "\u{f007}",
+            Style::default().add_modifier(Modifier::DIM),
+        ));
+    }
+
+    Line::from(parts)
+}

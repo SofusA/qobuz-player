@@ -15,7 +15,7 @@ use crate::{
         AlbumPopupState, ArtistPopupState, DeletePlaylistPopupstate, NewPlaylistPopupState,
         PlaylistPopupState, Popup,
     },
-    ui::{album_table, basic_list_table, render_input, track_table},
+    ui::{album_table, basic_list_table, mark_as_owned, render_input, track_table},
 };
 
 pub(crate) struct FavoritesState {
@@ -106,12 +106,16 @@ impl FavoritesState {
                 &mut self.artists.state,
             ),
             SubTab::Playlists => (
-                // TODO: Render owned
                 basic_list_table(
                     self.playlists
                         .filter
                         .iter()
-                        .map(|playlist| Row::new(Line::from(playlist.title.clone())))
+                        .map(|playlist| {
+                            Row::new(vec![mark_as_owned(
+                                playlist.title.clone(),
+                                playlist.is_owned,
+                            )])
+                        })
                         .collect::<Vec<_>>(),
                     title.as_str(),
                     true,
