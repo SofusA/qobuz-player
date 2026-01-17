@@ -44,7 +44,7 @@ impl DiscoverState {
                             .iter()
                             .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                             .collect::<Vec<_>>(),
-                        &list_state.0,
+                        Some(&list_state.0),
                         true,
                     ),
                     &mut list_state.1.state,

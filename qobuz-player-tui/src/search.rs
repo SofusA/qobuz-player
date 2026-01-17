@@ -97,7 +97,7 @@ impl SearchState {
                         .iter()
                         .map(|artist| Row::new(Line::from(artist.name.clone())))
                         .collect::<Vec<_>>(),
-                    &title,
+                    Some(&title),
                     true,
                 ),
                 &mut self.artists.state,
@@ -109,7 +109,7 @@ impl SearchState {
                         .iter()
                         .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                         .collect::<Vec<_>>(),
-                    &title,
+                    Some(&title),
                     true,
                 ),
                 &mut self.playlists.state,
@@ -273,18 +273,14 @@ impl SearchState {
                                     return Output::Consumed;
                                 };
 
-                                let artist_albums =
-                                    match self.client.artist_albums(selected.id).await {
-                                        Ok(res) => res,
-                                        Err(err) => return Output::Error(err.to_string()),
-                                    };
+                                let state =
+                                    ArtistPopupState::new(selected, self.client.clone()).await;
+                                let state = match state {
+                                    Ok(res) => res,
+                                    Err(err) => return Output::Error(err.to_string()),
+                                };
 
-                                Output::Popup(Popup::Artist(ArtistPopupState {
-                                    artist_name: selected.name.clone(),
-                                    albums: artist_albums,
-                                    state: Default::default(),
-                                    client: self.client.clone(),
-                                }))
+                                Output::Popup(Popup::Artist(state))
                             }
                             SubTab::Playlists => {
                                 let index = self.playlists.state.selected();

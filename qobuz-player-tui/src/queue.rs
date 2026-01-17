@@ -45,7 +45,7 @@ impl QueueState {
                     ]))
                 })
                 .collect(),
-            "Queue",
+            Some("Queue"),
             false,
         );
 

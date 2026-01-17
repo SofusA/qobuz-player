@@ -81,6 +81,7 @@ pub(crate) enum PlayOutcome {
     Track(u32),
     SkipToPosition(usize),
     AddTrackToPlaylist(Track),
+    TopTracks(u32, usize),
 }
 
 #[derive(Default, PartialEq)]
@@ -436,6 +437,9 @@ impl App {
                     self.app_state = AppState::Popup(popups);
                     return false;
                 }
+            }
+            PlayOutcome::TopTracks(artist_id, index) => {
+                self.controls.play_top_tracks(artist_id, index)
             }
         }
         true

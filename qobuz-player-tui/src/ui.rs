@@ -323,12 +323,16 @@ pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple], title: &'a str) -> Ta
 
 pub(crate) fn basic_list_table<'a>(
     rows: Vec<Row<'a>>,
-    title: &'a str,
+    title: Option<&'a str>,
     selectable: bool,
 ) -> Table<'a> {
-    Table::new(rows, [Constraint::Min(1)])
-        .block(block(title, selectable))
-        .row_highlight_style(ROW_HIGHLIGHT_STYLE)
+    let mut table = Table::new(rows, [Constraint::Min(1)]).row_highlight_style(ROW_HIGHLIGHT_STYLE);
+
+    if let Some(title) = title {
+        table = table.block(block(title, selectable));
+    }
+
+    table
 }
 
 pub(crate) fn track_table<'a>(rows: &[Track], block_title: Option<&'a str>) -> Table<'a> {
