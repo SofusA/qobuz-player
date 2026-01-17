@@ -211,7 +211,7 @@ impl Popup {
                 let block_title = format!("Delete {}?", state.title);
                 let area = center(
                     frame.area(),
-                    Constraint::Length(block_title.len() as u16 + 6),
+                    Constraint::Length(block_title.chars().count() as u16 + 6),
                     Constraint::Length(3),
                 );
                 let tabs = Tabs::new(["Delete", "Cancel"])
