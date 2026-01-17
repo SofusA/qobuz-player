@@ -135,7 +135,6 @@ impl Player {
             self.query_track(&current_track, false).await?;
         }
 
-        self.set_target_status(Status::Playing);
         self.sink.play();
         Ok(())
     }
@@ -180,6 +179,7 @@ impl Player {
                     }
                 };
             }
+            self.set_target_status(Status::Playing);
         } else {
             tracing::info!("Buffering track: {}", &track.title);
             self.set_target_status(Status::Buffering);
@@ -294,8 +294,6 @@ impl Player {
         if let Some(first_track) = tracklist.current_track() {
             tracing::info!("New queue starting with: {}", first_track.title);
             self.query_track(first_track, false).await?;
-            self.sink.play();
-            self.set_target_status(Status::Playing);
         }
 
         self.broadcast_tracklist(tracklist).await?;
