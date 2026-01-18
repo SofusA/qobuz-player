@@ -7,6 +7,7 @@ use ratatui::{
     prelude::*,
     widgets::*,
 };
+use tokio::try_join;
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
@@ -30,15 +31,16 @@ pub(crate) struct ArtistPopupState {
 
 impl ArtistPopupState {
     pub async fn new(artist: &Artist, client: Arc<Client>) -> Result<Self> {
-        let artist_albums = client.artist_albums(artist.id).await?;
-        let artist_page = client.artist_page(artist.id).await?;
+        let id = artist.id;
+        let (artist_page, artist_albums) =
+            try_join!(client.artist_page(id), client.artist_albums(id))?;
 
         let is_album_empty = artist_albums.is_empty();
         let is_top_tracks_empty = artist_page.top_tracks.is_empty();
 
         let mut state = Self {
             artist_name: artist.name.clone(),
-            id: artist.id,
+            id,
             albums: artist_albums,
             state: Default::default(),
             show_top_track: false,

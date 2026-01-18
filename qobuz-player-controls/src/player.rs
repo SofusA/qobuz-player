@@ -554,6 +554,7 @@ impl Player {
                 self.set_target_status(Status::Paused);
                 self.sink.pause();
                 self.sink.clear()?;
+                self.position.send(Default::default())?;
             }
         }
         self.next_track_is_queried = false;

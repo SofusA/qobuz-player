@@ -315,14 +315,30 @@ impl Client {
         let playlist = client
             .create_playlist(name, is_public, description, is_collaborative)
             .await?;
-        self.favorites_cache.clear().await;
+        let cache = self.favorites_cache.get().await;
+
+        if let Some(mut cache) = cache {
+            cache.playlists.push(playlist.clone());
+            cache.playlists.sort_by(|a, b| a.title.cmp(&b.title));
+            self.favorites_cache.set(cache).await;
+        }
+
         Ok(playlist)
     }
 
     pub async fn delete_playlist(&self, playlist_id: u32) -> Result<()> {
         let client = self.get_client().await?;
         client.delete_playlist(playlist_id).await?;
-        self.favorites_cache.clear().await;
+        let cache = self.favorites_cache.get().await;
+
+        if let Some(mut cache) = cache {
+            cache
+                .playlists
+                .retain(|playlist| playlist.id != playlist_id);
+
+            self.favorites_cache.set(cache).await;
+        }
+
         Ok(())
     }
 
