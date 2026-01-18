@@ -44,21 +44,23 @@ impl App {
             ])
             .split(area);
 
-        let tabs = Tabs::new(
-            Tab::VALUES
-                .iter()
-                .enumerate()
-                .map(|(i, tab)| format!("[{}] {}", i + 1, tab)),
-        )
-        .block(Block::bordered().border_type(BorderType::Rounded))
-        .highlight_style(Style::default().bg(Color::Blue))
-        .select(
+        let labels: Vec<String> = Tab::VALUES
+            .iter()
+            .enumerate()
+            .map(|(i, tab)| format!("[{}] {}", i + 1, tab))
+            .collect();
+
+        let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
+
+        let tabs = tab_bar(
+            label_refs,
             Tab::VALUES
                 .iter()
                 .position(|tab| tab == &self.current_screen)
                 .unwrap_or(0),
         )
-        .divider(symbols::line::VERTICAL);
+        .block(block(None));
+
         frame.render_widget(tabs, chunks[0]);
 
         if self.now_playing.playing_track.is_some() {
@@ -220,7 +222,7 @@ fn render_help(frame: &mut Frame) {
         Constraint::Length(rows.len() as u16 + 2),
     );
 
-    let block = block("Help", false);
+    let block = block(Some("Help"));
 
     let table = Table::default().rows(rows).block(block);
 
@@ -245,7 +247,7 @@ pub(crate) fn render_input(
     let input_paragraph = Paragraph::new(input.value())
         .style(style)
         .scroll((0, scroll as u16))
-        .block(block(title, false));
+        .block(block(Some(title)));
 
     frame.render_widget(input_paragraph, area);
 
@@ -257,19 +259,19 @@ pub(crate) fn render_input(
 
 const ROW_HIGHLIGHT_STYLE: Style = Style::new().bg(Color::Blue);
 
-pub(crate) fn block(title: &str, selectable: bool) -> Block<'_> {
-    let title = match selectable {
-        true => format!(" <{title}> "),
-        false => format!(" {title} "),
-    };
-
-    Block::bordered()
-        .title(title)
+pub(crate) fn block(title: Option<&str>) -> Block<'_> {
+    let mut block = Block::bordered()
         .title_alignment(Alignment::Center)
-        .border_type(BorderType::Rounded)
+        .border_type(BorderType::Rounded);
+
+    if let Some(title) = title {
+        block = block.title(format!(" {title} "));
+    }
+
+    block
 }
 
-pub(crate) fn album_table<'a>(rows: &[Album], title: &'a str) -> Table<'a> {
+pub(crate) fn album_table<'a>(rows: &[Album]) -> Table<'a> {
     let rows: Vec<_> = rows
         .iter()
         .map(|album| {
@@ -282,6 +284,7 @@ pub(crate) fn album_table<'a>(rows: &[Album], title: &'a str) -> Table<'a> {
         .collect();
 
     let is_empty = rows.is_empty();
+
     let mut table = Table::new(
         rows,
         [
@@ -290,7 +293,6 @@ pub(crate) fn album_table<'a>(rows: &[Album], title: &'a str) -> Table<'a> {
             Constraint::Length(4),
         ],
     )
-    .block(block(title, true))
     .row_highlight_style(ROW_HIGHLIGHT_STYLE);
 
     if !is_empty {
@@ -299,7 +301,7 @@ pub(crate) fn album_table<'a>(rows: &[Album], title: &'a str) -> Table<'a> {
     table
 }
 
-pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple], title: &'a str) -> Table<'a> {
+pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
     let rows: Vec<_> = rows
         .iter()
         .map(|album| {
@@ -312,7 +314,6 @@ pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple], title: &'a str) -> Ta
 
     let is_empty = rows.is_empty();
     let mut table = Table::new(rows, [Constraint::Ratio(2, 3), Constraint::Ratio(1, 3)])
-        .block(block(title, true))
         .row_highlight_style(ROW_HIGHLIGHT_STYLE);
 
     if !is_empty {
@@ -321,15 +322,11 @@ pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple], title: &'a str) -> Ta
     table
 }
 
-pub(crate) fn basic_list_table<'a>(
-    rows: Vec<Row<'a>>,
-    title: Option<&'a str>,
-    selectable: bool,
-) -> Table<'a> {
+pub(crate) fn basic_list_table<'a>(rows: Vec<Row<'a>>, title: Option<&'a str>) -> Table<'a> {
     let mut table = Table::new(rows, [Constraint::Min(1)]).row_highlight_style(ROW_HIGHLIGHT_STYLE);
 
     if let Some(title) = title {
-        table = table.block(block(title, selectable));
+        table = table.block(block(Some(title)));
     }
 
     table
@@ -359,13 +356,21 @@ pub(crate) fn track_table<'a>(rows: &[Track], block_title: Option<&'a str>) -> T
     .row_highlight_style(ROW_HIGHLIGHT_STYLE);
 
     if let Some(title) = block_title {
-        table = table.block(block(title, true));
+        table = table.block(block(Some(title)));
     }
 
     if !is_empty {
         table = table.header(Row::new(["Title", "Artist", "Album"]).add_modifier(Modifier::BOLD));
     }
     table
+}
+
+pub fn tab_bar<'a>(tabs: Vec<&'a str>, selected: usize) -> Tabs<'a> {
+    Tabs::new(tabs)
+        .not_underlined()
+        .highlight_style(Style::default().bg(Color::Blue))
+        .divider(symbols::line::VERTICAL)
+        .select(selected)
 }
 
 pub fn mark_explicit_and_hifi(

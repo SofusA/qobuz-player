@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
     app::{Output, PlayOutcome, QueueOutcome, UnfilteredListState},
-    ui::{basic_list_table, mark_explicit_and_hifi},
+    ui::{basic_list_table, block, mark_explicit_and_hifi},
 };
 
 pub(crate) struct QueueState {
@@ -45,9 +45,9 @@ impl QueueState {
                     ]))
                 })
                 .collect(),
-            Some("Queue"),
-            false,
-        );
+            None,
+        )
+        .block(block(None));
 
         frame.render_stateful_widget(table, area, &mut self.queue.state);
     }

@@ -14,7 +14,7 @@ use crate::{
     app::{Output, PlayOutcome},
     ui::{
         basic_list_table, block, center, centered_rect_fixed, mark_explicit_and_hifi, render_input,
-        track_table,
+        tab_bar, track_table,
     },
 };
 
@@ -139,7 +139,6 @@ impl Popup {
                         })
                         .collect(),
                     Some(&state.album.title),
-                    false,
                 );
 
                 frame.render_widget(Clear, area);
@@ -166,12 +165,12 @@ impl Popup {
 
                 let area = centered_rect_fixed(popup_width, popup_height, frame.area());
 
-                let outer_block = block(&artist.artist_name, false);
+                let outer_block = block(Some(&artist.artist_name));
 
-                let tabs = Tabs::new(["Albums", "Top Tracks"])
-                    .not_underlined()
-                    .highlight_style(Style::default().bg(Color::Blue))
-                    .select(if artist.show_top_track { 1 } else { 0 });
+                let tabs = tab_bar(
+                    ["Albums", "Top Tracks"].into(),
+                    if artist.show_top_track { 1 } else { 0 },
+                );
 
                 let top_tracks = track_table(&artist.top_tracks, None);
 
@@ -182,7 +181,6 @@ impl Popup {
                         .map(|album| Row::new(Line::from(album.title.clone())))
                         .collect(),
                     None,
-                    false,
                 );
 
                 frame.render_widget(Clear, area);
@@ -220,14 +218,14 @@ impl Popup {
 
                 let area = centered_rect_fixed(popup_width, popup_height, frame.area());
 
-                let buttons = Tabs::new(["Play", "Shuffle"])
-                    .not_underlined()
-                    .highlight_style(Style::default().bg(Color::Blue))
-                    .select(if playlist_state.shuffle { 1 } else { 0 });
+                let buttons = tab_bar(
+                    ["Play", "Shuffle"].into(),
+                    if playlist_state.shuffle { 1 } else { 0 },
+                );
 
                 let tracks = track_table(&playlist_state.playlist.tracks, None);
 
-                let block = block(&playlist_state.playlist.title, false);
+                let block = block(Some(&playlist_state.playlist.title));
 
                 frame.render_widget(Clear, area);
 
@@ -261,7 +259,6 @@ impl Popup {
                         .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                         .collect::<Vec<_>>(),
                     Some(&block_title),
-                    true,
                 );
 
                 frame.render_widget(Clear, area);
@@ -284,12 +281,12 @@ impl Popup {
                     Constraint::Length(block_title.chars().count() as u16 + 6),
                     Constraint::Length(3),
                 );
-                let tabs = Tabs::new(["Delete", "Cancel"])
-                    .block(block(&block_title, false))
-                    .not_underlined()
-                    .highlight_style(Style::default().bg(Color::Blue))
-                    .select(if state.confirm { 0 } else { 1 })
-                    .divider(symbols::line::VERTICAL);
+
+                let tabs = tab_bar(
+                    ["Delete", "Cancel"].into(),
+                    if state.confirm { 0 } else { 1 },
+                )
+                .block(block(Some(&block_title)));
 
                 frame.render_widget(Clear, area);
                 frame.render_widget(tabs, area);

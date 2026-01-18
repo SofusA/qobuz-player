@@ -19,6 +19,7 @@ mod now_playing;
 mod popup;
 mod queue;
 mod search;
+mod sub_tab;
 mod ui;
 
 #[allow(clippy::too_many_arguments)]
@@ -148,7 +149,7 @@ pub async fn init(
             client: client_clone,
             featured_albums,
             featured_playlists,
-            sub_tab: Default::default(),
+            selected_sub_tab: Default::default(),
         },
     };
 

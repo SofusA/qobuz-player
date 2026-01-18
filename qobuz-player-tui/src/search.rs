@@ -1,4 +1,4 @@
-use std::{fmt, sync::Arc};
+use std::sync::Arc;
 
 use qobuz_player_controls::{Result, client::Client};
 use qobuz_player_models::{Album, Artist, Playlist, Track};
@@ -12,7 +12,8 @@ use tui_input::{Input, backend::crossterm::EventHandler};
 use crate::{
     app::{Output, PlayOutcome, QueueOutcome, UnfilteredListState},
     popup::{AlbumPopupState, ArtistPopupState, PlaylistPopupState, Popup},
-    ui::{album_table, basic_list_table, render_input, track_table},
+    sub_tab::SubTab,
+    ui::{album_table, basic_list_table, block, render_input, tab_bar, track_table},
 };
 
 pub(crate) struct SearchState {
@@ -24,48 +25,6 @@ pub(crate) struct SearchState {
     pub playlists: UnfilteredListState<Playlist>,
     pub tracks: UnfilteredListState<Track>,
     pub sub_tab: SubTab,
-}
-
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum SubTab {
-    #[default]
-    Albums,
-    Artists,
-    Playlists,
-    Tracks,
-}
-
-impl fmt::Display for SubTab {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Albums => write!(f, "Albums"),
-            Self::Artists => write!(f, "Artists"),
-            Self::Playlists => write!(f, "Playlists"),
-            Self::Tracks => write!(f, "Tracks"),
-        }
-    }
-}
-
-impl SubTab {
-    pub(crate) const VALUES: [Self; 4] =
-        [Self::Albums, Self::Artists, Self::Playlists, Self::Tracks];
-
-    pub(crate) fn next(self) -> Self {
-        let index = Self::VALUES
-            .iter()
-            .position(|&x| x == self)
-            .expect("infallible");
-        Self::VALUES[(index + 1) % Self::VALUES.len()]
-    }
-
-    pub(crate) fn previous(self) -> Self {
-        let index = Self::VALUES
-            .iter()
-            .position(|&x| x == self)
-            .expect("unfailable");
-        let len = Self::VALUES.len();
-        Self::VALUES[(index + len - 1) % len]
-    }
 }
 
 impl SearchState {
@@ -82,14 +41,21 @@ impl SearchState {
             "Search",
         );
 
-        let tab_content_area = tab_content_area_split[1];
-        let title = format!("Search: {}", self.sub_tab);
+        let block = block(None);
+        frame.render_widget(block, tab_content_area_split[1]);
+
+        let tab_content_area = tab_content_area_split[1].inner(Margin::new(1, 1));
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(2), Constraint::Min(1)])
+            .split(tab_content_area);
+
+        let tabs = tab_bar(SubTab::labels(), self.sub_tab.selected().into());
+        frame.render_widget(tabs, chunks[0]);
 
         let (table, state) = match self.sub_tab {
-            SubTab::Albums => (
-                album_table(&self.albums.items, &title),
-                &mut self.albums.state,
-            ),
+            SubTab::Albums => (album_table(&self.albums.items), &mut self.albums.state),
             SubTab::Artists => (
                 basic_list_table(
                     self.artists
@@ -97,8 +63,7 @@ impl SearchState {
                         .iter()
                         .map(|artist| Row::new(Line::from(artist.name.clone())))
                         .collect::<Vec<_>>(),
-                    Some(&title),
-                    true,
+                    None,
                 ),
                 &mut self.artists.state,
             ),
@@ -109,18 +74,17 @@ impl SearchState {
                         .iter()
                         .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                         .collect::<Vec<_>>(),
-                    Some(&title),
-                    true,
+                    None,
                 ),
                 &mut self.playlists.state,
             ),
             SubTab::Tracks => (
-                track_table(&self.tracks.items, Some(&title)),
+                track_table(&self.tracks.items, None),
                 &mut self.tracks.state,
             ),
         };
 
-        frame.render_stateful_widget(table, tab_content_area, state);
+        frame.render_stateful_widget(table, chunks[1], state);
     }
 
     pub(crate) async fn handle_events(&mut self, event: Event) -> Output {

@@ -28,7 +28,7 @@ pub(crate) fn render(
     };
 
     let title = get_status(state.status).to_string();
-    let block = block(&title, false);
+    let block = block(Some(&title));
 
     let length = state
         .image

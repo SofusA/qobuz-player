@@ -11,31 +11,56 @@ use ratatui::{
 use crate::{
     app::{Output, UnfilteredListState},
     popup::{AlbumPopupState, PlaylistPopupState, Popup},
-    ui::{album_simple_table, basic_list_table},
+    ui::{album_simple_table, basic_list_table, block, tab_bar},
 };
 
 pub(crate) struct DiscoverState {
     pub(crate) client: Arc<Client>,
     pub(crate) featured_albums: Vec<(String, UnfilteredListState<AlbumSimple>)>,
     pub(crate) featured_playlists: Vec<(String, UnfilteredListState<Playlist>)>,
-    pub(crate) sub_tab: usize,
+    pub(crate) selected_sub_tab: usize,
 }
 
 impl DiscoverState {
     pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) {
+        let block = block(None);
+        frame.render_widget(block, area);
+
+        let tab_content_area = area.inner(Margin::new(1, 1));
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(2), Constraint::Min(1)])
+            .split(tab_content_area);
+
+        let album_labels: Vec<_> = self
+            .featured_albums
+            .iter()
+            .map(|fa| fa.0.as_str())
+            .collect();
+        let playlist_labels: Vec<_> = self
+            .featured_playlists
+            .iter()
+            .map(|fp| fp.0.as_str())
+            .collect();
+        let labels = [album_labels, playlist_labels].concat();
+
+        let tabs = tab_bar(labels, self.selected_sub_tab);
+        frame.render_widget(tabs, chunks[0]);
+
         let is_album = self.album_selected();
 
         let (table, state) = match is_album {
             true => {
-                let list_state = &mut self.featured_albums[self.sub_tab];
+                let list_state = &mut self.featured_albums[self.selected_sub_tab];
                 (
-                    album_simple_table(&list_state.1.items, &list_state.0),
+                    album_simple_table(&list_state.1.items),
                     &mut list_state.1.state,
                 )
             }
             false => {
-                let list_state =
-                    &mut self.featured_playlists[self.sub_tab - self.featured_albums.len()];
+                let list_state = &mut self.featured_playlists
+                    [self.selected_sub_tab - self.featured_albums.len()];
                 (
                     basic_list_table(
                         list_state
@@ -44,15 +69,14 @@ impl DiscoverState {
                             .iter()
                             .map(|playlist| Row::new(Line::from(playlist.title.clone())))
                             .collect::<Vec<_>>(),
-                        Some(&list_state.0),
-                        true,
+                        None,
                     ),
                     &mut list_state.1.state,
                 )
             }
         };
 
-        frame.render_stateful_widget(table, area, state);
+        frame.render_stateful_widget(table, chunks[1], state);
     }
 
     pub(crate) async fn handle_events(&mut self, event: Event) -> Output {
@@ -82,7 +106,7 @@ impl DiscoverState {
 
                             match is_abum {
                                 true => {
-                                    let items = self.featured_albums.get(self.sub_tab);
+                                    let items = self.featured_albums.get(self.selected_sub_tab);
                                     let Some(items) = items else {
                                         return Output::NotConsumed;
                                     };
@@ -105,7 +129,7 @@ impl DiscoverState {
                                 }
                                 false => {
                                     let items = &self.featured_playlists
-                                        [self.sub_tab - self.featured_albums.len()]
+                                        [self.selected_sub_tab - self.featured_albums.len()]
                                     .1
                                     .items;
 
@@ -129,7 +153,7 @@ impl DiscoverState {
 
                             match is_abum {
                                 true => {
-                                    let items = self.featured_albums.get(self.sub_tab);
+                                    let items = self.featured_albums.get(self.selected_sub_tab);
                                     let Some(items) = items else {
                                         return Output::NotConsumed;
                                     };
@@ -146,7 +170,7 @@ impl DiscoverState {
                                 }
                                 false => {
                                     let items = &self.featured_playlists
-                                        [self.sub_tab - self.featured_albums.len()]
+                                        [self.selected_sub_tab - self.featured_albums.len()]
                                     .1
                                     .items;
 
@@ -168,16 +192,16 @@ impl DiscoverState {
     }
 
     fn album_selected(&self) -> bool {
-        self.sub_tab < self.featured_albums.len()
+        self.selected_sub_tab < self.featured_albums.len()
     }
 
     fn current_list_state(&mut self) -> &mut TableState {
         let is_album = self.album_selected();
 
         match is_album {
-            true => &mut self.featured_albums[self.sub_tab].1.state,
+            true => &mut self.featured_albums[self.selected_sub_tab].1.state,
             false => {
-                &mut self.featured_playlists[self.sub_tab - self.featured_albums.len()]
+                &mut self.featured_playlists[self.selected_sub_tab - self.featured_albums.len()]
                     .1
                     .state
             }
@@ -186,11 +210,11 @@ impl DiscoverState {
 
     fn cycle_subtab_backwards(&mut self) {
         let count = self.featured_albums.len() + self.featured_playlists.len();
-        self.sub_tab = (self.sub_tab + count - 1) % count;
+        self.selected_sub_tab = (self.selected_sub_tab + count - 1) % count;
     }
 
     fn cycle_subtab(&mut self) {
         let count = self.featured_albums.len() + self.featured_playlists.len();
-        self.sub_tab = (self.sub_tab + count + 1) % count;
+        self.selected_sub_tab = (self.selected_sub_tab + count + 1) % count;
     }
 }
