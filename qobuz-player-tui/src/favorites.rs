@@ -250,6 +250,7 @@ impl FavoritesState {
 
                                     return Output::Popup(Popup::Album(AlbumPopupState::new(
                                         album,
+                                        self.client.clone(),
                                     )));
                                 }
                                 Output::Consumed

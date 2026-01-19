@@ -11,7 +11,7 @@ use tokio::try_join;
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
-    app::{Output, PlayOutcome},
+    app::{Output, PlayOutcome, QueueOutcome},
     ui::{
         basic_list_table, block, center, centered_rect_fixed, mark_explicit_and_hifi, render_input,
         tab_bar, track_table,
@@ -63,14 +63,16 @@ impl ArtistPopupState {
 pub(crate) struct AlbumPopupState {
     pub album: Album,
     pub state: TableState,
+    pub client: Arc<Client>,
 }
 
 impl AlbumPopupState {
-    pub fn new(album: Album) -> Self {
+    pub fn new(album: Album, client: Arc<Client>) -> Self {
         let is_empty = album.tracks.is_empty();
         let mut state = Self {
             album,
             state: Default::default(),
+            client,
         };
 
         if !is_empty {
@@ -306,6 +308,40 @@ impl Popup {
                         album_state.state.select_next();
                         Output::Consumed
                     }
+                    KeyCode::Char('N') => {
+                        let index = album_state.state.selected();
+                        let selected = index.and_then(|index| album_state.album.tracks.get(index));
+
+                        let Some(selected) = selected else {
+                            return Output::Consumed;
+                        };
+
+                        Output::Queue(QueueOutcome::PlayTrackNext(selected.id))
+                    }
+                    KeyCode::Char('B') => {
+                        let index = album_state.state.selected();
+                        let selected = index.and_then(|index| album_state.album.tracks.get(index));
+
+                        let Some(selected) = selected else {
+                            return Output::Consumed;
+                        };
+
+                        Output::Queue(QueueOutcome::AddTrackToQueue(selected.id))
+                    }
+                    KeyCode::Char('A') => {
+                        let index = album_state.state.selected();
+
+                        let id = index
+                            .and_then(|index| album_state.album.tracks.get(index))
+                            .map(|track| track.id);
+
+                        if let Some(id) = id {
+                            _ = album_state.client.add_favorite_track(id).await;
+                            return Output::UpdateFavorites;
+                        }
+
+                        Output::Consumed
+                    }
                     KeyCode::Enter => {
                         let index = album_state.state.selected();
 
@@ -339,6 +375,20 @@ impl Popup {
                         artist_popup_state.show_top_track = !artist_popup_state.show_top_track;
                         Output::Consumed
                     }
+                    KeyCode::Char('A') => {
+                        let index = artist_popup_state.state.selected();
+
+                        let id = index
+                            .and_then(|index| artist_popup_state.albums.get(index))
+                            .map(|album| album.id.clone());
+
+                        if let Some(id) = id {
+                            _ = artist_popup_state.client.add_favorite_album(&id).await;
+                            return Output::UpdateFavorites;
+                        }
+
+                        Output::Consumed
+                    }
                     KeyCode::Enter => {
                         match artist_popup_state.show_top_track {
                             true => {
@@ -361,7 +411,10 @@ impl Popup {
                                     match album {
                                         Ok(album) => {
                                             return Output::Popup(Popup::Album(
-                                                AlbumPopupState::new(album),
+                                                AlbumPopupState::new(
+                                                    album,
+                                                    artist_popup_state.client.clone(),
+                                                ),
                                             ));
                                         }
                                         Err(err) => return Output::Error(err.to_string()),
