@@ -133,9 +133,11 @@ impl Player {
             tracing::info!("Sink is empty. Query track from play");
             self.set_target_status(Status::Buffering);
             self.query_track(&current_track, false).await?;
+        } else {
+            self.set_target_status(Status::Playing);
+            self.sink.play();
         }
 
-        self.sink.play();
         Ok(())
     }
 
@@ -179,6 +181,7 @@ impl Player {
                     }
                 };
             }
+            self.sink.play();
             self.set_target_status(Status::Playing);
         } else {
             tracing::info!("Buffering track: {}", &track.title);
