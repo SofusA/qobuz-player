@@ -11,7 +11,7 @@ use tokio::try_join;
 
 use crate::{AppState, ResponseResult, ok_or_send_error_toast};
 
-pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
+pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
         .route("/artist/{id}", get(index))
         .route("/artist/{id}/content", get(content))

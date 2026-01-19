@@ -15,13 +15,13 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 
-pub(crate) fn routes() -> Router<Arc<AppState>> {
+pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/auth", get(index))
         .route("/auth/login", post(login))
 }
 
-pub(crate) async fn auth_middleware(
+pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
     request: Request,

@@ -91,15 +91,15 @@ impl Sink {
         self.output_stream = None;
         *self.duration_played.lock() = Default::default();
 
+        if let Some(handle) = self.track_handle.take() {
+            handle.abort();
+        }
+
         Ok(())
     }
 
     pub fn clear_queue(&mut self) -> Result<()> {
         tracing::info!("Clearing sink queue");
-        if let Some(handle) = self.track_handle.take() {
-            handle.abort();
-        }
-
         *self.duration_played.lock() = Default::default();
 
         if let Some(sender) = self.sender.as_ref() {

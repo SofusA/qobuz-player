@@ -10,7 +10,7 @@ use skabelon::Templates;
 struct TemplatesEmbed;
 
 #[allow(unused_variables)]
-pub(crate) fn templates(root_dir: &Path) -> Templates {
+pub fn templates(root_dir: &Path) -> Templates {
     let mut templates = Templates::new();
 
     #[cfg(not(debug_assertions))]

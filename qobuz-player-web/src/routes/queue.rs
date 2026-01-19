@@ -10,7 +10,7 @@ use serde_json::json;
 
 use crate::app_state::AppState;
 
-pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
+pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
         .route("/queue", get(index))
         .route("/queue/partial", get(queue_partial))

@@ -30,7 +30,7 @@ where
     }
 }
 
-pub(crate) async fn static_handler(uri: axum::http::Uri) -> impl IntoResponse {
+pub async fn static_handler(uri: axum::http::Uri) -> impl IntoResponse {
     let path = uri.path().trim_start_matches("/assets/").to_string();
 
     StaticFile(path)

@@ -26,7 +26,7 @@ pub struct Track {
     pub playlist_track_id: Option<u64>,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Album {
     pub id: String,
     pub title: String,

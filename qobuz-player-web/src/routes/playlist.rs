@@ -13,7 +13,7 @@ use serde_json::json;
 
 use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
 
-pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
+pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
         .route("/playlist/create", get(create).post(create_form))
         .route("/playlist/{id}", get(index).delete(delete))

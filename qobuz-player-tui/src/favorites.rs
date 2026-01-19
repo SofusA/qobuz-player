@@ -1,37 +1,48 @@
-use std::sync::Arc;
-
-use qobuz_player_controls::client::Client;
-use qobuz_player_models::{Album, Artist, Playlist, Track};
+use qobuz_player_controls::{Result, client::Client, controls::Controls};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
-    widgets::*,
 };
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
-    app::{FilteredListState, Output, PlayOutcome, QueueOutcome},
-    popup::{
-        AlbumPopupState, ArtistPopupState, DeletePlaylistPopupstate, NewPlaylistPopupState,
-        PlaylistPopupState, Popup,
-    },
+    app::{NotificationList, Output},
     sub_tab::SubTab,
-    ui::{album_table, basic_list_table, block, mark_as_owned, render_input, tab_bar, track_table},
+    ui::{block, render_input, tab_bar},
+    widgets::{
+        album_list::AlbumList,
+        artist_list::ArtistList,
+        playlist_list::PlaylistList,
+        track_list::{TrackList, TrackListEvent},
+    },
 };
 
-pub(crate) struct FavoritesState {
-    pub client: Arc<Client>,
+pub struct FavoritesState {
     pub editing: bool,
     pub filter: Input,
-    pub albums: FilteredListState<Album>,
-    pub artists: FilteredListState<Artist>,
-    pub playlists: FilteredListState<Playlist>,
-    pub tracks: FilteredListState<Track>,
+    pub albums: AlbumList,
+    pub artists: ArtistList,
+    pub playlists: PlaylistList,
+    pub tracks: TrackList,
     pub sub_tab: SubTab,
 }
 
 impl FavoritesState {
-    pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) {
+    pub async fn new(client: &Client) -> Result<Self> {
+        let favorites = client.favorites().await?;
+
+        Ok(Self {
+            editing: Default::default(),
+            filter: Default::default(),
+            albums: AlbumList::new(favorites.albums),
+            artists: ArtistList::new(favorites.artists),
+            playlists: PlaylistList::new(favorites.playlists),
+            tracks: TrackList::new(favorites.tracks),
+            sub_tab: Default::default(),
+        })
+    }
+
+    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         let tab_content_area_split = Layout::default()
             .constraints([Constraint::Length(3), Constraint::Min(1)])
             .split(area);
@@ -57,45 +68,21 @@ impl FavoritesState {
         let tabs = tab_bar(SubTab::labels(), self.sub_tab.selected().into());
         frame.render_widget(tabs, chunks[0]);
 
-        let (table, state) = match self.sub_tab {
-            SubTab::Albums => (album_table(&self.albums.filter), &mut self.albums.state),
-            SubTab::Artists => (
-                basic_list_table(
-                    self.artists
-                        .filter
-                        .iter()
-                        .map(|artist| Row::new(Line::from(artist.name.clone())))
-                        .collect::<Vec<_>>(),
-                    None,
-                ),
-                &mut self.artists.state,
-            ),
-            SubTab::Playlists => (
-                basic_list_table(
-                    self.playlists
-                        .filter
-                        .iter()
-                        .map(|playlist| {
-                            Row::new(vec![mark_as_owned(
-                                playlist.title.clone(),
-                                playlist.is_owned,
-                            )])
-                        })
-                        .collect::<Vec<_>>(),
-                    None,
-                ),
-                &mut self.playlists.state,
-            ),
-            SubTab::Tracks => (
-                track_table(&self.tracks.filter, None),
-                &mut self.tracks.state,
-            ),
+        match self.sub_tab {
+            SubTab::Albums => self.albums.render(chunks[1], frame.buffer_mut()),
+            SubTab::Artists => self.artists.render(chunks[1], frame.buffer_mut()),
+            SubTab::Playlists => self.playlists.render(chunks[1], frame.buffer_mut()),
+            SubTab::Tracks => self.tracks.render(chunks[1], frame.buffer_mut()),
         };
-
-        frame.render_stateful_widget(table, chunks[1], state);
     }
 
-    pub(crate) async fn handle_events(&mut self, event: Event) -> Output {
+    pub async fn handle_events(
+        &mut self,
+        event: Event,
+        client: &Client,
+        controls: &Controls,
+        notifications: &mut NotificationList,
+    ) -> Output {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match &mut self.editing {
@@ -112,201 +99,38 @@ impl FavoritesState {
                             self.cycle_subtab();
                             Output::Consumed
                         }
-                        KeyCode::Down | KeyCode::Char('j') => {
-                            self.current_list_state().select_next();
-                            Output::Consumed
-                        }
-                        KeyCode::Up | KeyCode::Char('k') => {
-                            self.current_list_state().select_previous();
-                            Output::Consumed
-                        }
-                        KeyCode::Char('C') => match self.sub_tab {
-                            SubTab::Playlists => {
-                                Output::Popup(Popup::NewPlaylist(NewPlaylistPopupState {
-                                    name: Default::default(),
-                                    client: self.client.clone(),
-                                }))
-                            }
-                            _ => Output::NotConsumed,
-                        },
-                        KeyCode::Char('a') => match self.sub_tab {
-                            SubTab::Tracks => {
-                                let index = self.tracks.state.selected();
-
-                                let track = index.and_then(|index| self.tracks.filter.get(index));
-
-                                if let Some(id) = track {
-                                    return Output::PlayOutcome(PlayOutcome::AddTrackToPlaylist(
-                                        id.clone(),
-                                    ));
-                                }
-                                Output::Consumed
-                            }
-                            _ => Output::NotConsumed,
-                        },
-                        KeyCode::Char('N') => {
-                            if self.sub_tab != SubTab::Tracks {
-                                return Output::Consumed;
-                            }
-                            let index = self.tracks.state.selected();
-                            let selected = index.and_then(|index| self.tracks.filter.get(index));
-
-                            let Some(selected) = selected else {
-                                return Output::Consumed;
-                            };
-
-                            Output::Queue(QueueOutcome::PlayTrackNext(selected.id))
-                        }
-                        KeyCode::Char('B') => {
-                            if self.sub_tab != SubTab::Tracks {
-                                return Output::Consumed;
-                            }
-
-                            let index = self.tracks.state.selected();
-                            let selected = index.and_then(|index| self.tracks.filter.get(index));
-
-                            let Some(selected) = selected else {
-                                return Output::Consumed;
-                            };
-
-                            Output::Queue(QueueOutcome::AddTrackToQueue(selected.id))
-                        }
-                        KeyCode::Char('D') => match self.sub_tab {
+                        _ => match self.sub_tab {
                             SubTab::Albums => {
-                                let index = self.albums.state.selected();
-
-                                let id = index
-                                    .and_then(|index| self.albums.filter.get(index))
-                                    .map(|album| album.id.clone());
-
-                                if let Some(id) = id {
-                                    _ = self.client.remove_favorite_album(&id).await;
-                                }
-
-                                Output::UpdateFavorites
+                                return self
+                                    .albums
+                                    .handle_events(key_event.code, client, notifications)
+                                    .await;
                             }
                             SubTab::Artists => {
-                                let index = self.artists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.artists.filter.get(index));
-
-                                if let Some(selected) = selected {
-                                    _ = self.client.remove_favorite_artist(selected.id).await;
-                                }
-                                Output::UpdateFavorites
+                                return self
+                                    .artists
+                                    .handle_events(key_event.code, client, notifications)
+                                    .await;
                             }
                             SubTab::Playlists => {
-                                let index = self.playlists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.playlists.filter.get(index));
-
-                                if let Some(selected) = selected {
-                                    match selected.is_owned {
-                                        true => {
-                                            return Output::Popup(Popup::DeletePlaylist(
-                                                DeletePlaylistPopupstate {
-                                                    title: selected.title.clone(),
-                                                    id: selected.id,
-                                                    confirm: false,
-                                                    client: self.client.clone(),
-                                                },
-                                            ));
-                                        }
-                                        false => {
-                                            _ = self
-                                                .client
-                                                .remove_favorite_playlist(selected.id)
-                                                .await
-                                        }
-                                    }
-                                }
-
-                                Output::UpdateFavorites
+                                return self
+                                    .playlists
+                                    .handle_events(key_event.code, client, notifications)
+                                    .await;
                             }
                             SubTab::Tracks => {
-                                let index = self.tracks.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.tracks.filter.get(index));
-
-                                if let Some(selected) = selected {
-                                    _ = self.client.remove_favorite_track(selected.id).await;
-                                }
-                                Output::UpdateFavorites
+                                return self
+                                    .tracks
+                                    .handle_events(
+                                        key_event.code,
+                                        client,
+                                        controls,
+                                        notifications,
+                                        TrackListEvent::Track,
+                                    )
+                                    .await;
                             }
                         },
-                        KeyCode::Enter => match self.sub_tab {
-                            SubTab::Albums => {
-                                let index = self.albums.state.selected();
-
-                                let id = index
-                                    .and_then(|index| self.albums.filter.get(index))
-                                    .map(|album| album.id.clone());
-
-                                if let Some(id) = id {
-                                    let album = match self.client.album(&id).await {
-                                        Ok(res) => res,
-                                        Err(err) => return Output::Error(err.to_string()),
-                                    };
-
-                                    return Output::Popup(Popup::Album(AlbumPopupState::new(
-                                        album,
-                                        self.client.clone(),
-                                    )));
-                                }
-                                Output::Consumed
-                            }
-                            SubTab::Artists => {
-                                let index = self.artists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.artists.filter.get(index));
-
-                                let Some(selected) = selected else {
-                                    return Output::Consumed;
-                                };
-
-                                let state =
-                                    ArtistPopupState::new(selected, self.client.clone()).await;
-                                let state = match state {
-                                    Ok(res) => res,
-                                    Err(err) => return Output::Error(err.to_string()),
-                                };
-
-                                Output::Popup(Popup::Artist(state))
-                            }
-                            SubTab::Playlists => {
-                                let index = self.playlists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.playlists.filter.get(index));
-
-                                let Some(selected) = selected else {
-                                    return Output::Consumed;
-                                };
-
-                                let playlist = match self.client.playlist(selected.id).await {
-                                    Ok(res) => res,
-                                    Err(err) => return Output::Error(err.to_string()),
-                                };
-
-                                Output::Popup(Popup::Playlist(PlaylistPopupState {
-                                    playlist,
-                                    shuffle: false,
-                                    state: Default::default(),
-                                    client: self.client.clone(),
-                                }))
-                            }
-                            SubTab::Tracks => {
-                                let index = self.tracks.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.tracks.filter.get(index));
-
-                                let Some(selected) = selected else {
-                                    return Output::Consumed;
-                                };
-
-                                Output::PlayOutcome(PlayOutcome::Track(selected.id))
-                            }
-                        },
-                        _ => Output::NotConsumed,
                     },
                     true => match key_event.code {
                         KeyCode::Esc | KeyCode::Enter => {
@@ -316,45 +140,49 @@ impl FavoritesState {
                         _ => {
                             self.filter.handle_event(&event);
 
-                            self.albums.filter = self
-                                .albums
-                                .all_items
-                                .iter()
-                                .filter(|x| {
-                                    x.title
-                                        .to_lowercase()
-                                        .contains(&self.filter.value().to_lowercase())
-                                        || x.artist
-                                            .name
+                            self.albums.set_filter(
+                                self.albums
+                                    .all_items()
+                                    .iter()
+                                    .filter(|x| {
+                                        x.title
                                             .to_lowercase()
                                             .contains(&self.filter.value().to_lowercase())
-                                })
-                                .cloned()
-                                .collect();
+                                            || x.artist
+                                                .name
+                                                .to_lowercase()
+                                                .contains(&self.filter.value().to_lowercase())
+                                    })
+                                    .cloned()
+                                    .collect(),
+                            );
 
-                            self.artists.filter = self
-                                .artists
-                                .all_items
-                                .iter()
-                                .filter(|x| {
-                                    x.name
-                                        .to_lowercase()
-                                        .contains(&self.filter.value().to_lowercase())
-                                })
-                                .cloned()
-                                .collect();
+                            self.artists.set_filter(
+                                self.artists
+                                    .all_items()
+                                    .iter()
+                                    .filter(|x| {
+                                        x.name
+                                            .to_lowercase()
+                                            .contains(&self.filter.value().to_lowercase())
+                                    })
+                                    .cloned()
+                                    .collect(),
+                            );
 
-                            self.playlists.filter = self
-                                .playlists
-                                .all_items
-                                .iter()
-                                .filter(|x| {
-                                    x.title
-                                        .to_lowercase()
-                                        .contains(&self.filter.value().to_lowercase())
-                                })
-                                .cloned()
-                                .collect();
+                            self.playlists.set_filter(
+                                self.playlists
+                                    .all_items()
+                                    .iter()
+                                    .filter(|x| {
+                                        x.title
+                                            .to_lowercase()
+                                            .contains(&self.filter.value().to_lowercase())
+                                    })
+                                    .cloned()
+                                    .collect(),
+                            );
+
                             Output::Consumed
                         }
                     },
@@ -370,15 +198,6 @@ impl FavoritesState {
 
     fn stop_editing(&mut self) {
         self.editing = false;
-    }
-
-    fn current_list_state(&mut self) -> &mut TableState {
-        match self.sub_tab {
-            SubTab::Albums => &mut self.albums.state,
-            SubTab::Artists => &mut self.artists.state,
-            SubTab::Playlists => &mut self.playlists.state,
-            SubTab::Tracks => &mut self.tracks.state,
-        }
     }
 
     fn cycle_subtab_backwards(&mut self) {

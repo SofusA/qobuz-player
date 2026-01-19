@@ -1,34 +1,35 @@
-use std::sync::Arc;
-
-use qobuz_player_controls::{Result, client::Client};
-use qobuz_player_models::{Album, Artist, Playlist, Track};
+use qobuz_player_controls::{Result, client::Client, controls::Controls};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
-    widgets::*,
 };
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
-    app::{Output, PlayOutcome, QueueOutcome, UnfilteredListState},
-    popup::{AlbumPopupState, ArtistPopupState, PlaylistPopupState, Popup},
+    app::{NotificationList, Output},
     sub_tab::SubTab,
-    ui::{album_table, basic_list_table, block, render_input, tab_bar, track_table},
+    ui::{block, render_input, tab_bar},
+    widgets::{
+        album_list::AlbumList,
+        artist_list::ArtistList,
+        playlist_list::PlaylistList,
+        track_list::{TrackList, TrackListEvent},
+    },
 };
 
-pub(crate) struct SearchState {
-    pub client: Arc<Client>,
+#[derive(Default)]
+pub struct SearchState {
     pub editing: bool,
     pub filter: Input,
-    pub albums: UnfilteredListState<Album>,
-    pub artists: UnfilteredListState<Artist>,
-    pub playlists: UnfilteredListState<Playlist>,
-    pub tracks: UnfilteredListState<Track>,
+    pub albums: AlbumList,
+    pub artists: ArtistList,
+    pub playlists: PlaylistList,
+    pub tracks: TrackList,
     pub sub_tab: SubTab,
 }
 
 impl SearchState {
-    pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         let tab_content_area_split = Layout::default()
             .constraints([Constraint::Length(3), Constraint::Min(1)])
             .split(area);
@@ -54,40 +55,21 @@ impl SearchState {
         let tabs = tab_bar(SubTab::labels(), self.sub_tab.selected().into());
         frame.render_widget(tabs, chunks[0]);
 
-        let (table, state) = match self.sub_tab {
-            SubTab::Albums => (album_table(&self.albums.items), &mut self.albums.state),
-            SubTab::Artists => (
-                basic_list_table(
-                    self.artists
-                        .items
-                        .iter()
-                        .map(|artist| Row::new(Line::from(artist.name.clone())))
-                        .collect::<Vec<_>>(),
-                    None,
-                ),
-                &mut self.artists.state,
-            ),
-            SubTab::Playlists => (
-                basic_list_table(
-                    self.playlists
-                        .items
-                        .iter()
-                        .map(|playlist| Row::new(Line::from(playlist.title.clone())))
-                        .collect::<Vec<_>>(),
-                    None,
-                ),
-                &mut self.playlists.state,
-            ),
-            SubTab::Tracks => (
-                track_table(&self.tracks.items, None),
-                &mut self.tracks.state,
-            ),
+        match self.sub_tab {
+            SubTab::Albums => self.albums.render(chunks[1], frame.buffer_mut()),
+            SubTab::Artists => self.artists.render(chunks[1], frame.buffer_mut()),
+            SubTab::Playlists => self.playlists.render(chunks[1], frame.buffer_mut()),
+            SubTab::Tracks => self.tracks.render(chunks[1], frame.buffer_mut()),
         };
-
-        frame.render_stateful_widget(table, chunks[1], state);
     }
 
-    pub(crate) async fn handle_events(&mut self, event: Event) -> Output {
+    pub async fn handle_events(
+        &mut self,
+        event: Event,
+        client: &Client,
+        controls: &Controls,
+        notifications: &mut NotificationList,
+    ) -> Output {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match &mut self.editing {
@@ -104,189 +86,39 @@ impl SearchState {
                             self.cycle_subtab();
                             Output::Consumed
                         }
-                        KeyCode::Down | KeyCode::Char('j') => {
-                            self.current_list_state().select_next();
-                            Output::Consumed
-                        }
-                        KeyCode::Up | KeyCode::Char('k') => {
-                            self.current_list_state().select_previous();
-                            Output::Consumed
-                        }
-                        KeyCode::Char('N') => {
-                            if self.sub_tab != SubTab::Tracks {
-                                return Output::Consumed;
-                            }
-                            let index = self.tracks.state.selected();
-                            let selected = index.and_then(|index| self.tracks.items.get(index));
-
-                            let Some(selected) = selected else {
-                                return Output::Consumed;
-                            };
-
-                            Output::Queue(QueueOutcome::PlayTrackNext(selected.id))
-                        }
-                        KeyCode::Char('B') => {
-                            if self.sub_tab != SubTab::Tracks {
-                                return Output::Consumed;
-                            }
-
-                            let index = self.tracks.state.selected();
-                            let selected = index.and_then(|index| self.tracks.items.get(index));
-
-                            let Some(selected) = selected else {
-                                return Output::Consumed;
-                            };
-
-                            Output::Queue(QueueOutcome::AddTrackToQueue(selected.id))
-                        }
-                        KeyCode::Char('A') => match self.sub_tab {
+                        _ => match self.sub_tab {
                             SubTab::Albums => {
-                                let index = self.albums.state.selected();
-
-                                let id = index
-                                    .and_then(|index| self.albums.items.get(index))
-                                    .map(|album| album.id.clone());
-
-                                if let Some(id) = id {
-                                    _ = self.client.add_favorite_album(&id).await;
-                                    return Output::UpdateFavorites;
-                                }
-
-                                Output::Consumed
+                                self.albums
+                                    .handle_events(key_event.code, client, notifications)
+                                    .await
                             }
                             SubTab::Artists => {
-                                let index = self.artists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.artists.items.get(index));
-
-                                if let Some(selected) = selected {
-                                    _ = self.client.add_favorite_artist(selected.id).await;
-                                    return Output::UpdateFavorites;
-                                }
-
-                                Output::Consumed
+                                self.artists
+                                    .handle_events(key_event.code, client, notifications)
+                                    .await
                             }
                             SubTab::Playlists => {
-                                let index = self.playlists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.playlists.items.get(index));
-
-                                if let Some(selected) = selected {
-                                    _ = self.client.add_favorite_playlist(selected.id).await;
-                                    return Output::UpdateFavorites;
-                                }
-
-                                Output::Consumed
+                                self.playlists
+                                    .handle_events(key_event.code, client, notifications)
+                                    .await
                             }
                             SubTab::Tracks => {
-                                let index = self.tracks.state.selected();
-
-                                let id = index
-                                    .and_then(|index| self.tracks.items.get(index))
-                                    .map(|track| track.id);
-
-                                if let Some(id) = id {
-                                    _ = self.client.add_favorite_track(id).await;
-                                    return Output::UpdateFavorites;
-                                }
-
-                                Output::Consumed
+                                self.tracks
+                                    .handle_events(
+                                        key_event.code,
+                                        client,
+                                        controls,
+                                        notifications,
+                                        TrackListEvent::Track,
+                                    )
+                                    .await
                             }
                         },
-                        KeyCode::Char('a') => match self.sub_tab {
-                            SubTab::Tracks => {
-                                let index = self.tracks.state.selected();
-
-                                let track = index.and_then(|index| self.tracks.items.get(index));
-
-                                if let Some(id) = track {
-                                    return Output::PlayOutcome(PlayOutcome::AddTrackToPlaylist(
-                                        id.clone(),
-                                    ));
-                                }
-                                Output::Consumed
-                            }
-                            _ => Output::NotConsumed,
-                        },
-                        KeyCode::Enter => match self.sub_tab {
-                            SubTab::Albums => {
-                                let index = self.albums.state.selected();
-
-                                let id = index
-                                    .and_then(|index| self.albums.items.get(index))
-                                    .map(|album| album.id.clone());
-
-                                if let Some(id) = id {
-                                    let album = match self.client.album(&id).await {
-                                        Ok(res) => res,
-                                        Err(err) => return Output::Error(err.to_string()),
-                                    };
-
-                                    return Output::Popup(Popup::Album(AlbumPopupState::new(
-                                        album,
-                                        self.client.clone(),
-                                    )));
-                                }
-                                Output::Consumed
-                            }
-                            SubTab::Artists => {
-                                let index = self.artists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.artists.items.get(index));
-
-                                let Some(selected) = selected else {
-                                    return Output::Consumed;
-                                };
-
-                                let state =
-                                    ArtistPopupState::new(selected, self.client.clone()).await;
-                                let state = match state {
-                                    Ok(res) => res,
-                                    Err(err) => return Output::Error(err.to_string()),
-                                };
-
-                                Output::Popup(Popup::Artist(state))
-                            }
-                            SubTab::Playlists => {
-                                let index = self.playlists.state.selected();
-                                let selected =
-                                    index.and_then(|index| self.playlists.items.get(index));
-
-                                let Some(selected) = selected else {
-                                    return Output::Consumed;
-                                };
-
-                                let playlist = match self.client.playlist(selected.id).await {
-                                    Ok(res) => res,
-                                    Err(err) => return Output::Error(err.to_string()),
-                                };
-
-                                Output::Popup(Popup::Playlist(PlaylistPopupState {
-                                    playlist,
-                                    shuffle: false,
-                                    state: Default::default(),
-                                    client: self.client.clone(),
-                                }))
-                            }
-                            SubTab::Tracks => {
-                                let index = self.tracks.state.selected();
-
-                                let id = index
-                                    .and_then(|index| self.tracks.items.get(index))
-                                    .map(|track| track.id);
-
-                                if let Some(id) = id {
-                                    return Output::PlayOutcome(PlayOutcome::Track(id));
-                                }
-                                Output::Consumed
-                            }
-                        },
-                        _ => Output::NotConsumed,
                     },
                     true => match key_event.code {
                         KeyCode::Esc | KeyCode::Enter => {
                             self.stop_editing();
-                            if let Err(err) = self.update_search().await {
+                            if let Err(err) = self.update_search(client).await {
                                 return Output::Error(err.to_string());
                             };
                             Output::Consumed
@@ -302,14 +134,14 @@ impl SearchState {
         }
     }
 
-    async fn update_search(&mut self) -> Result<()> {
+    async fn update_search(&mut self, client: &Client) -> Result<()> {
         if !self.filter.value().trim().is_empty() {
-            let search_results = self.client.search(self.filter.value().to_string()).await?;
+            let search_results = client.search(self.filter.value().to_string()).await?;
 
-            self.albums.items = search_results.albums;
-            self.artists.items = search_results.artists;
-            self.playlists.items = search_results.playlists;
-            self.tracks.items = search_results.tracks;
+            self.albums.set_all_items(search_results.albums);
+            self.artists.set_all_items(search_results.artists);
+            self.playlists.set_all_items(search_results.playlists);
+            self.tracks.set_all_items(search_results.tracks);
         }
 
         Ok(())
@@ -321,15 +153,6 @@ impl SearchState {
 
     fn stop_editing(&mut self) {
         self.editing = false;
-    }
-
-    fn current_list_state(&mut self) -> &mut TableState {
-        match self.sub_tab {
-            SubTab::Albums => &mut self.albums.state,
-            SubTab::Artists => &mut self.artists.state,
-            SubTab::Playlists => &mut self.playlists.state,
-            SubTab::Tracks => &mut self.tracks.state,
-        }
     }
 
     fn cycle_subtab_backwards(&mut self) {

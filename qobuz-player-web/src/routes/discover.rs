@@ -6,7 +6,7 @@ use tokio::try_join;
 
 use crate::{AppState, Discover, ResponseResult, ok_or_error_page};
 
-pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
+pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/discover", get(index))
 }
 
