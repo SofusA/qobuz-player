@@ -4,7 +4,7 @@ use axum::{Router, extract::State, response::IntoResponse, routing::get};
 
 use crate::AppState;
 
-pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
+pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/controls", get(controls))
 }
 

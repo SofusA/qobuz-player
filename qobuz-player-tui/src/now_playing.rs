@@ -5,17 +5,17 @@ use ratatui::{prelude::*, widgets::*};
 use ratatui_image::{StatefulImage, protocol::StatefulProtocol};
 
 #[derive(Default)]
-pub(crate) struct NowPlayingState {
-    pub(crate) image: Option<(StatefulProtocol, f32)>,
-    pub(crate) entity_title: Option<String>,
-    pub(crate) playing_track: Option<Track>,
-    pub(crate) tracklist_length: usize,
-    pub(crate) tracklist_position: usize,
-    pub(crate) status: Status,
-    pub(crate) duration_ms: u32,
+pub struct NowPlayingState {
+    pub image: Option<(StatefulProtocol, f32)>,
+    pub entity_title: Option<String>,
+    pub playing_track: Option<Track>,
+    pub tracklist_length: usize,
+    pub tracklist_position: usize,
+    pub status: Status,
+    pub duration_ms: u32,
 }
 
-pub(crate) fn render(
+pub fn render(
     frame: &mut Frame,
     area: Rect,
     state: &mut NowPlayingState,

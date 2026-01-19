@@ -1,3 +1,4 @@
+use qobuz_player_controls::controls::Controls;
 use qobuz_player_models::{Track, TrackStatus};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
@@ -7,19 +8,25 @@ use ratatui::{
 };
 
 use crate::{
-    app::{Output, PlayOutcome, QueueOutcome, UnfilteredListState},
+    app::Output,
     ui::{basic_list_table, block, mark_explicit_and_hifi},
 };
 
-pub(crate) struct QueueState {
-    pub queue: UnfilteredListState<Track>,
+pub struct QueueState {
+    items: Vec<Track>,
+    state: TableState,
 }
 
 impl QueueState {
-    pub(crate) fn render(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn new(tracks: Vec<Track>) -> Self {
+        Self {
+            items: tracks,
+            state: Default::default(),
+        }
+    }
+    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         let table = basic_list_table(
-            self.queue
-                .items
+            self.items
                 .iter()
                 .enumerate()
                 .map(|(index, track)| {
@@ -45,54 +52,76 @@ impl QueueState {
                     ]))
                 })
                 .collect(),
-            None,
         )
         .block(block(None));
 
-        frame.render_stateful_widget(table, area, &mut self.queue.state);
+        frame.render_stateful_widget(table, area, &mut self.state);
     }
 
-    pub(crate) async fn handle_events(&mut self, event: Event) -> Output {
+    pub fn items(&self) -> &Vec<Track> {
+        &self.items
+    }
+
+    pub fn set_items(&mut self, items: Vec<Track>) {
+        self.items = items
+    }
+
+    pub async fn handle_events(&mut self, event: Event, controls: &Controls) -> Output {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match key_event.code {
                     KeyCode::Down | KeyCode::Char('j') => {
-                        self.queue.state.select_next();
+                        self.state.select_next();
                         Output::Consumed
                     }
                     KeyCode::Up | KeyCode::Char('k') => {
-                        self.queue.state.select_previous();
+                        self.state.select_previous();
                         Output::Consumed
                     }
                     KeyCode::Char('d') => {
-                        let index = self.queue.state.selected();
+                        let index = self.state.selected();
 
                         if let Some(index) = index {
-                            return Output::Queue(QueueOutcome::MoveIndexDown(index));
+                            if index == self.items().len() - 1 {
+                                return Output::Consumed;
+                            }
+
+                            let mut order: Vec<_> =
+                                self.items().iter().enumerate().map(|x| x.0).collect();
+
+                            order.swap(index, index + 1);
+                            controls.reorder_queue(order);
                         }
                         Output::Consumed
                     }
                     KeyCode::Char('u') => {
-                        let index = self.queue.state.selected();
+                        let index = self.state.selected();
 
                         if let Some(index) = index {
-                            return Output::Queue(QueueOutcome::MoveIndexUp(index));
+                            if index == 0 {
+                                return Output::Consumed;
+                            }
+                            let mut order: Vec<_> =
+                                self.items().iter().enumerate().map(|x| x.0).collect();
+
+                            order.swap(index, index - 1);
+                            controls.reorder_queue(order);
                         }
                         Output::Consumed
                     }
                     KeyCode::Char('D') => {
-                        let index = self.queue.state.selected();
+                        let index = self.state.selected();
 
                         if let Some(index) = index {
-                            return Output::Queue(QueueOutcome::RemoveIndex(index));
+                            controls.remove_index_from_queue(index);
                         }
                         Output::Consumed
                     }
                     KeyCode::Enter => {
-                        let index = self.queue.state.selected();
+                        let index = self.state.selected();
 
                         if let Some(index) = index {
-                            return Output::PlayOutcome(PlayOutcome::SkipToPosition(index));
+                            controls.skip_to_position(index, false);
                         }
                         Output::Consumed
                     }

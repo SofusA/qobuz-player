@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
 
-pub(crate) fn routes() -> Router<Arc<AppState>> {
+pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/play", put(play))
         .route("/api/pause", put(pause))

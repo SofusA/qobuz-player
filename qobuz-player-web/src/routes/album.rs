@@ -10,7 +10,7 @@ use serde_json::json;
 
 use crate::{AppState, ResponseResult, ok_or_send_error_toast};
 
-pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
+pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
         .route("/album/{id}", get(index))
         .route("/album/{id}/content", get(content))

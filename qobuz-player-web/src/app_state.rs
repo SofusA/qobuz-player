@@ -15,22 +15,22 @@ use tokio::sync::{broadcast::Sender, watch};
 
 use crate::{AlbumData, ServerSentEvent};
 
-pub(crate) struct AppState {
-    pub(crate) tx: Sender<ServerSentEvent>,
-    pub(crate) web_secret: Option<String>,
-    pub(crate) rfid_state: Option<RfidState>,
-    pub(crate) broadcast: Arc<NotificationBroadcast>,
-    pub(crate) client: Arc<Client>,
-    pub(crate) controls: Controls,
-    pub(crate) position_receiver: PositionReceiver,
-    pub(crate) tracklist_receiver: TracklistReceiver,
-    pub(crate) status_receiver: StatusReceiver,
-    pub(crate) volume_receiver: VolumeReceiver,
-    pub(crate) templates: watch::Receiver<Templates>,
+pub struct AppState {
+    pub tx: Sender<ServerSentEvent>,
+    pub web_secret: Option<String>,
+    pub rfid_state: Option<RfidState>,
+    pub broadcast: Arc<NotificationBroadcast>,
+    pub client: Arc<Client>,
+    pub controls: Controls,
+    pub position_receiver: PositionReceiver,
+    pub tracklist_receiver: TracklistReceiver,
+    pub status_receiver: StatusReceiver,
+    pub volume_receiver: VolumeReceiver,
+    pub templates: watch::Receiver<Templates>,
 }
 
 impl AppState {
-    pub(crate) fn render<T>(&self, view: &str, context: &T) -> Response
+    pub fn render<T>(&self, view: &str, context: &T) -> Response
     where
         T: serde::Serialize,
     {
@@ -75,7 +75,7 @@ impl AppState {
         Html(render).into_response()
     }
 
-    pub(crate) fn send_toast(&self, message: Notification) -> Response {
+    pub fn send_toast(&self, message: Notification) -> Response {
         let (message_string, severity) = match &message {
             Notification::Error(message) => (message, 1),
             Notification::Warning(message) => (message, 2),
@@ -89,7 +89,7 @@ impl AppState {
         )
     }
 
-    pub(crate) fn send_sse(&self, event: String, data: String) {
+    pub fn send_sse(&self, event: String, data: String) {
         let event = ServerSentEvent {
             event_name: event,
             event_data: data,
@@ -98,11 +98,11 @@ impl AppState {
         _ = self.tx.send(event);
     }
 
-    pub(crate) async fn get_favorites(&self) -> Result<Favorites> {
+    pub async fn get_favorites(&self) -> Result<Favorites> {
         self.client.favorites().await
     }
 
-    pub(crate) async fn get_album(&self, id: &str) -> Result<AlbumData> {
+    pub async fn get_album(&self, id: &str) -> Result<AlbumData> {
         let (album, suggested_albums) =
             try_join!(self.client.album(id), self.client.suggested_albums(id))?;
 
@@ -112,7 +112,7 @@ impl AppState {
         })
     }
 
-    pub(crate) async fn is_album_favorite(&self, id: &str) -> Result<bool> {
+    pub async fn is_album_favorite(&self, id: &str) -> Result<bool> {
         let favorites = self.get_favorites().await?;
         Ok(favorites.albums.iter().any(|album| album.id == id))
     }

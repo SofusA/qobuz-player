@@ -287,19 +287,19 @@ async fn sse_handler(
 }
 
 #[derive(Clone)]
-pub(crate) struct AlbumData {
+pub struct AlbumData {
     pub album: Album,
     pub suggested_albums: Vec<AlbumSimple>,
 }
 
 #[derive(Clone)]
-pub(crate) struct ServerSentEvent {
+pub struct ServerSentEvent {
     event_name: String,
     event_data: String,
 }
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct Discover {
+pub struct Discover {
     pub albums: Vec<(String, Vec<AlbumSimple>)>,
     pub playlists: Vec<(String, Vec<Playlist>)>,
 }

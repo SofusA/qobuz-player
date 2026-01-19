@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
-use qobuz_player_controls::{Result, client::Client};
-use qobuz_player_models::{Album, AlbumSimple, Artist, Playlist, Track};
+use qobuz_player_controls::{Result, client::Client, controls::Controls};
+use qobuz_player_models::{Album, Artist, Playlist, Track};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
@@ -11,26 +9,25 @@ use tokio::try_join;
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
-    app::{Output, PlayOutcome, QueueOutcome},
-    ui::{
-        basic_list_table, block, center, centered_rect_fixed, mark_explicit_and_hifi, render_input,
-        tab_bar, track_table,
+    app::{NotificationList, Output},
+    ui::{block, center, centered_rect_fixed, render_input, tab_bar},
+    widgets::{
+        album_simple_list::AlbumSimpleList,
+        playlist_list::PlaylistList,
+        track_list::{TrackList, TrackListEvent},
     },
 };
 
-pub(crate) struct ArtistPopupState {
-    pub artist_name: String,
-    pub id: u32,
-    pub albums: Vec<AlbumSimple>,
-    pub state: TableState,
-    pub show_top_track: bool,
-    pub top_tracks: Vec<Track>,
-    pub top_track_state: TableState,
-    pub client: Arc<Client>,
+pub struct ArtistPopupState {
+    artist_name: String,
+    albums: AlbumSimpleList,
+    show_top_track: bool,
+    top_tracks: TrackList,
+    id: u32,
 }
 
 impl ArtistPopupState {
-    pub async fn new(artist: &Artist, client: Arc<Client>) -> Result<Self> {
+    pub async fn new(artist: &Artist, client: &Client) -> Result<Self> {
         let id = artist.id;
         let (artist_page, artist_albums) =
             try_join!(client.artist_page(id), client.artist_albums(id))?;
@@ -40,75 +37,112 @@ impl ArtistPopupState {
 
         let mut state = Self {
             artist_name: artist.name.clone(),
-            id,
-            albums: artist_albums,
-            state: Default::default(),
+            albums: AlbumSimpleList::new(artist_albums),
             show_top_track: false,
-            top_tracks: artist_page.top_tracks,
-            top_track_state: Default::default(),
-            client,
+            top_tracks: TrackList::new(artist_page.top_tracks),
+            id: artist.id,
         };
 
         if !is_album_empty {
-            state.state.select(Some(0));
+            state.albums.select_first();
         }
         if !is_top_tracks_empty {
-            state.state.select(Some(0));
+            state.top_tracks.select_first();
         }
 
         Ok(state)
     }
 }
 
-pub(crate) struct AlbumPopupState {
-    pub album: Album,
-    pub state: TableState,
-    pub client: Arc<Client>,
+pub struct AlbumPopupState {
+    title: String,
+    tracks: TrackList,
+    id: String,
 }
 
 impl AlbumPopupState {
-    pub fn new(album: Album, client: Arc<Client>) -> Self {
+    pub fn new(album: Album) -> Self {
         let is_empty = album.tracks.is_empty();
         let mut state = Self {
-            album,
-            state: Default::default(),
-            client,
+            title: album.title,
+            tracks: TrackList::new(album.tracks),
+            id: album.id,
         };
 
         if !is_empty {
-            state.state.select(Some(0));
+            state.tracks.select_first();
         }
         state
     }
 }
 
-pub(crate) struct PlaylistPopupState {
-    pub playlist: Playlist,
-    pub shuffle: bool,
-    pub state: TableState,
-    pub client: Arc<Client>,
+pub struct PlaylistPopupState {
+    shuffle: bool,
+    tracks: TrackList,
+    title: String,
+    id: u32,
 }
 
-pub(crate) struct DeletePlaylistPopupstate {
-    pub title: String,
-    pub id: u32,
-    pub confirm: bool,
-    pub client: Arc<Client>,
+impl PlaylistPopupState {
+    pub fn new(playlist: Playlist) -> Self {
+        let is_empty = playlist.tracks.is_empty();
+        let mut state = Self {
+            tracks: TrackList::new(playlist.tracks),
+            title: playlist.title,
+            shuffle: false,
+            id: playlist.id,
+        };
+
+        if !is_empty {
+            state.tracks.select_first();
+        }
+        state
+    }
 }
 
-pub(crate) struct TrackPopupState {
-    pub playlists: Vec<Playlist>,
-    pub track: Track,
-    pub state: TableState,
-    pub client: Arc<Client>,
+pub struct DeletePlaylistPopupstate {
+    title: String,
+    id: u32,
+    confirm: bool,
 }
 
-pub(crate) struct NewPlaylistPopupState {
-    pub name: Input,
-    pub client: Arc<Client>,
+impl DeletePlaylistPopupstate {
+    pub fn new(playlist: Playlist) -> Self {
+        Self {
+            title: playlist.title,
+            id: playlist.id,
+            confirm: false,
+        }
+    }
 }
 
-pub(crate) enum Popup {
+pub struct TrackPopupState {
+    playlists: PlaylistList,
+    track: Track,
+}
+
+impl TrackPopupState {
+    pub fn new(track: Track, owned_playlists: Vec<Playlist>) -> Self {
+        Self {
+            playlists: PlaylistList::new(owned_playlists),
+            track,
+        }
+    }
+}
+
+pub struct NewPlaylistPopupState {
+    name: Input,
+}
+
+impl NewPlaylistPopupState {
+    pub fn new() -> Self {
+        Self {
+            name: Default::default(),
+        }
+    }
+}
+
+pub enum Popup {
     Artist(ArtistPopupState),
     Album(AlbumPopupState),
     Playlist(PlaylistPopupState),
@@ -118,38 +152,26 @@ pub(crate) enum Popup {
 }
 
 impl Popup {
-    pub(crate) fn render(&mut self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         match self {
             Popup::Album(state) => {
                 let area = center(
                     frame.area(),
                     Constraint::Percentage(50),
-                    Constraint::Length(state.album.tracks.len() as u16 + 2),
+                    Constraint::Length(state.tracks.filter().len() as u16 + 2),
                 );
 
-                let table = basic_list_table(
-                    state
-                        .album
-                        .tracks
-                        .iter()
-                        .map(|track| {
-                            Row::new(vec![mark_explicit_and_hifi(
-                                track.title.clone(),
-                                track.explicit,
-                                track.hires_available,
-                            )])
-                        })
-                        .collect(),
-                    Some(&state.album.title),
-                );
+                let block = block(Some(&state.title));
 
                 frame.render_widget(Clear, area);
-                frame.render_stateful_widget(table, area, &mut state.state);
+                frame.render_widget(&block, area);
+                state.tracks.render(block.inner(area), frame.buffer_mut());
             }
             Popup::Artist(artist) => {
                 let max_visible_rows: u16 = 15;
-                let album_rows = (artist.albums.len() as u16).min(max_visible_rows);
-                let top_track_rows = (artist.top_tracks.len() as u16).min(max_visible_rows);
+                let album_rows = (artist.albums.filter().len() as u16).min(max_visible_rows);
+                let top_track_rows =
+                    (artist.top_tracks.filter().len() as u16).min(max_visible_rows);
                 let visible_rows = if artist.show_top_track {
                     top_track_rows
                 } else {
@@ -174,17 +196,6 @@ impl Popup {
                     if artist.show_top_track { 1 } else { 0 },
                 );
 
-                let top_tracks = track_table(&artist.top_tracks, None);
-
-                let list = basic_list_table(
-                    artist
-                        .albums
-                        .iter()
-                        .map(|album| Row::new(Line::from(album.title.clone())))
-                        .collect(),
-                    None,
-                );
-
                 frame.render_widget(Clear, area);
                 frame.render_widget(&outer_block, area);
 
@@ -198,17 +209,13 @@ impl Popup {
                 frame.render_widget(tabs, chunks[0]);
 
                 if artist.show_top_track {
-                    frame.render_stateful_widget(
-                        top_tracks,
-                        chunks[1],
-                        &mut artist.top_track_state,
-                    );
+                    artist.top_tracks.render(chunks[1], frame.buffer_mut());
                 } else {
-                    frame.render_stateful_widget(list, chunks[1], &mut artist.state);
+                    artist.albums.render(chunks[1], frame.buffer_mut());
                 }
             }
             Popup::Playlist(playlist_state) => {
-                let visible_rows = playlist_state.playlist.tracks.len().min(15) as u16;
+                let visible_rows = playlist_state.tracks.filter().len().min(15) as u16;
 
                 let inner_content_height = visible_rows + 2;
                 let block_border_height = 2;
@@ -225,9 +232,7 @@ impl Popup {
                     if playlist_state.shuffle { 1 } else { 0 },
                 );
 
-                let tracks = track_table(&playlist_state.playlist.tracks, None);
-
-                let block = block(Some(&playlist_state.playlist.title));
+                let block = block(Some(&playlist_state.title));
 
                 frame.render_widget(Clear, area);
 
@@ -243,7 +248,7 @@ impl Popup {
                     ])
                     .split(inner);
 
-                frame.render_stateful_widget(tracks, chunks[0], &mut playlist_state.state);
+                playlist_state.tracks.render(chunks[0], frame.buffer_mut());
                 frame.render_widget(buttons, chunks[2]);
             }
             Popup::Track(track_state) => {
@@ -254,17 +259,13 @@ impl Popup {
                 );
 
                 let block_title = format!("Add {} to playlist", track_state.track.title);
-                let playlists = basic_list_table(
-                    track_state
-                        .playlists
-                        .iter()
-                        .map(|playlist| Row::new(Line::from(playlist.title.clone())))
-                        .collect::<Vec<_>>(),
-                    Some(&block_title),
-                );
+                let block = block(Some(&block_title));
 
                 frame.render_widget(Clear, area);
-                frame.render_stateful_widget(playlists, area, &mut track_state.state);
+                frame.render_widget(&block, area);
+                track_state
+                    .playlists
+                    .render(block.inner(area), frame.buffer_mut());
             }
             Popup::NewPlaylist(state) => {
                 let area = center(
@@ -296,297 +297,84 @@ impl Popup {
         };
     }
 
-    pub(crate) async fn handle_event(&mut self, event: Event) -> Output {
+    pub async fn handle_event(
+        &mut self,
+        event: Event,
+        client: &Client,
+        controls: &Controls,
+        notifications: &mut NotificationList,
+    ) -> Output {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self {
-                Popup::Album(album_state) => match key_event.code {
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        album_state.state.select_previous();
-                        Output::Consumed
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        album_state.state.select_next();
-                        Output::Consumed
-                    }
-                    KeyCode::Char('N') => {
-                        let index = album_state.state.selected();
-                        let selected = index.and_then(|index| album_state.album.tracks.get(index));
-
-                        let Some(selected) = selected else {
-                            return Output::Consumed;
-                        };
-
-                        Output::Queue(QueueOutcome::PlayTrackNext(selected.id))
-                    }
-                    KeyCode::Char('B') => {
-                        let index = album_state.state.selected();
-                        let selected = index.and_then(|index| album_state.album.tracks.get(index));
-
-                        let Some(selected) = selected else {
-                            return Output::Consumed;
-                        };
-
-                        Output::Queue(QueueOutcome::AddTrackToQueue(selected.id))
-                    }
-                    KeyCode::Char('A') => {
-                        let index = album_state.state.selected();
-
-                        let id = index
-                            .and_then(|index| album_state.album.tracks.get(index))
-                            .map(|track| track.id);
-
-                        if let Some(id) = id {
-                            _ = album_state.client.add_favorite_track(id).await;
-                            return Output::UpdateFavorites;
-                        }
-
-                        Output::Consumed
-                    }
-                    KeyCode::Enter => {
-                        let index = album_state.state.selected();
-
-                        if let Some(index) = index {
-                            return Output::PlayOutcome(PlayOutcome::Album(
-                                album_state.album.id.clone(),
-                                index,
-                            ));
-                        }
-
-                        Output::PopPopup
-                    }
-                    _ => Output::Consumed,
-                },
+                Popup::Album(album_state) => {
+                    album_state
+                        .tracks
+                        .handle_events(
+                            key_event.code,
+                            client,
+                            controls,
+                            notifications,
+                            TrackListEvent::Album(album_state.id.clone()),
+                        )
+                        .await
+                }
                 Popup::Artist(artist_popup_state) => match key_event.code {
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        match artist_popup_state.show_top_track {
-                            true => artist_popup_state.top_track_state.select_previous(),
-                            false => artist_popup_state.state.select_previous(),
-                        }
-                        Output::Consumed
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        match artist_popup_state.show_top_track {
-                            true => artist_popup_state.top_track_state.select_next(),
-                            false => artist_popup_state.state.select_next(),
-                        }
-                        Output::Consumed
-                    }
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::Right | KeyCode::Char('l') => {
                         artist_popup_state.show_top_track = !artist_popup_state.show_top_track;
                         Output::Consumed
                     }
-                    KeyCode::Char('A') => {
-                        let index = artist_popup_state.state.selected();
-
-                        let id = index
-                            .and_then(|index| artist_popup_state.albums.get(index))
-                            .map(|album| album.id.clone());
-
-                        if let Some(id) = id {
-                            _ = artist_popup_state.client.add_favorite_album(&id).await;
-                            return Output::UpdateFavorites;
+                    _ => match artist_popup_state.show_top_track {
+                        true => {
+                            return artist_popup_state
+                                .top_tracks
+                                .handle_events(
+                                    key_event.code,
+                                    client,
+                                    controls,
+                                    notifications,
+                                    TrackListEvent::Artist(artist_popup_state.id),
+                                )
+                                .await;
                         }
-
-                        Output::Consumed
-                    }
-                    KeyCode::Enter => {
-                        match artist_popup_state.show_top_track {
-                            true => {
-                                let index = artist_popup_state.top_track_state.selected();
-                                if let Some(index) = index {
-                                    return Output::PlayOutcome(PlayOutcome::TopTracks(
-                                        artist_popup_state.id,
-                                        index,
-                                    ));
-                                }
-                            }
-                            false => {
-                                let index = artist_popup_state.state.selected();
-                                let id = index
-                                    .and_then(|index| artist_popup_state.albums.get(index))
-                                    .map(|album| album.id.clone());
-
-                                if let Some(id) = id {
-                                    let album = artist_popup_state.client.album(&id).await;
-                                    match album {
-                                        Ok(album) => {
-                                            return Output::Popup(Popup::Album(
-                                                AlbumPopupState::new(
-                                                    album,
-                                                    artist_popup_state.client.clone(),
-                                                ),
-                                            ));
-                                        }
-                                        Err(err) => return Output::Error(err.to_string()),
-                                    }
-                                }
-                            }
+                        false => {
+                            return artist_popup_state
+                                .albums
+                                .handle_events(key_event.code, client, notifications)
+                                .await;
                         }
-
-                        Output::PopPopup
-                    }
-                    _ => Output::Consumed,
+                    },
                 },
                 Popup::Playlist(playlist_popup_state) => match key_event.code {
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        playlist_popup_state.state.select_previous();
-                        Output::Consumed
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        playlist_popup_state.state.select_next();
-                        Output::Consumed
-                    }
-                    KeyCode::Left | KeyCode::Char('h') => {
+                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Right | KeyCode::Char('l') => {
                         playlist_popup_state.shuffle = !playlist_popup_state.shuffle;
                         Output::Consumed
                     }
-                    KeyCode::Right | KeyCode::Char('l') => {
-                        playlist_popup_state.shuffle = !playlist_popup_state.shuffle;
-                        Output::Consumed
+                    _ => {
+                        playlist_popup_state
+                            .tracks
+                            .handle_events(
+                                key_event.code,
+                                client,
+                                controls,
+                                notifications,
+                                TrackListEvent::Playlist(
+                                    playlist_popup_state.id,
+                                    playlist_popup_state.shuffle,
+                                ),
+                            )
+                            .await
                     }
-                    KeyCode::Char('u') => {
-                        if let Some(index) = playlist_popup_state.state.selected() {
-                            let playlist_track_id = playlist_popup_state
-                                .playlist
-                                .tracks
-                                .get(index)
-                                .and_then(|x| x.playlist_track_id)
-                                .expect("infallible");
-
-                            _ = playlist_popup_state
-                                .client
-                                .update_playlist_track_position(
-                                    index,
-                                    playlist_popup_state.playlist.id,
-                                    playlist_track_id,
-                                )
-                                .await;
-
-                            if let Ok(updated_playlist) = playlist_popup_state
-                                .client
-                                .playlist(playlist_popup_state.playlist.id)
-                                .await
-                            {
-                                playlist_popup_state.playlist = updated_playlist;
-                                playlist_popup_state.state.select_previous();
-                            };
-                        }
-                        Output::Consumed
-                    }
-                    KeyCode::Char('d') => {
-                        if let Some(index) = playlist_popup_state.state.selected() {
-                            let playlist_track_id = playlist_popup_state
-                                .playlist
-                                .tracks
-                                .get(index)
-                                .and_then(|x| x.playlist_track_id)
-                                .expect("infallible");
-
-                            _ = playlist_popup_state
-                                .client
-                                .update_playlist_track_position(
-                                    index + 3,
-                                    playlist_popup_state.playlist.id,
-                                    playlist_track_id,
-                                )
-                                .await;
-
-                            if let Ok(updated_playlist) = playlist_popup_state
-                                .client
-                                .playlist(playlist_popup_state.playlist.id)
-                                .await
-                            {
-                                playlist_popup_state.playlist = updated_playlist;
-                                playlist_popup_state.state.select_next();
-                            };
-                        }
-                        Output::Consumed
-                    }
-                    KeyCode::Char('D') => {
-                        if let Some(playlist_track_id) = playlist_popup_state
-                            .state
-                            .selected()
-                            .and_then(|index| playlist_popup_state.playlist.tracks.get(index))
-                            .and_then(|t| t.playlist_track_id)
-                        {
-                            _ = playlist_popup_state
-                                .client
-                                .playlist_delete_track(
-                                    playlist_popup_state.playlist.id,
-                                    &[playlist_track_id],
-                                )
-                                .await;
-
-                            if let Ok(updated_playlist) = playlist_popup_state
-                                .client
-                                .playlist(playlist_popup_state.playlist.id)
-                                .await
-                            {
-                                playlist_popup_state.playlist = updated_playlist;
-                            };
-                        }
-                        Output::Consumed
-                    }
-                    KeyCode::Char('a') => {
-                        if let Some(index) = playlist_popup_state.state.selected() {
-                            let track = playlist_popup_state
-                                .playlist
-                                .tracks
-                                .get(index)
-                                .expect("infallible");
-
-                            return Output::PlayOutcome(PlayOutcome::AddTrackToPlaylist(
-                                track.clone(),
-                            ));
-                        };
-                        Output::Consumed
-                    }
-                    KeyCode::Enter => {
-                        let id = playlist_popup_state.playlist.id;
-                        let index = playlist_popup_state.state.selected().unwrap_or(0);
-                        Output::PlayOutcome(PlayOutcome::Playlist((
-                            id,
-                            playlist_popup_state.shuffle,
-                            index,
-                        )))
-                    }
-                    _ => Output::Consumed,
                 },
-                Popup::Track(track_popup_state) => match key_event.code {
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        track_popup_state.state.select_previous();
-                        Output::Consumed
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        track_popup_state.state.select_next();
-                        Output::Consumed
-                    }
-                    KeyCode::Enter => {
-                        let index = track_popup_state.state.selected();
-                        let id = index
-                            .and_then(|index| track_popup_state.playlists.get(index))
-                            .map(|p| p.id);
-
-                        if let Some(id) = id {
-                            match track_popup_state
-                                .client
-                                .playlist_add_track(id, &[track_popup_state.track.id])
-                                .await
-                            {
-                                Ok(_) => return Output::PopPopup,
-                                Err(err) => return Output::Error(err.to_string()),
-                            };
-                        }
-
-                        Output::PopPopup
-                    }
-                    _ => Output::Consumed,
-                },
+                Popup::Track(track_popup_state) => {
+                    track_popup_state
+                        .playlists
+                        .handle_events(key_event.code, client, notifications)
+                        .await
+                }
                 Popup::NewPlaylist(state) => match key_event.code {
                     KeyCode::Enter => {
                         let input = state.name.value();
-                        match state
-                            .client
+                        match client
                             .create_playlist(input.to_string(), false, Default::default(), None)
                             .await
                         {
@@ -602,7 +390,7 @@ impl Popup {
                 Popup::DeletePlaylist(state) => match key_event.code {
                     KeyCode::Enter => {
                         if state.confirm {
-                            match state.client.delete_playlist(state.id).await {
+                            match client.delete_playlist(state.id).await {
                                 Ok(_) => return Output::PopPoputUpdateFavorites,
                                 Err(err) => {
                                     return Output::Error(err.to_string());

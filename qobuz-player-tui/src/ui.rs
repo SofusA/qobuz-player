@@ -1,5 +1,4 @@
 use qobuz_player_controls::notification::Notification;
-use qobuz_player_models::{Album, AlbumSimple, Track};
 use ratatui::{layout::Flex, prelude::*, widgets::*};
 use tui_input::Input;
 
@@ -9,7 +8,7 @@ use crate::{
 };
 
 impl App {
-    pub(crate) fn render(&mut self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         let area = frame.area();
 
         self.render_inner(frame);
@@ -94,7 +93,7 @@ impl App {
     }
 
     fn render_notifications(&self, frame: &mut Frame, area: Rect) {
-        let notifications: Vec<_> = self.notifications.iter().map(|x| &x.0).collect();
+        let notifications: Vec<_> = self.notifications.notifications();
 
         if notifications.is_empty() {
             return;
@@ -149,7 +148,7 @@ impl App {
     }
 }
 
-pub(crate) fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
+pub fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
     let [area] = Layout::horizontal([horizontal])
         .flex(Flex::Center)
         .areas(area);
@@ -157,7 +156,7 @@ pub(crate) fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -
     area
 }
 
-pub(crate) fn centered_rect_fixed(width: u16, height: u16, area: Rect) -> Rect {
+pub fn centered_rect_fixed(width: u16, height: u16, area: Rect) -> Rect {
     let w = width.min(area.width);
     let h = height.min(area.height);
 
@@ -230,13 +229,7 @@ fn render_help(frame: &mut Frame) {
     frame.render_widget(table, area);
 }
 
-pub(crate) fn render_input(
-    input: &Input,
-    editing: bool,
-    area: Rect,
-    frame: &mut Frame,
-    title: &str,
-) {
+pub fn render_input(input: &Input, editing: bool, area: Rect, frame: &mut Frame, title: &str) {
     let width = area.width.max(3) - 3;
     let scroll = input.visual_scroll(width as usize);
     let style = match editing {
@@ -257,9 +250,9 @@ pub(crate) fn render_input(
     }
 }
 
-const ROW_HIGHLIGHT_STYLE: Style = Style::new().bg(Color::Blue);
+pub const ROW_HIGHLIGHT_STYLE: Style = Style::new().bg(Color::Blue);
 
-pub(crate) fn block(title: Option<&str>) -> Block<'_> {
+pub fn block(title: Option<&str>) -> Block<'_> {
     let mut block = Block::bordered()
         .title_alignment(Alignment::Center)
         .border_type(BorderType::Rounded);
@@ -271,98 +264,8 @@ pub(crate) fn block(title: Option<&str>) -> Block<'_> {
     block
 }
 
-pub(crate) fn album_table<'a>(rows: &[Album]) -> Table<'a> {
-    let rows: Vec<_> = rows
-        .iter()
-        .map(|album| {
-            Row::new(vec![
-                mark_explicit_and_hifi(album.title.clone(), album.explicit, album.hires_available),
-                Line::from(album.artist.name.clone()),
-                Line::from(album.release_year.to_string()),
-            ])
-        })
-        .collect();
-
-    let is_empty = rows.is_empty();
-
-    let mut table = Table::new(
-        rows,
-        [
-            Constraint::Ratio(2, 3),
-            Constraint::Ratio(1, 3),
-            Constraint::Length(4),
-        ],
-    )
-    .row_highlight_style(ROW_HIGHLIGHT_STYLE);
-
-    if !is_empty {
-        table = table.header(Row::new(["Title", "Artist", "Year"]).add_modifier(Modifier::BOLD));
-    }
-    table
-}
-
-pub(crate) fn album_simple_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
-    let rows: Vec<_> = rows
-        .iter()
-        .map(|album| {
-            Row::new(vec![
-                mark_explicit_and_hifi(album.title.clone(), album.explicit, album.hires_available),
-                Line::from(album.artist.name.clone()),
-            ])
-        })
-        .collect();
-
-    let is_empty = rows.is_empty();
-    let mut table = Table::new(rows, [Constraint::Ratio(2, 3), Constraint::Ratio(1, 3)])
-        .row_highlight_style(ROW_HIGHLIGHT_STYLE);
-
-    if !is_empty {
-        table = table.header(Row::new(["Title", "Artist"]).add_modifier(Modifier::BOLD));
-    }
-    table
-}
-
-pub(crate) fn basic_list_table<'a>(rows: Vec<Row<'a>>, title: Option<&'a str>) -> Table<'a> {
-    let mut table = Table::new(rows, [Constraint::Min(1)]).row_highlight_style(ROW_HIGHLIGHT_STYLE);
-
-    if let Some(title) = title {
-        table = table.block(block(Some(title)));
-    }
-
-    table
-}
-
-pub(crate) fn track_table<'a>(rows: &[Track], block_title: Option<&'a str>) -> Table<'a> {
-    let rows: Vec<_> = rows
-        .iter()
-        .map(|track| {
-            Row::new(vec![
-                mark_explicit_and_hifi(track.title.clone(), track.explicit, track.hires_available),
-                Line::from(track.artist_name.clone().unwrap_or_default()),
-                Line::from(track.album_title.clone().unwrap_or_default()),
-            ])
-        })
-        .collect();
-
-    let is_empty = rows.is_empty();
-    let mut table = Table::new(
-        rows,
-        [
-            Constraint::Ratio(1, 3),
-            Constraint::Ratio(1, 3),
-            Constraint::Ratio(1, 3),
-        ],
-    )
-    .row_highlight_style(ROW_HIGHLIGHT_STYLE);
-
-    if let Some(title) = block_title {
-        table = table.block(block(Some(title)));
-    }
-
-    if !is_empty {
-        table = table.header(Row::new(["Title", "Artist", "Album"]).add_modifier(Modifier::BOLD));
-    }
-    table
+pub fn basic_list_table<'a>(rows: Vec<Row<'a>>) -> Table<'a> {
+    Table::new(rows, [Constraint::Min(1)]).row_highlight_style(ROW_HIGHLIGHT_STYLE)
 }
 
 pub fn tab_bar<'a>(tabs: Vec<&'a str>, selected: usize) -> Tabs<'a> {

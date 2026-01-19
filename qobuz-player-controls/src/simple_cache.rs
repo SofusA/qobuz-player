@@ -2,7 +2,7 @@ use time::Duration;
 use tokio::{sync::RwLock, time::Instant};
 
 #[derive(Debug)]
-pub(crate) struct SimpleCache<T> {
+pub struct SimpleCache<T> {
     value: RwLock<Option<T>>,
     ttl: Duration,
     created: RwLock<Option<Instant>>,

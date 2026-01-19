@@ -25,67 +25,71 @@ use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::{io, sync::Arc, time::Instant};
 use tokio::time::{self, Duration};
 
-pub(crate) struct App {
-    pub(crate) client: Arc<Client>,
-    pub(crate) controls: Controls,
-    pub(crate) position: PositionReceiver,
-    pub(crate) tracklist: TracklistReceiver,
-    pub(crate) status: StatusReceiver,
-    pub(crate) current_screen: Tab,
-    pub(crate) exit: bool,
-    pub(crate) should_draw: bool,
-    pub(crate) app_state: AppState,
-    pub(crate) now_playing: NowPlayingState,
-    pub(crate) favorites: FavoritesState,
-    pub(crate) search: SearchState,
-    pub(crate) queue: QueueState,
-    pub(crate) discover: DiscoverState,
-    pub(crate) broadcast: Arc<NotificationBroadcast>,
-    pub(crate) notifications: Vec<(Notification, Instant)>,
-    pub(crate) full_screen: bool,
-    pub(crate) disable_tui_album_cover: bool,
+#[derive(Default)]
+pub struct NotificationList {
+    notifications: Vec<(Notification, Instant)>,
 }
 
-#[allow(clippy::large_enum_variant)] // TODO remove
+impl NotificationList {
+    pub fn push(&mut self, notification: Notification) {
+        self.notifications.push((notification, Instant::now()));
+    }
+
+    pub fn tick(&mut self) -> bool {
+        let notifications_before_clean = self.notifications.len();
+        self.notifications
+            .retain(|notification| notification.1.elapsed() < Duration::from_secs(5));
+        let notifications_after_clean = self.notifications.len();
+
+        notifications_before_clean != notifications_after_clean
+    }
+
+    pub fn notifications(&self) -> Vec<&Notification> {
+        self.notifications.iter().map(|x| &x.0).collect()
+    }
+}
+
+pub struct App {
+    pub client: Arc<Client>,
+    pub controls: Controls,
+    pub position: PositionReceiver,
+    pub tracklist: TracklistReceiver,
+    pub status: StatusReceiver,
+    pub current_screen: Tab,
+    pub exit: bool,
+    pub should_draw: bool,
+    pub app_state: AppState,
+    pub now_playing: NowPlayingState,
+    pub favorites: FavoritesState,
+    pub search: SearchState,
+    pub queue: QueueState,
+    pub discover: DiscoverState,
+    pub broadcast: Arc<NotificationBroadcast>,
+    pub notifications: NotificationList,
+    pub full_screen: bool,
+    pub disable_tui_album_cover: bool,
+}
+
 #[derive(Default)]
-pub(crate) enum AppState {
+pub enum AppState {
     #[default]
     Normal,
     Popup(Vec<Popup>),
     Help,
 }
 
-pub(crate) enum Output {
+pub enum Output {
     Consumed,
     NotConsumed,
     UpdateFavorites,
     Popup(Popup),
-    PopPopup,
     PopPoputUpdateFavorites,
-    PlayOutcome(PlayOutcome),
     Error(String),
-    Queue(QueueOutcome),
-}
-
-pub(crate) enum QueueOutcome {
-    MoveIndexUp(usize),
-    MoveIndexDown(usize),
-    RemoveIndex(usize),
-    PlayTrackNext(u32),
-    AddTrackToQueue(u32),
-}
-
-pub(crate) enum PlayOutcome {
-    Album(String, usize),
-    Playlist((u32, bool, usize)),
-    Track(u32),
-    SkipToPosition(usize),
     AddTrackToPlaylist(Track),
-    TopTracks(u32, usize),
 }
 
 #[derive(Default, PartialEq)]
-pub(crate) enum Tab {
+pub enum Tab {
     #[default]
     Favorites,
     Search,
@@ -105,22 +109,48 @@ impl fmt::Display for Tab {
 }
 
 impl Tab {
-    pub(crate) const VALUES: [Self; 4] = [Tab::Favorites, Tab::Search, Tab::Queue, Tab::Discover];
+    pub const VALUES: [Self; 4] = [Tab::Favorites, Tab::Search, Tab::Queue, Tab::Discover];
 }
 
-pub(crate) struct FilteredListState<T> {
-    pub(crate) filter: Vec<T>,
-    pub(crate) all_items: Vec<T>,
-    pub(crate) state: TableState,
+#[derive(Default)]
+pub struct FilteredListState<T> {
+    filter: Vec<T>,
+    all_items: Vec<T>,
+    pub state: TableState,
 }
 
-pub(crate) struct UnfilteredListState<T> {
-    pub(crate) items: Vec<T>,
-    pub(crate) state: TableState,
+impl<T> FilteredListState<T>
+where
+    T: Clone,
+{
+    pub fn new(list: Vec<T>) -> Self {
+        Self {
+            filter: list.clone(),
+            all_items: list,
+            state: Default::default(),
+        }
+    }
+
+    pub fn filter(&self) -> &Vec<T> {
+        &self.filter
+    }
+
+    pub fn all_items(&self) -> &Vec<T> {
+        &self.all_items
+    }
+
+    pub fn set_all_items(&mut self, items: Vec<T>) {
+        self.all_items = items.clone();
+        self.filter = items;
+    }
+
+    pub fn set_filter(&mut self, items: Vec<T>) {
+        self.filter = items;
+    }
 }
 
 impl App {
-    pub(crate) async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         let mut tick_interval = time::interval(Duration::from_millis(10));
         let mut receiver = self.broadcast.subscribe();
 
@@ -133,7 +163,7 @@ impl App {
 
                 Ok(_) = self.tracklist.changed() => {
                     let tracklist = self.tracklist.borrow_and_update().clone();
-                    self.queue.queue.items = tracklist.queue().to_vec();
+                    self.queue.set_items(tracklist.queue().to_vec());
                     let status = self.now_playing.status;
                     self.now_playing = get_current_state(tracklist, status).await;
                     self.should_draw = true;
@@ -152,21 +182,16 @@ impl App {
                 }
 
                 notification = receiver.recv() => {
-                    if let Ok(message) = notification {
-                        self.notifications.push((message, Instant::now()));
+                    if let Ok(notification) = notification {
+                        self.notifications.push(notification);
                         self.should_draw = true;
                     }
                 }
             }
 
-            let notifications_before_clean = self.notifications.len();
-            self.notifications
-                .retain(|notification| notification.1.elapsed() < Duration::from_secs(5));
-            let notifications_after_clean = self.notifications.len();
-
-            if notifications_before_clean != notifications_after_clean {
+            if self.notifications.tick() {
                 self.should_draw = true;
-            }
+            };
 
             if self.should_draw {
                 terminal.draw(|frame| self.render(frame))?;
@@ -183,18 +208,14 @@ impl App {
             return;
         };
 
-        self.favorites.albums.all_items = favorites.albums;
-        self.favorites.albums.filter = self.favorites.albums.all_items.clone();
-        self.favorites.artists.all_items = favorites.artists;
-        self.favorites.artists.filter = self.favorites.artists.all_items.clone();
-        self.favorites.playlists.all_items = favorites.playlists;
-        self.favorites.playlists.filter = self.favorites.playlists.all_items.clone();
-        self.favorites.tracks.all_items = favorites.tracks;
-        self.favorites.tracks.filter = self.favorites.tracks.all_items.clone();
+        self.favorites.albums.set_all_items(favorites.albums);
+        self.favorites.artists.set_all_items(favorites.artists);
+        self.favorites.playlists.set_all_items(favorites.playlists);
+        self.favorites.tracks.set_all_items(favorites.tracks);
         self.favorites.filter.reset();
     }
 
-    async fn handle_output(&mut self, output: Output) {
+    async fn handle_output(&mut self, key_code: KeyCode, output: Output) {
         match output {
             Output::Consumed => {
                 self.should_draw = true;
@@ -203,7 +224,58 @@ impl App {
                 self.update_favorites().await;
                 self.should_draw = true;
             }
-            Output::NotConsumed => {}
+
+            Output::NotConsumed => match key_code {
+                KeyCode::Char('?') => {
+                    self.app_state = AppState::Help;
+                    self.should_draw = true;
+                }
+                KeyCode::Char('q') => {
+                    self.should_draw = true;
+                    self.exit()
+                }
+                KeyCode::Char('1') => {
+                    self.navigate_to_favorites();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('2') => {
+                    self.navigate_to_search();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('3') => {
+                    self.navigate_to_queue();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('4') => {
+                    self.navigate_to_discover();
+                    self.should_draw = true;
+                }
+                KeyCode::Char(' ') => {
+                    self.controls.play_pause();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('n') => {
+                    self.controls.next();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('p') => {
+                    self.controls.previous();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('f') => {
+                    self.controls.jump_forward();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('b') => {
+                    self.controls.jump_backward();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('F') => {
+                    self.full_screen = !self.full_screen;
+                    self.should_draw = true;
+                }
+                _ => {}
+            },
             Output::Popup(popup) => {
                 let mut popups = match std::mem::take(&mut self.app_state) {
                     AppState::Popup(popups) => popups,
@@ -215,64 +287,8 @@ impl App {
                 self.app_state = AppState::Popup(popups);
                 self.should_draw = true;
             }
-            Output::PlayOutcome(outcome) => {
-                self.handle_playoutcome(outcome).await;
-            }
             Output::Error(err) => {
-                self.broadcast.send_error(err);
-            }
-            Output::Queue(queue_outcome) => match queue_outcome {
-                QueueOutcome::MoveIndexUp(index) => {
-                    if index == 0 {
-                        return;
-                    }
-                    let mut order: Vec<_> = self
-                        .queue
-                        .queue
-                        .items
-                        .iter()
-                        .enumerate()
-                        .map(|x| x.0)
-                        .collect();
-
-                    order.swap(index, index - 1);
-                    self.controls.reorder_queue(order);
-                }
-                QueueOutcome::MoveIndexDown(index) => {
-                    if index == self.queue.queue.items.len() - 1 {
-                        return;
-                    }
-
-                    let mut order: Vec<_> = self
-                        .queue
-                        .queue
-                        .items
-                        .iter()
-                        .enumerate()
-                        .map(|x| x.0)
-                        .collect();
-
-                    order.swap(index, index + 1);
-                    self.controls.reorder_queue(order);
-                }
-                QueueOutcome::RemoveIndex(index) => {
-                    self.controls.remove_index_from_queue(index);
-                }
-                QueueOutcome::PlayTrackNext(id) => {
-                    self.controls.play_track_next(id);
-                }
-                QueueOutcome::AddTrackToQueue(id) => {
-                    self.controls.add_track_to_queue(id);
-                }
-            },
-            Output::PopPopup => {
-                if let AppState::Popup(popups) = &mut self.app_state {
-                    popups.pop();
-                    if popups.is_empty() {
-                        self.app_state = AppState::Normal;
-                    }
-                    self.should_draw = true;
-                }
+                self.notifications.push(Notification::Error(err));
             }
             Output::PopPoputUpdateFavorites => {
                 if let AppState::Popup(popups) = &mut self.app_state {
@@ -281,6 +297,29 @@ impl App {
                         self.app_state = AppState::Normal;
                     }
                     self.update_favorites().await;
+                    self.should_draw = true;
+                }
+            }
+            Output::AddTrackToPlaylist(track) => {
+                let playlists_res = self.client.favorites().await.map(|favs| {
+                    favs.playlists
+                        .into_iter()
+                        .filter(|p| p.is_owned)
+                        .collect::<Vec<_>>()
+                });
+
+                if let Ok(playlists) = playlists_res {
+                    let mut popups = match std::mem::take(&mut self.app_state) {
+                        AppState::Popup(v) => v,
+                        other => {
+                            self.app_state = other;
+                            Vec::new()
+                        }
+                    };
+
+                    popups.push(Popup::Track(TrackPopupState::new(track, playlists)));
+
+                    self.app_state = AppState::Popup(popups);
                     self.should_draw = true;
                 }
             }
@@ -311,7 +350,14 @@ impl App {
                         let outcome_opt = {
                             if let AppState::Popup(popups) = &mut self.app_state {
                                 if let Some(popup) = popups.last_mut() {
-                                    popup.handle_event(event).await
+                                    popup
+                                        .handle_event(
+                                            event,
+                                            &self.client,
+                                            &self.controls,
+                                            &mut self.notifications,
+                                        )
+                                        .await
                                 } else {
                                     Output::NotConsumed
                                 }
@@ -320,7 +366,7 @@ impl App {
                             }
                         };
 
-                        self.handle_output(outcome_opt).await;
+                        self.handle_output(key_event.code, outcome_opt).await;
 
                         self.should_draw = true;
                         return Ok(());
@@ -329,120 +375,41 @@ impl App {
                 };
 
                 let screen_output = match self.current_screen {
-                    Tab::Favorites => self.favorites.handle_events(event).await,
-                    Tab::Search => self.search.handle_events(event).await,
-                    Tab::Queue => self.queue.handle_events(event).await,
-                    Tab::Discover => self.discover.handle_events(event).await,
+                    Tab::Favorites => {
+                        self.favorites
+                            .handle_events(
+                                event,
+                                &self.client,
+                                &self.controls,
+                                &mut self.notifications,
+                            )
+                            .await
+                    }
+                    Tab::Search => {
+                        self.search
+                            .handle_events(
+                                event,
+                                &self.client,
+                                &self.controls,
+                                &mut self.notifications,
+                            )
+                            .await
+                    }
+                    Tab::Queue => self.queue.handle_events(event, &self.controls).await,
+                    Tab::Discover => {
+                        self.discover
+                            .handle_events(event, &self.client, &mut self.notifications)
+                            .await
+                    }
                 };
 
-                self.handle_output(screen_output).await;
-
-                match key_event.code {
-                    KeyCode::Char('?') => {
-                        self.app_state = AppState::Help;
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('q') => {
-                        self.should_draw = true;
-                        self.exit()
-                    }
-                    KeyCode::Char('1') => {
-                        self.navigate_to_favorites();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('2') => {
-                        self.navigate_to_search();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('3') => {
-                        self.navigate_to_queue();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('4') => {
-                        self.navigate_to_discover();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char(' ') => {
-                        self.controls.play_pause();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('n') => {
-                        self.controls.next();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('p') => {
-                        self.controls.previous();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('f') => {
-                        self.controls.jump_forward();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('b') => {
-                        self.controls.jump_backward();
-                        self.should_draw = true;
-                    }
-                    KeyCode::Char('F') => {
-                        self.full_screen = !self.full_screen;
-                        self.should_draw = true;
-                    }
-                    _ => {}
-                };
+                self.handle_output(key_event.code, screen_output).await;
             }
 
             Event::Resize(_, _) => self.should_draw = true,
             _ => {}
         };
         Ok(())
-    }
-
-    async fn handle_playoutcome(&mut self, outcome: PlayOutcome) -> bool {
-        match outcome {
-            PlayOutcome::Album(id, index) => {
-                self.controls.play_album(&id, index);
-            }
-            PlayOutcome::Playlist(outcome) => {
-                self.controls.play_playlist(outcome.0, outcome.2, outcome.1);
-            }
-            PlayOutcome::Track(id) => {
-                self.controls.play_track(id);
-            }
-            PlayOutcome::SkipToPosition(index) => {
-                self.controls.skip_to_position(index, true);
-            }
-            PlayOutcome::AddTrackToPlaylist(track) => {
-                let playlists_res = self.client.favorites().await.map(|favs| {
-                    favs.playlists
-                        .into_iter()
-                        .filter(|p| p.is_owned)
-                        .collect::<Vec<_>>()
-                });
-
-                if let Ok(playlists) = playlists_res {
-                    let mut popups = match std::mem::take(&mut self.app_state) {
-                        AppState::Popup(v) => v,
-                        other => {
-                            self.app_state = other;
-                            Vec::new()
-                        }
-                    };
-
-                    popups.push(Popup::Track(TrackPopupState {
-                        playlists,
-                        track,
-                        state: Default::default(),
-                        client: self.client.clone(),
-                    }));
-
-                    self.app_state = AppState::Popup(popups);
-                    return false;
-                }
-            }
-            PlayOutcome::TopTracks(artist_id, index) => {
-                self.controls.play_top_tracks(artist_id, index)
-            }
-        }
-        true
     }
 
     fn navigate_to_favorites(&mut self) {
@@ -479,7 +446,7 @@ async fn fetch_image(image_url: &str) -> Option<(StatefulProtocol, f32)> {
     Some((picker.new_resize_protocol(image), ratio))
 }
 
-pub(crate) async fn get_current_state(tracklist: Tracklist, status: Status) -> NowPlayingState {
+pub async fn get_current_state(tracklist: Tracklist, status: Status) -> NowPlayingState {
     let entity = tracklist.entity_playing();
     let track = tracklist.current_track().cloned();
     let image = if let Some(image_url) = entity.cover_link {

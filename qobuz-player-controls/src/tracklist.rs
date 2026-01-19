@@ -42,8 +42,8 @@ pub enum TracklistType {
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Tracklist {
-    pub(crate) queue: Vec<Track>,
-    pub(crate) list_type: TracklistType,
+    pub queue: Vec<Track>,
+    pub list_type: TracklistType,
 }
 
 pub struct Entity {
@@ -150,7 +150,7 @@ impl Tracklist {
         }
     }
 
-    pub(crate) fn skip_to_track(&mut self, new_position: i32) -> Option<&Track> {
+    pub fn skip_to_track(&mut self, new_position: i32) -> Option<&Track> {
         if new_position < 0 {
             return None;
         }

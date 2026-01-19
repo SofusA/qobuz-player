@@ -14,7 +14,7 @@ use crate::{
     controls::{ControlCommand, Controls},
     database::Database,
     downloader::Downloader,
-    notification::NotificationBroadcast,
+    notification::{Notification, NotificationBroadcast},
     sink::QueryTrackResult,
     tracklist::{SingleTracklist, TracklistType},
 };
@@ -406,24 +406,35 @@ impl Player {
         let mut tracklist = self.tracklist_rx.borrow().clone();
 
         tracklist.queue.remove(index);
-        self.update_queue(tracklist).await
+        self.update_queue(tracklist).await?;
+        let notification = Notification::Info("Queue updated".into());
+        self.broadcast.send(notification);
+        Ok(())
     }
 
     async fn add_track_to_queue(&mut self, id: u32) -> Result<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         let track = self.client.track(id).await?;
 
+        let notification = Notification::Info(format!("{} added to queue", track.title.clone()));
+
         tracklist.queue.push(track);
-        self.update_queue(tracklist).await
+        self.update_queue(tracklist).await?;
+        self.broadcast.send(notification);
+        Ok(())
     }
 
     async fn play_track_next(&mut self, id: u32) -> Result<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         let track = self.client.track(id).await?;
 
+        let notification = Notification::Info(format!("{} playing next", track.title.clone()));
+
         let current_index = tracklist.current_position();
         tracklist.queue.insert(current_index + 1, track);
-        self.update_queue(tracklist).await
+        self.update_queue(tracklist).await?;
+        self.broadcast.send(notification);
+        Ok(())
     }
 
     async fn reorder_queue(&mut self, new_order: Vec<usize>) -> Result<()> {
@@ -440,7 +451,10 @@ impl Player {
 
         tracklist.queue = reordered;
 
-        self.update_queue(tracklist).await
+        self.update_queue(tracklist).await?;
+        let notification = Notification::Info("Queue updated".into());
+        self.broadcast.send(notification);
+        Ok(())
     }
 
     async fn tick(&mut self) -> Result<()> {

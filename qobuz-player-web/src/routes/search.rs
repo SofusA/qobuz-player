@@ -11,7 +11,7 @@ use serde_json::json;
 
 #[derive(Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum Tab {
+pub enum Tab {
     Albums,
     Artists,
     Playlists,
@@ -20,7 +20,7 @@ pub(crate) enum Tab {
 
 use crate::{AppState, ResponseResult, ok_or_error_page, ok_or_send_error_toast};
 
-pub(crate) fn routes() -> Router<std::sync::Arc<crate::AppState>> {
+pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new().route("/search/{tab}", get(index).post(search))
 }
 
