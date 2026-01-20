@@ -1,4 +1,4 @@
-use qobuz_player_controls::{client::Client, notification::Notification};
+use qobuz_player_controls::{Result, client::Client, notification::Notification};
 use qobuz_player_models::Artist;
 use ratatui::{
     buffer::Buffer,
@@ -54,16 +54,16 @@ impl ArtistList {
         event: KeyCode,
         client: &Client,
         notifications: &mut NotificationList,
-    ) -> Output {
+    ) -> Result<Output> {
         match event {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.items.state.select_next();
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Up | KeyCode::Char('k') => {
                 self.items.state.select_previous();
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('A') => {
@@ -71,18 +71,15 @@ impl ArtistList {
                 let selected = index.and_then(|index| self.items.filter().get(index));
 
                 if let Some(selected) = selected {
-                    return match client.add_favorite_artist(selected.id).await {
-                        Ok(_) => {
-                            notifications.push(Notification::Info(format!(
-                                "{} added to favorites",
-                                selected.name
-                            )));
-                            Output::UpdateFavorites
-                        }
-                        Err(err) => Output::Error(err.to_string()),
-                    };
+                    client.add_favorite_artist(selected.id).await?;
+
+                    notifications.push(Notification::Info(format!(
+                        "{} added to favorites",
+                        selected.name
+                    )));
+                    return Ok(Output::UpdateFavorites);
                 }
-                Output::UpdateFavorites
+                Ok(Output::UpdateFavorites)
             }
 
             KeyCode::Char('D') => {
@@ -90,18 +87,15 @@ impl ArtistList {
                 let selected = index.and_then(|index| self.items.filter().get(index));
 
                 if let Some(selected) = selected {
-                    return match client.remove_favorite_artist(selected.id).await {
-                        Ok(_) => {
-                            notifications.push(Notification::Info(format!(
-                                "{} removed from favorites",
-                                selected.name
-                            )));
-                            Output::UpdateFavorites
-                        }
-                        Err(err) => Output::Error(err.to_string()),
-                    };
+                    client.remove_favorite_artist(selected.id).await?;
+
+                    notifications.push(Notification::Info(format!(
+                        "{} removed from favorites",
+                        selected.name
+                    )));
+                    return Ok(Output::UpdateFavorites);
                 }
-                Output::UpdateFavorites
+                Ok(Output::UpdateFavorites)
             }
 
             KeyCode::Enter => {
@@ -109,19 +103,15 @@ impl ArtistList {
                 let selected = index.and_then(|index| self.items.filter().get(index));
 
                 let Some(selected) = selected else {
-                    return Output::Consumed;
+                    return Ok(Output::Consumed);
                 };
 
-                let state = ArtistPopupState::new(selected, client).await;
-                let state = match state {
-                    Ok(res) => res,
-                    Err(err) => return Output::Error(err.to_string()),
-                };
+                let state = ArtistPopupState::new(selected, client).await?;
 
-                Output::Popup(Popup::Artist(state))
+                Ok(Output::Popup(Popup::Artist(state)))
             }
 
-            _ => Output::NotConsumed,
+            _ => Ok(Output::NotConsumed),
         }
     }
 }

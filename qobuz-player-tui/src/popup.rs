@@ -303,7 +303,7 @@ impl Popup {
         client: &Client,
         controls: &Controls,
         notifications: &mut NotificationList,
-    ) -> Output {
+    ) -> Result<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self {
                 Popup::Album(album_state) => {
@@ -321,7 +321,7 @@ impl Popup {
                 Popup::Artist(artist_popup_state) => match key_event.code {
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::Right | KeyCode::Char('l') => {
                         artist_popup_state.show_top_track = !artist_popup_state.show_top_track;
-                        Output::Consumed
+                        Ok(Output::Consumed)
                     }
                     _ => match artist_popup_state.show_top_track {
                         true => {
@@ -347,7 +347,7 @@ impl Popup {
                 Popup::Playlist(playlist_popup_state) => match key_event.code {
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::Right | KeyCode::Char('l') => {
                         playlist_popup_state.shuffle = !playlist_popup_state.shuffle;
-                        Output::Consumed
+                        Ok(Output::Consumed)
                     }
                     _ => {
                         playlist_popup_state
@@ -374,40 +374,33 @@ impl Popup {
                 Popup::NewPlaylist(state) => match key_event.code {
                     KeyCode::Enter => {
                         let input = state.name.value();
-                        match client
+                        client
                             .create_playlist(input.to_string(), false, Default::default(), None)
-                            .await
-                        {
-                            Ok(_) => Output::PopPoputUpdateFavorites,
-                            Err(err) => Output::Error(err.to_string()),
-                        }
+                            .await?;
+                        Ok(Output::PopPoputUpdateFavorites)
                     }
                     _ => {
                         state.name.handle_event(&event);
-                        Output::Consumed
+                        Ok(Output::Consumed)
                     }
                 },
                 Popup::DeletePlaylist(state) => match key_event.code {
                     KeyCode::Enter => {
                         if state.confirm {
-                            match client.delete_playlist(state.id).await {
-                                Ok(_) => return Output::PopPoputUpdateFavorites,
-                                Err(err) => {
-                                    return Output::Error(err.to_string());
-                                }
-                            }
+                            client.delete_playlist(state.id).await?;
+                            return Ok(Output::PopPoputUpdateFavorites);
                         }
 
-                        Output::PopPoputUpdateFavorites
+                        Ok(Output::PopPoputUpdateFavorites)
                     }
                     KeyCode::Left | KeyCode::Right => {
                         state.confirm = !state.confirm;
-                        Output::Consumed
+                        Ok(Output::Consumed)
                     }
-                    _ => Output::Consumed,
+                    _ => Ok(Output::Consumed),
                 },
             },
-            _ => Output::Consumed,
+            _ => Ok(Output::Consumed),
         }
     }
 }

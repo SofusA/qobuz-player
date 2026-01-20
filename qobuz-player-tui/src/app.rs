@@ -9,7 +9,7 @@ use crate::{
 use core::fmt;
 use image::load_from_memory;
 use qobuz_player_controls::{
-    PositionReceiver, Status, StatusReceiver, TracklistReceiver,
+    PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver,
     client::Client,
     controls::Controls,
     notification::{Notification, NotificationBroadcast},
@@ -84,7 +84,6 @@ pub enum Output {
     UpdateFavorites,
     Popup(Popup),
     PopPoputUpdateFavorites,
-    Error(String),
     AddTrackToPlaylist(Track),
 }
 
@@ -215,7 +214,16 @@ impl App {
         self.favorites.filter.reset();
     }
 
-    async fn handle_output(&mut self, key_code: KeyCode, output: Output) {
+    async fn handle_output(&mut self, key_code: KeyCode, output: Result<Output>) {
+        let output = match output {
+            Ok(res) => res,
+            Err(err) => {
+                self.notifications
+                    .push(Notification::Error(err.to_string()));
+                return;
+            }
+        };
+
         match output {
             Output::Consumed => {
                 self.should_draw = true;
@@ -287,9 +295,6 @@ impl App {
                 self.app_state = AppState::Popup(popups);
                 self.should_draw = true;
             }
-            Output::Error(err) => {
-                self.notifications.push(Notification::Error(err));
-            }
             Output::PopPoputUpdateFavorites => {
                 if let AppState::Popup(popups) = &mut self.app_state {
                     popups.pop();
@@ -359,10 +364,10 @@ impl App {
                                         )
                                         .await
                                 } else {
-                                    Output::NotConsumed
+                                    Ok(Output::NotConsumed)
                                 }
                             } else {
-                                Output::NotConsumed
+                                Ok(Output::NotConsumed)
                             }
                         };
 
@@ -395,7 +400,7 @@ impl App {
                             )
                             .await
                     }
-                    Tab::Queue => self.queue.handle_events(event, &self.controls).await,
+                    Tab::Queue => Ok(self.queue.handle_events(event, &self.controls).await),
                     Tab::Discover => {
                         self.discover
                             .handle_events(event, &self.client, &mut self.notifications)

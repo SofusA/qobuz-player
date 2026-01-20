@@ -69,22 +69,22 @@ impl SearchState {
         client: &Client,
         controls: &Controls,
         notifications: &mut NotificationList,
-    ) -> Output {
+    ) -> Result<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match &mut self.editing {
                     false => match key_event.code {
                         KeyCode::Char('e') => {
                             self.start_editing();
-                            Output::Consumed
+                            Ok(Output::Consumed)
                         }
                         KeyCode::Left | KeyCode::Char('h') => {
                             self.cycle_subtab_backwards();
-                            Output::Consumed
+                            Ok(Output::Consumed)
                         }
                         KeyCode::Right | KeyCode::Char('l') => {
                             self.cycle_subtab();
-                            Output::Consumed
+                            Ok(Output::Consumed)
                         }
                         _ => match self.sub_tab {
                             SubTab::Albums => {
@@ -118,19 +118,17 @@ impl SearchState {
                     true => match key_event.code {
                         KeyCode::Esc | KeyCode::Enter => {
                             self.stop_editing();
-                            if let Err(err) = self.update_search(client).await {
-                                return Output::Error(err.to_string());
-                            };
-                            Output::Consumed
+                            self.update_search(client).await?;
+                            Ok(Output::Consumed)
                         }
                         _ => {
                             self.filter.handle_event(&event);
-                            Output::Consumed
+                            Ok(Output::Consumed)
                         }
                     },
                 }
             }
-            _ => Output::NotConsumed,
+            _ => Ok(Output::NotConsumed),
         }
     }
 

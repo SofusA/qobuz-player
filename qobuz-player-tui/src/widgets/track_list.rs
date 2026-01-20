@@ -1,4 +1,6 @@
-use qobuz_player_controls::{client::Client, controls::Controls, notification::Notification};
+use qobuz_player_controls::{
+    Result, client::Client, controls::Controls, notification::Notification,
+};
 use qobuz_player_models::Track;
 use ratatui::{
     buffer::Buffer,
@@ -56,16 +58,16 @@ impl TrackList {
         controls: &Controls,
         notifications: &mut NotificationList,
         event_type: TrackListEvent,
-    ) -> Output {
+    ) -> Result<Output> {
         match event {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.items.state.select_next();
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Up | KeyCode::Char('k') => {
                 self.items.state.select_previous();
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('a') => {
@@ -74,9 +76,9 @@ impl TrackList {
                 let track = index.and_then(|index| self.items.filter().get(index));
 
                 if let Some(id) = track {
-                    return Output::AddTrackToPlaylist(id.clone());
+                    return Ok(Output::AddTrackToPlaylist(id.clone()));
                 }
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('N') => {
@@ -84,11 +86,11 @@ impl TrackList {
                 let selected = index.and_then(|index| self.items.filter().get(index));
 
                 let Some(selected) = selected else {
-                    return Output::Consumed;
+                    return Ok(Output::Consumed);
                 };
 
                 controls.play_track_next(selected.id);
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('B') => {
@@ -98,8 +100,7 @@ impl TrackList {
                 if let Some(selected) = selected {
                     controls.add_track_to_queue(selected.id);
                 };
-
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('A') => {
@@ -107,18 +108,15 @@ impl TrackList {
                 let selected = index.and_then(|index| self.items.filter().get(index));
 
                 if let Some(selected) = selected {
-                    return match client.add_favorite_track(selected.id).await {
-                        Ok(_) => {
-                            notifications.push(Notification::Info(format!(
-                                "{} added to favorites",
-                                selected.title
-                            )));
-                            Output::UpdateFavorites
-                        }
-                        Err(err) => Output::Error(err.to_string()),
-                    };
+                    client.add_favorite_track(selected.id).await?;
+                    notifications.push(Notification::Info(format!(
+                        "{} added to favorites",
+                        selected.title
+                    )));
+                    return Ok(Output::UpdateFavorites);
                 }
-                Output::Consumed
+
+                Ok(Output::Consumed)
             }
 
             KeyCode::Char('D') => {
@@ -126,23 +124,19 @@ impl TrackList {
                 let selected = index.and_then(|index| self.items.filter().get(index));
 
                 if let Some(selected) = selected {
-                    return match client.remove_favorite_track(selected.id).await {
-                        Ok(_) => {
-                            notifications.push(Notification::Info(format!(
-                                "{} removed from favorites",
-                                selected.title
-                            )));
-                            Output::UpdateFavorites
-                        }
-                        Err(err) => Output::Error(err.to_string()),
-                    };
+                    client.remove_favorite_track(selected.id).await?;
+                    notifications.push(Notification::Info(format!(
+                        "{} removed from favorites",
+                        selected.title
+                    )));
+                    return Ok(Output::UpdateFavorites);
                 }
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
             KeyCode::Enter => {
                 let Some(index) = self.items.state.selected() else {
-                    return Output::Consumed;
+                    return Ok(Output::Consumed);
                 };
 
                 match event_type {
@@ -159,10 +153,10 @@ impl TrackList {
                     TrackListEvent::Artist(id) => controls.play_top_tracks(id, index),
                 }
 
-                Output::Consumed
+                Ok(Output::Consumed)
             }
 
-            _ => Output::NotConsumed,
+            _ => Ok(Output::NotConsumed),
         }
     }
 }

@@ -89,17 +89,17 @@ impl DiscoverState {
         event: Event,
         client: &Client,
         notifications: &mut NotificationList,
-    ) -> Output {
+    ) -> Result<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match key_event.code {
                     KeyCode::Left | KeyCode::Char('h') => {
                         self.cycle_subtab_backwards();
-                        Output::Consumed
+                        Ok(Output::Consumed)
                     }
                     KeyCode::Right | KeyCode::Char('l') => {
                         self.cycle_subtab();
-                        Output::Consumed
+                        Ok(Output::Consumed)
                     }
                     _ => {
                         let is_album = self.album_selected();
@@ -122,7 +122,7 @@ impl DiscoverState {
                     }
                 }
             }
-            _ => Output::NotConsumed,
+            _ => Ok(Output::NotConsumed),
         }
     }
 
