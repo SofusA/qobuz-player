@@ -38,16 +38,19 @@
       hx-get="{{ artist.id }}/top-tracks"
     >
       <h3 class="px-4 text-lg">Top tracks</h3>
-      <div id="top-tracks" class="max-h-92 overflow-scroll">
+      <div id="top-tracks">
         @defer (
           list-tracks.html;
           now_playing_id=playing_info.now_playing_id;
-          tracks=artist.top_tracks;
+          tracks=top_tracks;
           show_artist=false;
           show_track_cover=true;
           click=click
         ) {}
       </div>
+      <a href="/artist/{{ artist.id }}/top-tracks/page" class="button">
+        Show more
+      </a>
     </div>
 
     <div class="flex flex-col gap-2">

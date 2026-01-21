@@ -16,6 +16,7 @@ pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
         .route("/artist/{id}", get(index))
         .route("/artist/{id}/content", get(content))
         .route("/artist/{id}/top-tracks", get(top_tracks_partial))
+        .route("/artist/{id}/top-tracks/page", get(top_tracks_page))
         .route("/artist/{id}/set-favorite", put(set_favorite))
         .route("/artist/{id}/unset-favorite", put(unset_favorite))
         .route(
@@ -32,14 +33,33 @@ async fn top_tracks_partial(
     let click_string = format!("/artist/{}/play-top-track/", artist.id);
     let now_playing_id = state.tracklist_receiver.borrow().currently_playing();
 
+    let top_tracks: Vec<_> = artist.top_tracks.iter().take(5).collect();
+
     Ok(state.render(
         "list-tracks.html",
         &json!({
             "click": click_string,
-            "tracks": artist.top_tracks,
+            "tracks": top_tracks ,
             "show_artist": false,
             "show_track_cover": true,
             "now_playing_id": now_playing_id
+        }),
+    ))
+}
+
+async fn top_tracks_page(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<u32>,
+) -> ResponseResult {
+    let artist = ok_or_send_error_toast(&state, state.client.artist_page(id).await)?;
+    let click_string = format!("/artist/{}/play-top-track/", artist.id);
+
+    Ok(state.render(
+        "artist-top-tracks.html",
+        &json!({
+            "click": click_string,
+            "artist": artist,
+            "top_tracks": artist.top_tracks,
         }),
     ))
 }
@@ -87,12 +107,14 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
     let favorites = ok_or_send_error_toast(&state, state.get_favorites().await)?;
     let is_favorite = favorites.artists.iter().any(|artist| artist.id == id);
     let click_string = format!("/artist/{}/play-top-track/", artist.id);
+    let top_tracks: Vec<_> = artist.top_tracks.iter().take(5).collect();
 
     Ok(state.render(
         "artist.html",
         &json!({
             "artist": artist,
             "albums": albums,
+            "top_tracks": top_tracks,
             "is_favorite": is_favorite,
             "similar_artists": similar_artists,
             "click": click_string
