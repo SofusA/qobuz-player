@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" class="h-full dark">
+<html lang="en" class="dark h-full">
   @defer (head.html) {}
-  <body class="flex flex-col justify-between h-full text-gray-50 bg-black">
-    <div class="flex justify-center items-center w-full h-full">
+  <body class="flex h-full flex-col justify-between bg-black text-gray-50">
+    <div class="flex h-full w-full items-center justify-center">
       <form class="flex flex-col gap-4" action="/auth/login" method="post">
         <input
-          class="p-2 w-full text-black bg-white rounded"
+          class="w-full rounded bg-white p-2 text-black"
           type="password"
           id="secret"
           name="secret"

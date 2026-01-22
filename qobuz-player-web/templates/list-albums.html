@@ -2,21 +2,21 @@
   @for (album in albums) {
     @defer (list-item.html) {
       <a
-        class="flex gap-4 items-center w-full"
+        class="flex w-full items-center gap-4"
         hx-push-url="true"
         href="/album/{{ album.id }}"
         preload="mousedown"
         preload-images="true"
       >
         <img
-          class="inline text-sm text-gray-500 bg-gray-800 rounded-md aspect-square size-12"
+          class="inline aspect-square size-12 rounded-md bg-gray-800 text-sm text-gray-500"
           alt="{{ album.title }}"
           src="{{ album.image_thumbnail }}"
         />
 
-        <div class="overflow-hidden w-full">
+        <div class="w-full overflow-hidden">
           <div class="flex justify-between">
-            <h3 class="text-lg truncate">{{ album.title }}</h3>
+            <h3 class="truncate text-lg">{{ album.title }}</h3>
             @defer (
               info.html;
               hires_available=album.hires_available;

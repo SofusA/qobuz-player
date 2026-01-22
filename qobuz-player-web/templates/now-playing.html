@@ -5,7 +5,7 @@
   playing_info=playing_info
 ) {
   <div
-    class="flex flex-col gap-4 p-4 mx-auto touch-none"
+    class="mx-auto flex touch-none flex-col gap-4 p-4"
     style="
       max-width: calc(600px + 2rem);
       height: calc(100% - 4rem - env(safe-area-inset-bottom));
@@ -16,7 +16,7 @@
     hx-swap="outerHTML"
   >
     <div
-      class="flex overflow-hidden justify-center size-full aspect-square max-h-fit"
+      class="flex aspect-square size-full max-h-fit justify-center overflow-hidden"
     >
       @if (playing_info.cover_image) {
         <img
@@ -25,30 +25,30 @@
           class="rounded-lg"
         />
       } @else {
-        <div class="h-full bg-gray-900 rounded-lg aspect-square"></div>
+        <div class="aspect-square h-full rounded-lg bg-gray-900"></div>
       }
     </div>
 
-    <div class="flex flex-col grow justify-center w-full">
-      <div class="flex gap-2 justify-between items-center">
+    <div class="flex w-full grow flex-col justify-center">
+      <div class="flex items-center justify-between gap-2">
         <a class="text truncate" href="{{ playing_info.entity_link }}">
           {{ playing_info.entity_title }}
         </a>
-        <div class="text-gray-500 whitespace-nowrap">
+        <div class="whitespace-nowrap text-gray-500">
           {{ current_position }} of {{ number_of_tracks }}
         </div>
       </div>
 
       <a
         href="{{ playing_info.artist_link }}"
-        class="text-gray-400 truncate w-fit"
+        class="w-fit truncate text-gray-400"
       >
         {{ playing_info.artist_name }}
       </a>
 
-      <div class="flex flex-col gap-y-4 w-full">
-        <div class="flex gap-2 justify-between items-center">
-          <span class="text-lg truncate">{{ playing_info.title }}</span>
+      <div class="flex w-full flex-col gap-y-4">
+        <div class="flex items-center justify-between gap-2">
+          <span class="truncate text-lg">{{ playing_info.title }}</span>
           @defer (
             info.html;
             hires_available=playing_info.hires_available;
@@ -64,7 +64,7 @@
         ) {}
       </div>
       <div class="flex flex-col gap-4">
-        <div class="flex flex-row gap-2 justify-center h-10">
+        <div class="flex h-10 flex-row justify-center gap-2">
           @defer (previous.html) {}
           @defer (player-state.html; playing_info=playing_info) {}
           @defer (next.html) {}

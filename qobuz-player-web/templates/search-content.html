@@ -1,35 +1,32 @@
-<div class="overflow-auto h-full" id="search-content">
+<div class="h-full overflow-auto" id="search-content">
   @if (tab == "albums") {
     @defer (list-albums.html; albums=search_results.albums) {}
   }
-
   @if (tab == "artists") {
     @defer (list-artists.html; artists=search_results.artists) {}
   }
-
   @if (tab == "playlists") {
     @defer (list-playlists.html; playlists=search_results.playlists) {}
   }
-
   @if (tab == "tracks") {
     @defer (list.html) {
       @for (track in search_results.tracks) {
         @defer (list-item.html) {
           <div class="flex gap-4">
             <button
-              class="flex gap-4 items-center w-full cursor-pointer"
+              class="flex w-full cursor-pointer items-center gap-4"
               hx-put="/api/track/play/{{ track.id }}"
               hx-swap="none"
             >
               <img
-                class="inline text-sm text-gray-500 bg-gray-800 rounded-md aspect-square size-12"
+                class="inline aspect-square size-12 rounded-md bg-gray-800 text-sm text-gray-500"
                 alt="{{ track.title }}"
                 src="{{ track.image_thumbnail }}"
               />
 
-              <div class="overflow-hidden w-full">
-                <div class="flex justify-between items-center">
-                  <h3 class="text-lg truncate">{{ track.title }}</h3>
+              <div class="w-full overflow-hidden">
+                <div class="flex items-center justify-between">
+                  <h3 class="truncate text-lg">{{ track.title }}</h3>
                 </div>
 
                 <h4 class="flex gap-2 text-left text-gray-400">
@@ -43,16 +40,16 @@
               ) {}
             </button>
 
-            <div class="relative w-12 action-group overflow-hidden">
+            <div class="action-group relative w-12 overflow-hidden">
               <span
-                class="pointer-events-none absolute inset-y-0 left-0 flex items-center w-full justify-center text-white"
+                class="pointer-events-none absolute inset-y-0 left-0 flex w-full items-center justify-center text-white"
               >
                 @defer (icons/bars-4.html) {}
               </span>
               <input type="hidden" name="track_id" value="{{ track.id }}" />
               <select
                 name="action"
-                class="appearance-none text-transparent size-full cursor-pointer"
+                class="size-full cursor-pointer appearance-none text-transparent"
                 hx-trigger="change"
                 hx-put="/api/track/action"
                 hx-swap="none"

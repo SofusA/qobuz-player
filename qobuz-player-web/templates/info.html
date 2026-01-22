@@ -1,7 +1,7 @@
 @if (explicit || hires_available) {
-  <div class="flex gap-2 items-center">
+  <div class="flex items-center gap-2">
     @if (explicit) {
-      <div class="text-gray-400 whitespace-nowrap size-6">
+      <div class="size-6 whitespace-nowrap text-gray-400">
         <svg height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path
             d="M21 3H3v18h18V3zm-6 6h-4v2h4v2h-4v2h4v2H9V7h6v2z"
@@ -10,9 +10,8 @@
         </svg>
       </div>
     }
-
     @if (hires_available) {
-      <div class="text-gray-400 whitespace-nowrap size-6">
+      <div class="size-6 whitespace-nowrap text-gray-400">
         <svg
           height="24"
           viewBox="0 0 256 256"

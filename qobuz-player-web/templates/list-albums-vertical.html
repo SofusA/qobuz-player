@@ -1,14 +1,14 @@
-<div class="flex overflow-scroll gap-4 p-2 w-full">
+<div class="flex w-full gap-4 overflow-scroll p-2">
   @for (album in albums) {
     <a
       href="/album/{{ album.id }}"
-      class="h-full shrink-0 size-32"
+      class="size-32 h-full shrink-0"
       preload="mousedown"
       preload-images="true"
     >
       <img class="rounded-lg" alt="{{ album.title }}" src="{{ album.image }}" />
-      <p class="text-sm truncate">{{ album.title }}</p>
-      <p class="text-sm text-gray-500 truncate">{{ album.artist.name }}</p>
+      <p class="truncate text-sm">{{ album.title }}</p>
+      <p class="truncate text-sm text-gray-500">{{ album.artist.name }}</p>
     </a>
   }
 </div>

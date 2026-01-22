@@ -1,5 +1,5 @@
 <div
-  class="block p-4 shadow max-w-sm rounded-lg text-wrap text-white @if(severity == 1) {bg-red-500} @else if(severity == 2) {bg-yellow-500} @else if (severity == 3) {bg-green-700} @else {bg-blue-500}"
+  class="@if(severity == 1) {bg-red-500} @else if(severity == 2) {bg-yellow-500} @else if (severity == 3) {bg-green-700} @else {bg-blue-500} block max-w-sm rounded-lg p-4 text-wrap text-white shadow"
   remove-me="3s"
 >
   {{ message }}

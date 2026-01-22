@@ -2,7 +2,7 @@
   @for (artist in artists) {
     @defer (list-item.html) {
       <a
-        class="flex gap-4 items-center"
+        class="flex items-center gap-4"
         hx-push-url="true"
         href="/artist/{{ artist.id }}"
         preload="mousedown"
@@ -10,19 +10,19 @@
       >
         @if (artist.image) {
           <div
-            class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-full aspect-square size-12"
+            class="aspect-square size-12 rounded-full bg-gray-800 bg-cover bg-center bg-no-repeat"
             style="background-image: url({{ artist.image }});"
           ></div>
         } @else {
           <div
-            class="flex justify-center items-center bg-gray-500 rounded-full aspect-square size-12"
+            class="flex aspect-square size-12 items-center justify-center rounded-full bg-gray-500"
           >
             <div class="w-8">
               @defer (icons/user.html) {}
             </div>
           </div>
         }
-        <p class="w-full text-lg truncate">{{ artist.name }}</p>
+        <p class="w-full truncate text-lg">{{ artist.name }}</p>
       </a>
     }
   }

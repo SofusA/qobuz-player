@@ -1,7 +1,7 @@
 <button
-  class="transition-colors cursor-pointer"
+  class="cursor-pointer transition-colors"
   hx-swap="none"
-  hx-put="@if (playing_info.status == "Playing") {/api/pause} @else {/api/play}"
+  hx-put="@if (playing_info.status == 'Playing') {/api/pause} @else {/api/play}"
 >
   @if (playing_info.status == "Playing") {
     @defer (icons/pause.html) {}

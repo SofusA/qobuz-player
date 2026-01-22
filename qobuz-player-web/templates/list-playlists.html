@@ -2,17 +2,17 @@
   @for (playlist in playlists) {
     @defer (list-item.html) {
       <a
-        class="flex gap-4 items-center w-full text-lg text-left"
+        class="flex w-full items-center gap-4 text-left text-lg"
         href="/playlist/{{ playlist.id }}"
       >
         <div
-          class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-md aspect-square size-12"
+          class="aspect-square size-12 rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat"
           @if(playlist.image)
           {
           style="background-image: url({{ playlist.image }});"
           }
         ></div>
-        <p class="w-full text-lg truncate">{{ playlist.title }}</p>
+        <p class="w-full truncate text-lg">{{ playlist.title }}</p>
       </a>
     }
   }

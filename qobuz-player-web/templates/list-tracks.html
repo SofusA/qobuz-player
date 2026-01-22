@@ -7,22 +7,22 @@
           hx-put="@if(api_by_id){{{click}}{{ track.id }}} @else {{{ click }}{{
             index
           }}}"
-          class="flex justify-between items-center w-full min-w-0 text-left cursor-pointer disabled:text-gray-500 disabled:cursor-default"
+          class="flex w-full min-w-0 cursor-pointer items-center justify-between text-left disabled:cursor-default disabled:text-gray-500"
           @if(!track.available){disabled}
         >
-          <div class="flex overflow-hidden gap-4 items-center w-full">
+          <div class="flex w-full items-center gap-4 overflow-hidden">
             <div
-              class="flex justify-center items-center @if(show_track_cover) {size-12 aspect-square}"
+              class="@if(show_track_cover) {size-12 aspect-square} flex items-center justify-center"
             >
               @if (show_track_cover) {
                 <div
-                  class="flex justify-center items-center size-12 aspect-square"
+                  class="flex aspect-square size-12 items-center justify-center"
                 >
                   <div
-                    class="relative overflow-hidden rounded-md size-12 aspect-square"
+                    class="relative aspect-square size-12 overflow-hidden rounded-md"
                   >
                     <div
-                      class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-md w-full h-full @if(index == currently_playing_position) {opacity-50}"
+                      class="@if(track.id == now_playing_id) {opacity-50} h-full w-full rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat"
                       style="background-image: url({{ track.image }});"
                     ></div>
 
@@ -39,7 +39,7 @@
                 </div>
               } @else {
                 @if (track.id == now_playing_id) {
-                  <div class="text-blue-500 size-5">
+                  <div class="size-5 text-blue-500">
                     @defer (icons/play.html) {}
                   </div>
                 } @else {
@@ -50,9 +50,9 @@
               }
             </div>
             @if (show_artist && track.artist_name) {
-              <div class="flex overflow-hidden flex-col">
+              <div class="flex flex-col overflow-hidden">
                 <h2 class="truncate">{{ track.title }}</h2>
-                <h3 class="text-sm text-gray-400 truncate">
+                <h3 class="truncate text-sm text-gray-400">
                   {{ track.artist_name }}
                 </h3>
               </div>
@@ -67,16 +67,16 @@
           ) {}
         </button>
 
-        <div class="relative w-12 action-group overflow-hidden">
+        <div class="action-group relative w-12 overflow-hidden">
           <span
-            class="pointer-events-none absolute inset-y-0 left-0 flex items-center w-full justify-center text-white"
+            class="pointer-events-none absolute inset-y-0 left-0 flex w-full items-center justify-center text-white"
           >
             @defer (icons/bars-4.html) {}
           </span>
           <input type="hidden" name="track_id" value="{{ track.id }}" />
           <select
             name="action"
-            class="appearance-none text-transparent size-full cursor-pointer"
+            class="size-full cursor-pointer appearance-none text-transparent"
             hx-trigger="change"
             hx-put="/api/track/action"
             hx-swap="none"

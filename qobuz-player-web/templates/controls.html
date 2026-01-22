@@ -5,27 +5,27 @@
   hx-target="this"
 >
   <div class="h-16"></div>
-  <div class="fixed right-0 left-0 bottom-14 px-safe-offset-2 py-safe">
+  <div class="px-safe-offset-2 py-safe fixed right-0 bottom-14 left-0">
     <div
-      class="flex gap-2 justify-between items-center p-2 rounded-md bg-gray-900/70 backdrop-blur"
+      class="flex items-center justify-between gap-2 rounded-md bg-gray-900/70 p-2 backdrop-blur"
     >
       <a
-        class="flex overflow-hidden gap-2 items-center w-full"
+        class="flex w-full items-center gap-2 overflow-hidden"
         hx-target="unset"
         href="{{ playing_info.entity_link }}"
       >
         <div
-          class="bg-gray-800 bg-center bg-no-repeat bg-cover shadow aspect-square size-10 rounded-md"
+          class="aspect-square size-10 rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat shadow"
           style="@if(playing_info.cover_image){background-image: url({{
             playing_info.cover_image
           }});}"
         ></div>
-        <div class="flex overflow-hidden flex-wrap gap-2 leading-none">
+        <div class="flex flex-wrap gap-2 overflow-hidden leading-none">
           <span class="truncate">{{ playing_info.entity_title }}</span>
-          <span class="text-gray-500 truncate">{{ playing_info.title }}</span>
+          <span class="truncate text-gray-500">{{ playing_info.title }}</span>
         </div>
       </a>
-      <div class="flex gap-4 items-center">
+      <div class="flex items-center gap-4">
         <span class="hidden w-8 sm:flex">
           @defer (previous.html) {}
         </span>

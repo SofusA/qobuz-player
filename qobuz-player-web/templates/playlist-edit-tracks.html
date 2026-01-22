@@ -1,5 +1,5 @@
 <div>
-  <div class="w-full justify-end flex">
+  <div class="flex w-full justify-end">
     <button
       class="button button-primary"
       hx-get="/playlist/{{ playlist.id }}/tracks"
@@ -24,26 +24,26 @@
             class="flex gap-4"
             data-playlist-track-id="{{ track.playlist_track_id }}"
           >
-            <div class="flex overflow-hidden gap-4 items-center w-full">
+            <div class="flex w-full items-center gap-4 overflow-hidden">
               <div
-                class="flex justify-center items-center @if(show_track_cover) {size-12 aspect-square}"
+                class="@if(show_track_cover) {size-12 aspect-square} flex items-center justify-center"
               >
                 <div
-                  class="flex justify-center items-center size-12 aspect-square"
+                  class="flex aspect-square size-12 items-center justify-center"
                 >
-                  <div class="overflow-hidden rounded-md size-12 aspect-square">
+                  <div class="aspect-square size-12 overflow-hidden rounded-md">
                     <div
-                      class="bg-gray-800 bg-center bg-no-repeat bg-cover rounded-md w-full h-full"
+                      class="h-full w-full rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat"
                       style="background-image: url({{ track.image }});"
                     ></div>
                   </div>
                 </div>
               </div>
               @if (track.artist_name) {
-                <div class="flex overflow-hidden flex-col">
+                <div class="flex flex-col overflow-hidden">
                   <h2 class="truncate">{{ track.title }}</h2>
                   <h2 class="truncate">{{ track.playlist_id }}</h2>
-                  <h3 class="text-sm text-gray-400 truncate">
+                  <h3 class="truncate text-sm text-gray-400">
                     {{ track.artist_name }}
                   </h3>
                 </div>

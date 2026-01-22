@@ -2,47 +2,53 @@
   <div class="h-12"></div>
 </div>
 <nav
-  class="flex fixed bottom-0 justify-evenly w-full pb-safe px-safe backdrop-blur bg-black/80 *:flex *:h-13 *:w-20 *:flex-col *:items-center *:overflow-visible *:text-nowrap *:px-4 *:py-1 *:text-[10px] *:font-medium *:transition-colors"
+  class="pb-safe px-safe fixed bottom-0 flex w-full justify-evenly bg-black/80 backdrop-blur *:flex *:h-13 *:w-20 *:flex-col *:items-center *:overflow-visible *:px-4 *:py-1 *:text-[10px] *:font-medium *:text-nowrap *:transition-colors"
 >
   <a
     href="/"
     preload="mouseover"
     preload-images="true"
-    class="@if(active_page == "NowPlaying"){text-blue-500}@else {text-gray-500}"
+    class="@if (active_page == 'NowPlaying') {text-blue-500} @else {text-gray-500}"
   >
-    @defer (icons/play-circle.html){} Now Playing
+    @defer (icons/play-circle.html) {}
+    Now Playing
   </a>
 
   <a
     href="/queue"
-    class="@if(active_page == "Queue"){text-blue-500}@else {text-gray-500}"
+    class="@if (active_page == 'Queue') {text-blue-500} @else {text-gray-500}"
   >
-    @defer (icons/queue-list.html){} Queue
+    @defer (icons/queue-list.html) {}
+    Queue
   </a>
   <a
     href="/discover"
     preload="mouseover"
     preload-images="true"
-    class="@if(active_page == "Discover"){text-blue-500}@else {text-gray-500}"
+    class="@if (active_page == 'Discover') {text-blue-500} @else {text-gray-500}"
   >
-    @defer (icons/megaphone.html){} Discover
+    @defer (icons/megaphone.html) {}
+    Discover
   </a>
   <a
     href="/favorites/albums"
     href="/discover"
     preload="mouseover"
-    class="@if(active_page == "Favorites"){text-blue-500}@else {text-gray-500}"
+    class="@if (active_page == 'Favorites') {text-blue-500} @else {text-gray-500}"
   >
-    @defer (icons/star-solid.html){} Favorites
+    @defer (icons/star-solid.html) {}
+    Favorites
   </a>
 
   @if (active_page == "Search") {
     <button class="text-blue-500" onclick="focusSearchInput()">
-      @defer (icons/magnifying-glass.html){} Search
+      @defer (icons/magnifying-glass.html) {}
+      Search
     </button>
   } @else {
     <a href="/search/albums" class="text-gray-500">
-      @defer (icons/magnifying-glass.html){} Search
+      @defer (icons/magnifying-glass.html) {}
+      Search
     </a>
   }
 </nav>

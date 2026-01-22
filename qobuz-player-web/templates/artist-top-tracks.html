@@ -1,19 +1,27 @@
 @defer (base.html; playing_info=playing_info) {
   <div class="flex flex-col">
-    <div class="flex flex-col gap-4 p-4">
-      <div class="sticky top-0 pb-2 pt-safe bg-black/20 backdrop-blur">
+    <div
+      class="flex flex-col gap-4 p-4"
+      data-sse="tracklist"
+      hx-trigger="tracklist"
+      hx-target="#top-tracks"
+      hx-get="/artist/{{ artist.id }}/top-tracks/page/partial"
+    >
+      <div class="pt-safe sticky top-0 z-10 bg-black/20 pb-2 backdrop-blur">
         <h1 class="text-2xl">{{ artist.name }}</h1>
         <h2 class="text-xl">Top tracks</h2>
       </div>
 
-      @defer (
-        list-tracks.html;
-        now_playing_id=playing_info.now_playing_id;
-        tracks=top_tracks;
-        show_artist=false;
-        show_track_cover=true;
-        click=click
-      ) {}
+      <div id="top-tracks">
+        @defer (
+          list-tracks.html;
+          now_playing_id=playing_info.now_playing_id;
+          tracks=top_tracks;
+          show_artist=false;
+          show_track_cover=true;
+          click=click
+        ) {}
+      </div>
     </div>
   </div>
 }
