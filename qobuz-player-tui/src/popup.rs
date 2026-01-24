@@ -165,7 +165,9 @@ impl Popup {
 
                 frame.render_widget(Clear, area);
                 frame.render_widget(&block, area);
-                state.tracks.render(block.inner(area), frame.buffer_mut());
+                state
+                    .tracks
+                    .render(block.inner(area), frame.buffer_mut(), false);
             }
             Popup::Artist(artist) => {
                 let max_visible_rows: u16 = 15;
@@ -209,7 +211,9 @@ impl Popup {
                 frame.render_widget(tabs, chunks[0]);
 
                 if artist.show_top_track {
-                    artist.top_tracks.render(chunks[1], frame.buffer_mut());
+                    artist
+                        .top_tracks
+                        .render(chunks[1], frame.buffer_mut(), true);
                 } else {
                     artist.albums.render(chunks[1], frame.buffer_mut());
                 }
@@ -248,7 +252,9 @@ impl Popup {
                     ])
                     .split(inner);
 
-                playlist_state.tracks.render(chunks[0], frame.buffer_mut());
+                playlist_state
+                    .tracks
+                    .render(chunks[0], frame.buffer_mut(), true);
                 frame.render_widget(buttons, chunks[2]);
             }
             Popup::Track(track_state) => {

@@ -59,7 +59,7 @@ impl SearchState {
             SubTab::Albums => self.albums.render(chunks[1], frame.buffer_mut()),
             SubTab::Artists => self.artists.render(chunks[1], frame.buffer_mut()),
             SubTab::Playlists => self.playlists.render(chunks[1], frame.buffer_mut()),
-            SubTab::Tracks => self.tracks.render(chunks[1], frame.buffer_mut()),
+            SubTab::Tracks => self.tracks.render(chunks[1], frame.buffer_mut(), true),
         };
     }
 

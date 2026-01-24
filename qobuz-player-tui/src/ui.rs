@@ -251,6 +251,7 @@ pub fn render_input(input: &Input, editing: bool, area: Rect, frame: &mut Frame,
 }
 
 pub const ROW_HIGHLIGHT_STYLE: Style = Style::new().bg(Color::Blue);
+pub const COLUMN_SPACING: u16 = 2;
 
 pub fn block(title: Option<&str>) -> Block<'_> {
     let mut block = Block::bordered()
@@ -265,7 +266,9 @@ pub fn block(title: Option<&str>) -> Block<'_> {
 }
 
 pub fn basic_list_table<'a>(rows: Vec<Row<'a>>) -> Table<'a> {
-    Table::new(rows, [Constraint::Min(1)]).row_highlight_style(ROW_HIGHLIGHT_STYLE)
+    Table::new(rows, [Constraint::Min(1)])
+        .row_highlight_style(ROW_HIGHLIGHT_STYLE)
+        .column_spacing(COLUMN_SPACING)
 }
 
 pub fn tab_bar<'a>(tabs: Vec<&'a str>, selected: usize) -> Tabs<'a> {
@@ -318,4 +321,16 @@ pub fn mark_as_owned(title: String, owned: bool) -> Line<'static> {
     }
 
     Line::from(parts)
+}
+
+pub fn format_duration(secs: u32) -> String {
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    let seconds = secs % 60;
+
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes:02}:{seconds:02}")
+    }
 }

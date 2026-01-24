@@ -1015,6 +1015,7 @@ fn parse_featured_albums(
                     explicit: value.parental_warning,
                     available: value.streamable,
                     image: value.image.large,
+                    duration_seconds: value.duration,
                 })
                 .collect::<Vec<_>>();
 
@@ -1100,6 +1101,7 @@ fn parse_album_simple(
         explicit: s.parental_warning,
         available: s.rights.streamable,
         image: s.image.large,
+        duration_seconds: s.duration,
     }
 }
 

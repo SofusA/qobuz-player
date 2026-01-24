@@ -12,7 +12,7 @@ pub struct AlbumSuggestion {
     pub genre: Genre,
     pub release_type: Option<String>,
     pub release_tags: Option<Vec<String>>,
-    pub duration: Option<i64>,
+    pub duration: u32,
     pub dates: Dates,
     pub parental_warning: bool,
     pub audio_info: AudioInfo,

@@ -52,6 +52,7 @@ pub struct AlbumSimple {
     pub available: bool,
     pub hires_available: bool,
     pub explicit: bool,
+    pub duration_seconds: u32,
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]

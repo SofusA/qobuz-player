@@ -13,7 +13,7 @@ use ratatui::{
 
 use crate::{
     app::{FilteredListState, NotificationList, Output},
-    ui::{ROW_HIGHLIGHT_STYLE, mark_explicit_and_hifi},
+    ui::{COLUMN_SPACING, ROW_HIGHLIGHT_STYLE, format_duration, mark_explicit_and_hifi},
 };
 
 #[derive(Default)]
@@ -34,8 +34,8 @@ impl TrackList {
         Self { items: tracks }
     }
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        let table = track_table(self.items.filter());
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer, show_album: bool) {
+        let table = track_table(self.items.filter(), show_album);
         table.render(area, buf, &mut self.items.state);
     }
 
@@ -161,31 +161,61 @@ impl TrackList {
     }
 }
 
-fn track_table<'a>(rows: &[Track]) -> Table<'a> {
-    let rows: Vec<_> = rows
+fn track_table<'a>(rows: &[Track], show_album: bool) -> Table<'a> {
+    let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|track| {
-            Row::new(vec![
-                mark_explicit_and_hifi(track.title.clone(), track.explicit, track.hires_available),
-                Line::from(track.artist_name.clone().unwrap_or_default()),
-                Line::from(track.album_title.clone().unwrap_or_default()),
-            ])
+            let mut cols: Vec<Line<'a>> = Vec::with_capacity(if show_album { 4 } else { 3 });
+
+            cols.push(mark_explicit_and_hifi(
+                track.title.clone(),
+                track.explicit,
+                track.hires_available,
+            ));
+
+            cols.push(Line::from(track.artist_name.clone().unwrap_or_default()));
+
+            if show_album {
+                cols.push(Line::from(track.album_title.clone().unwrap_or_default()));
+            }
+
+            cols.push(Line::from(format_duration(track.duration_seconds)));
+
+            Row::new(cols)
         })
         .collect();
 
-    let is_empty = rows.is_empty();
-    let mut table = Table::new(
-        rows,
-        [
-            Constraint::Ratio(1, 3),
-            Constraint::Ratio(1, 3),
-            Constraint::Ratio(1, 3),
-        ],
-    )
-    .row_highlight_style(ROW_HIGHLIGHT_STYLE);
+    let is_empty = body_rows.is_empty();
+
+    let constraints: Vec<Constraint> = if show_album {
+        vec![
+            Constraint::Ratio(2, 6),
+            Constraint::Ratio(2, 6),
+            Constraint::Ratio(1, 6),
+            Constraint::Length(10),
+        ]
+    } else {
+        vec![
+            Constraint::Ratio(2, 5),
+            Constraint::Ratio(2, 5),
+            Constraint::Length(10),
+        ]
+    };
+
+    let mut table = Table::new(body_rows, constraints)
+        .row_highlight_style(ROW_HIGHLIGHT_STYLE)
+        .column_spacing(COLUMN_SPACING);
 
     if !is_empty {
-        table = table.header(Row::new(["Title", "Artist", "Album"]).add_modifier(Modifier::BOLD));
+        let header = if show_album {
+            Row::new(vec!["Title", "Artist", "Album", "Duration"])
+        } else {
+            Row::new(vec!["Title", "Artist", "Duration"])
+        }
+        .add_modifier(Modifier::BOLD);
+
+        table = table.header(header);
     }
+
     table
 }

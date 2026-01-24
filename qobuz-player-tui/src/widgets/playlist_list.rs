@@ -3,14 +3,16 @@ use qobuz_player_models::Playlist;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::KeyCode,
-    layout::Rect,
-    widgets::{Row, StatefulWidget},
+    layout::{Constraint, Rect},
+    style::{Modifier, Stylize},
+    text::Line,
+    widgets::{Row, StatefulWidget, Table},
 };
 
 use crate::{
     app::{FilteredListState, NotificationList, Output},
     popup::{DeletePlaylistPopupstate, NewPlaylistPopupState, PlaylistPopupState, Popup},
-    ui::{basic_list_table, mark_as_owned},
+    ui::{COLUMN_SPACING, ROW_HIGHLIGHT_STYLE, format_duration, mark_as_owned},
 };
 
 #[derive(Default)]
@@ -25,18 +27,7 @@ impl PlaylistList {
     }
 
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        let table = basic_list_table(
-            self.items
-                .filter()
-                .iter()
-                .map(|playlist| {
-                    Row::new(vec![mark_as_owned(
-                        playlist.title.clone(),
-                        playlist.is_owned,
-                    )])
-                })
-                .collect::<Vec<_>>(),
-        );
+        let table = playlist_list(self.all_items());
         table.render(area, buf, &mut self.items.state);
     }
 
@@ -136,4 +127,30 @@ impl PlaylistList {
             _ => Ok(Output::NotConsumed),
         }
     }
+}
+
+fn playlist_list<'a>(rows: &[Playlist]) -> Table<'a> {
+    let body_rows: Vec<Row<'a>> = rows
+        .iter()
+        .map(|playlist| {
+            Row::new(vec![
+                mark_as_owned(playlist.title.clone(), playlist.is_owned),
+                Line::from(format_duration(playlist.duration_seconds)),
+            ])
+        })
+        .collect();
+
+    let is_empty = body_rows.is_empty();
+
+    let constraints = [Constraint::Ratio(2, 3), Constraint::Length(10)];
+
+    let mut table = Table::new(body_rows, constraints)
+        .row_highlight_style(ROW_HIGHLIGHT_STYLE)
+        .column_spacing(COLUMN_SPACING);
+
+    if !is_empty {
+        table = table.header(Row::new(["Title", "Duration"]).add_modifier(Modifier::BOLD));
+    }
+
+    table
 }

@@ -12,7 +12,7 @@ use ratatui::{
 use crate::{
     app::{FilteredListState, NotificationList, Output},
     popup::{AlbumPopupState, Popup},
-    ui::{ROW_HIGHLIGHT_STYLE, mark_explicit_and_hifi},
+    ui::{COLUMN_SPACING, ROW_HIGHLIGHT_STYLE, format_duration, mark_explicit_and_hifi},
 };
 
 #[derive(Default)]
@@ -116,31 +116,35 @@ impl AlbumList {
 }
 
 fn album_table<'a>(rows: &[Album]) -> Table<'a> {
-    let rows: Vec<_> = rows
+    let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|album| {
             Row::new(vec![
                 mark_explicit_and_hifi(album.title.clone(), album.explicit, album.hires_available),
                 Line::from(album.artist.name.clone()),
                 Line::from(album.release_year.to_string()),
+                Line::from(format_duration(album.duration_seconds)),
             ])
         })
         .collect();
 
-    let is_empty = rows.is_empty();
+    let is_empty = body_rows.is_empty();
 
-    let mut table = Table::new(
-        rows,
-        [
-            Constraint::Ratio(2, 3),
-            Constraint::Ratio(1, 3),
-            Constraint::Length(4),
-        ],
-    )
-    .row_highlight_style(ROW_HIGHLIGHT_STYLE);
+    let constraints = [
+        Constraint::Ratio(2, 3),
+        Constraint::Ratio(1, 3),
+        Constraint::Length(4),
+        Constraint::Length(10),
+    ];
+
+    let mut table = Table::new(body_rows, constraints)
+        .row_highlight_style(ROW_HIGHLIGHT_STYLE)
+        .column_spacing(COLUMN_SPACING);
 
     if !is_empty {
-        table = table.header(Row::new(["Title", "Artist", "Year"]).add_modifier(Modifier::BOLD));
+        table = table
+            .header(Row::new(["Title", "Artist", "Year", "Duration"]).add_modifier(Modifier::BOLD));
     }
+
     table
 }
