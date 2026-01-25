@@ -30,6 +30,8 @@ Read more [in the wiki](https://github.com/SofusA/qobuz-player/wiki/RFID-player)
 - Terminal UI 
 
 ## Installation
+### Fonts
+The terminal ui needs a [nerdfont](https://www.nerdfonts.com/) to display icons for explicit and hi-resolution.
 
 ### Download Release
 
