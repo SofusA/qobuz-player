@@ -183,6 +183,19 @@ impl FavoritesState {
                                     .collect(),
                             );
 
+                            self.tracks.set_filter(
+                                self.tracks
+                                    .all_items()
+                                    .iter()
+                                    .filter(|x| {
+                                        x.title
+                                            .to_lowercase()
+                                            .contains(&self.filter.value().to_lowercase())
+                                    })
+                                    .cloned()
+                                    .collect(),
+                            );
+
                             Ok(Output::Consumed)
                         }
                     },

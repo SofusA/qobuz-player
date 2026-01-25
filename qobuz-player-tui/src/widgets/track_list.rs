@@ -39,6 +39,14 @@ impl TrackList {
         table.render(area, buf, &mut self.items.state);
     }
 
+    pub fn all_items(&self) -> &Vec<Track> {
+        self.items.all_items()
+    }
+
+    pub fn set_filter(&mut self, items: Vec<Track>) {
+        self.items.set_filter(items);
+    }
+
     pub fn select_first(&mut self) {
         self.items.state.select(Some(0));
     }
