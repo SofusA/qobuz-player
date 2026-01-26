@@ -27,7 +27,7 @@ impl PlaylistList {
     }
 
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        let table = playlist_list(self.all_items());
+        let table = playlist_list(self.items.filter());
         table.render(area, buf, &mut self.items.state);
     }
 
