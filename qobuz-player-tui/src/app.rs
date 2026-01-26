@@ -16,11 +16,9 @@ use qobuz_player_controls::{
     tracklist::Tracklist,
 };
 use qobuz_player_models::Track;
-use ratatui::{
-    DefaultTerminal,
-    crossterm::event::{self, Event, KeyCode, KeyEventKind},
-    widgets::*,
-};
+use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
+use futures::StreamExt;
+use ratatui::{DefaultTerminal, widgets::*};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::{io, sync::Arc, time::Instant};
 use tokio::time::{self, Duration};
@@ -150,11 +148,21 @@ where
 
 impl App {
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        let mut tick_interval = time::interval(Duration::from_millis(10));
+        let mut tick_interval = time::interval(Duration::from_millis(100));
         let mut receiver = self.broadcast.subscribe();
+        let mut event_stream = EventStream::new();
 
         while !self.exit {
             tokio::select! {
+                // Prioritize keyboard events by checking them first with biased
+                biased;
+
+                Some(event_result) = event_stream.next() => {
+                    if let Ok(event) = event_result {
+                        self.handle_event(event).await.expect("infallible");
+                    }
+                }
+
                 Ok(_) = self.position.changed() => {
                     self.now_playing.duration_ms = self.position.borrow_and_update().as_millis() as u32;
                     self.should_draw = true;
@@ -175,9 +183,7 @@ impl App {
                 }
 
                 _ = tick_interval.tick() => {
-                    if event::poll(Duration::from_millis(0))? {
-                        self.handle_events().await.expect("infallible");
-                    }
+                    // Tick is now only used for notification cleanup
                 }
 
                 notification = receiver.recv() => {
@@ -331,9 +337,7 @@ impl App {
         }
     }
 
-    async fn handle_events(&mut self) -> io::Result<()> {
-        let event = event::read()?;
-
+    async fn handle_event(&mut self, event: Event) -> io::Result<()> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match &mut self.app_state {
