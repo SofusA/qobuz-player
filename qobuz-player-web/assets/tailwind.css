@@ -28,4 +28,4 @@ html {
   @apply bg-red-700 active:bg-red-500;
 }
 
-@source inline("bg-red-500 bg-yellow-500 bg-blue-500 bg-teal-500 bg-green-700 bg-blue-800");
+@source inline("bg-red-500 bg-yellow-500 bg-blue-500 bg-teal-500 bg-green-700 bg-blue-800 opacity-40");

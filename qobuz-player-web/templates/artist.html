@@ -60,7 +60,7 @@
     @if (similar_artists) {
       <div class="flex flex-col gap-2">
         <h3 class="px-4 text-lg">Similar artists</h3>
-        <ListArtistsVertical artists="similar_artists" />
+        @defer (list-artists-vertical.html; artists=similar_artists) {}
       </div>
     }
     @if (artist.description) {
