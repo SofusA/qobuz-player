@@ -1,5 +1,5 @@
 use qobuz_player_controls::{Result, client::Client, notification::Notification};
-use qobuz_player_models::Album;
+use qobuz_player_models::AlbumSimple;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::KeyCode,
@@ -17,11 +17,11 @@ use crate::{
 
 #[derive(Default)]
 pub struct AlbumList {
-    items: FilteredListState<Album>,
+    items: FilteredListState<AlbumSimple>,
 }
 
 impl AlbumList {
-    pub fn new(albums: Vec<Album>) -> Self {
+    pub fn new(albums: Vec<AlbumSimple>) -> Self {
         let albums = FilteredListState::new(albums);
         Self { items: albums }
     }
@@ -31,15 +31,15 @@ impl AlbumList {
         table.render(area, buf, &mut self.items.state);
     }
 
-    pub fn set_filter(&mut self, items: Vec<Album>) {
+    pub fn set_filter(&mut self, items: Vec<AlbumSimple>) {
         self.items.set_filter(items);
     }
 
-    pub fn all_items(&self) -> &Vec<Album> {
+    pub fn all_items(&self) -> &Vec<AlbumSimple> {
         self.items.all_items()
     }
 
-    pub fn set_all_items(&mut self, items: Vec<Album>) {
+    pub fn set_all_items(&mut self, items: Vec<AlbumSimple>) {
         self.items.set_all_items(items);
     }
 
@@ -115,7 +115,7 @@ impl AlbumList {
     }
 }
 
-fn album_table<'a>(rows: &[Album]) -> Table<'a> {
+fn album_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
     let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|album| {

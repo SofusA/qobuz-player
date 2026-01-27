@@ -457,7 +457,7 @@ impl Client {
         Ok(qobuz_player_models::Favorites {
             albums: albums
                 .into_iter()
-                .map(|x| parse_album(x, &self.max_audio_quality))
+                .map(|x| parse_album(x, &self.max_audio_quality).into())
                 .collect(),
             artists: artists.into_iter().map(parse_artist).collect(),
             playlists: favorite_playlists,
@@ -1016,6 +1016,7 @@ fn parse_featured_albums(
                     available: value.streamable,
                     image: value.image.large,
                     duration_seconds: value.duration,
+                    release_year: extract_year(&value.release_date_original),
                 })
                 .collect::<Vec<_>>();
 
@@ -1102,13 +1103,14 @@ fn parse_album_simple(
         available: s.rights.streamable,
         image: s.image.large,
         duration_seconds: s.duration,
+        release_year: extract_year(&s.dates.original),
     }
 }
 
-fn extract_year(date_str: &str) -> i32 {
+fn extract_year(date_str: &str) -> u32 {
     let format = format_description!("[year]-[month]-[day]");
     let date = time::Date::parse(date_str, &format).expect("failed to parse date");
-    date.year()
+    date.year() as u32
 }
 
 fn parse_album(

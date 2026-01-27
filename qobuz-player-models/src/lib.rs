@@ -43,7 +43,7 @@ pub struct Album {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct AlbumSimple {
     pub id: String,
     pub title: String,
@@ -51,8 +51,25 @@ pub struct AlbumSimple {
     pub image: String,
     pub available: bool,
     pub hires_available: bool,
+    pub release_year: u32,
     pub explicit: bool,
     pub duration_seconds: u32,
+}
+
+impl From<Album> for AlbumSimple {
+    fn from(value: Album) -> Self {
+        Self {
+            id: value.id,
+            title: value.title,
+            artist: value.artist,
+            image: value.image,
+            available: value.available,
+            hires_available: value.hires_available,
+            explicit: value.explicit,
+            duration_seconds: value.duration_seconds,
+            release_year: value.release_year,
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -66,7 +83,7 @@ pub struct SearchResults {
 
 #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Favorites {
-    pub albums: Vec<Album>,
+    pub albums: Vec<AlbumSimple>,
     pub artists: Vec<Artist>,
     pub playlists: Vec<Playlist>,
     pub tracks: Vec<Track>,

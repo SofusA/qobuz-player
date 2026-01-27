@@ -1,13 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
-    Router,
+    Json, Router,
     extract::{Path, State},
     response::IntoResponse,
-    routing::{post, put},
+    routing::{get, post, put},
 };
 use axum_extra::extract::Form;
-use qobuz_player_controls::notification::Notification;
+use qobuz_player_controls::{Result, client::Client, notification::Notification};
+use qobuz_player_models::{AlbumSimple, Artist, Playlist, Track};
 use serde::Deserialize;
 
 use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
@@ -28,6 +29,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/api/track/play/{track_id}", put(play_track))
         .route("/api/track/action", put(track_action))
         .route("/api/queue/reorder", put(reorder_queue))
+        .route("/api/favorites/albums", get(favorite_albums))
+        .route("/api/favorites/artists", get(favorite_artists))
+        .route("/api/favorites/playlists", get(favorite_playlists))
+        .route("/api/favorites/tracks", get(favorite_tracks))
 }
 
 #[derive(Debug, Deserialize)]
@@ -157,4 +162,52 @@ async fn set_position(
 ) -> impl IntoResponse {
     let time = Duration::from_millis(parameters.value as u64);
     state.controls.seek(time);
+}
+
+async fn favorite_albums(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match get_favorite_albums(&state.client).await {
+        Ok(albums) => Json(albums).into_response(),
+        Err(err) => err.to_string().into_response(),
+    }
+}
+
+async fn get_favorite_albums(client: &Client) -> Result<Vec<AlbumSimple>> {
+    let favorites = client.favorites().await?;
+    Ok(favorites.albums)
+}
+
+async fn favorite_artists(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match get_favorite_artists(&state.client).await {
+        Ok(artists) => Json(artists).into_response(),
+        Err(err) => err.to_string().into_response(),
+    }
+}
+
+async fn get_favorite_artists(client: &Client) -> Result<Vec<Artist>> {
+    let favorites = client.favorites().await?;
+    Ok(favorites.artists)
+}
+
+async fn favorite_playlists(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match get_favorite_playlists(&state.client).await {
+        Ok(playlists) => Json(playlists).into_response(),
+        Err(err) => err.to_string().into_response(),
+    }
+}
+
+async fn get_favorite_playlists(client: &Client) -> Result<Vec<Playlist>> {
+    let favorites = client.favorites().await?;
+    Ok(favorites.playlists)
+}
+
+async fn favorite_tracks(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match get_favorite_tracks(&state.client).await {
+        Ok(tracks) => Json(tracks).into_response(),
+        Err(err) => err.to_string().into_response(),
+    }
+}
+
+async fn get_favorite_tracks(client: &Client) -> Result<Vec<Track>> {
+    let favorites = client.favorites().await?;
+    Ok(favorites.tracks)
 }

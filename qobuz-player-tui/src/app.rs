@@ -7,6 +7,8 @@ use crate::{
     search::SearchState,
 };
 use core::fmt;
+use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
+use futures::StreamExt;
 use image::load_from_memory;
 use qobuz_player_controls::{
     PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver,
@@ -16,8 +18,6 @@ use qobuz_player_controls::{
     tracklist::Tracklist,
 };
 use qobuz_player_models::Track;
-use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
-use futures::StreamExt;
 use ratatui::{DefaultTerminal, widgets::*};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::{io, sync::Arc, time::Instant};
