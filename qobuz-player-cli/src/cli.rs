@@ -9,7 +9,7 @@ use qobuz_player_controls::{
     AudioQuality, client::Client, database::Database, notification::NotificationBroadcast,
     player::Player,
 };
-use qobuz_player_rfid::RfidState;
+use qobuz_player_web::RfidState;
 use snafu::prelude::*;
 use tokio::sync::broadcast;
 use tokio_schedule::{Job, every};
@@ -49,7 +49,7 @@ enum Commands {
         /// Disable the album cover image in TUI
         disable_tui_album_cover: bool,
 
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "mpris"))]
         #[clap(long, default_value_t = false)]
         /// Disable the mpris interface
         disable_mpris: bool,
@@ -160,7 +160,7 @@ pub async fn run() -> Result<(), Error> {
         password: Default::default(),
         max_audio_quality: Default::default(),
         disable_tui: Default::default(),
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "mpris"))]
         disable_mpris: Default::default(),
         web: Default::default(),
         web_secret: Default::default(),
@@ -177,7 +177,7 @@ pub async fn run() -> Result<(), Error> {
             password,
             max_audio_quality,
             disable_tui,
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "mpris"))]
             disable_mpris,
             web,
             web_secret,
@@ -237,7 +237,14 @@ pub async fn run() -> Result<(), Error> {
 
             let rfid_state = rfid.then(RfidState::default);
 
-            #[cfg(target_os = "linux")]
+            #[cfg(not(feature = "rfid"))]
+            if rfid {
+                error_exit(Error::PlayerError {
+                    error: "RFID support not compiled in this build".to_string(),
+                });
+            }
+
+            #[cfg(all(target_os = "linux", feature = "mpris"))]
             if !disable_mpris {
                 let position_receiver = player.position();
                 let tracklist_receiver = player.tracklist();
@@ -260,6 +267,7 @@ pub async fn run() -> Result<(), Error> {
                     }
                 });
             }
+
 
             if web {
                 let position_receiver = player.position();
@@ -301,6 +309,7 @@ pub async fn run() -> Result<(), Error> {
                 });
             }
 
+            #[cfg(feature = "rfid")]
             if let Some(rfid_state) = rfid_state {
                 let tracklist_receiver = player.tracklist();
                 let controls = player.controls();
@@ -318,7 +327,7 @@ pub async fn run() -> Result<(), Error> {
                         error_exit(e.into());
                     }
                 });
-            } else if !disable_tui {
+            } if !disable_tui && rfid_state.is_none() {
                 let position_receiver = player.position();
                 let tracklist_receiver = player.tracklist();
                 let status_receiver = player.status();
