@@ -140,18 +140,17 @@ impl FavoritesState {
                         _ => {
                             self.filter.handle_event(&event);
 
+                            let match_in = |s: &str| {
+                                s.to_lowercase()
+                                    .contains(&self.filter.value().to_lowercase())
+                            };
+
                             self.albums.set_filter(
                                 self.albums
                                     .all_items()
                                     .iter()
-                                    .filter(|x| {
-                                        x.title
-                                            .to_lowercase()
-                                            .contains(&self.filter.value().to_lowercase())
-                                            || x.artist
-                                                .name
-                                                .to_lowercase()
-                                                .contains(&self.filter.value().to_lowercase())
+                                    .filter(|album| {
+                                        match_in(&album.title) || match_in(&album.artist.name)
                                     })
                                     .cloned()
                                     .collect(),
@@ -161,11 +160,7 @@ impl FavoritesState {
                                 self.artists
                                     .all_items()
                                     .iter()
-                                    .filter(|x| {
-                                        x.name
-                                            .to_lowercase()
-                                            .contains(&self.filter.value().to_lowercase())
-                                    })
+                                    .filter(|artist| match_in(&artist.name))
                                     .cloned()
                                     .collect(),
                             );
@@ -174,11 +169,7 @@ impl FavoritesState {
                                 self.playlists
                                     .all_items()
                                     .iter()
-                                    .filter(|x| {
-                                        x.title
-                                            .to_lowercase()
-                                            .contains(&self.filter.value().to_lowercase())
-                                    })
+                                    .filter(|playlist| match_in(&playlist.title))
                                     .cloned()
                                     .collect(),
                             );
@@ -187,10 +178,16 @@ impl FavoritesState {
                                 self.tracks
                                     .all_items()
                                     .iter()
-                                    .filter(|x| {
-                                        x.title
-                                            .to_lowercase()
-                                            .contains(&self.filter.value().to_lowercase())
+                                    .filter(|track| {
+                                        match_in(&track.title)
+                                            || track
+                                                .artist_name
+                                                .as_ref()
+                                                .is_some_and(|artist| match_in(artist))
+                                            || track
+                                                .album_title
+                                                .as_ref()
+                                                .is_some_and(|album| match_in(album))
                                     })
                                     .cloned()
                                     .collect(),
