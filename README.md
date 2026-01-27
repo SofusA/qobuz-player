@@ -71,12 +71,6 @@ Build with **both** (explicit, same as default):
 cargo build --release -p qobuz-player --no-default-features --features mpris,rfid
 ```
 
-Run example (web only, no TUI):
-```bash
-./target/release/qobuz-player open --disable-tui --web \
-  --audio-cache /dev/shm/qobuz-cache \
-  --audio-cache-time-to-live 0
-```
 
 Notes:
 - If `mpris` is not compiled, `--disable-mpris` is not available.
