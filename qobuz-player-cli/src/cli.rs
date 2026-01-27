@@ -189,12 +189,26 @@ pub async fn run() -> Result<(), Error> {
             audio_cache_time_to_live,
             disable_tui_album_cover,
         } => {
+            // In some feature combinations these flags may not be used.
+            #[cfg(all(not(feature = "mpris"), not(feature = "rfid")))]
+            let _ = (disable_tui, disable_tui_album_cover);
+
+            #[cfg(all(feature = "mpris", not(feature = "rfid")))]
+            let _ = (disable_tui, disable_tui_album_cover);
+
             let database_credentials = database.get_credentials().await?;
             let database_configuration = database.get_configuration().await?;
             let tracklist = database.get_tracklist().await.unwrap_or_default();
             let volume = database.get_volume().await.unwrap_or(1.0);
 
             let (exit_sender, exit_receiver) = broadcast::channel(5);
+
+            #[cfg(all(not(feature = "mpris"), not(feature = "rfid")))]
+            let _ = &exit_sender;
+
+            #[cfg(all(feature = "mpris", not(feature = "rfid")))]
+            let _ = &exit_sender;
+
 
             let audio_cache = audio_cache.unwrap_or_else(|| {
                 let mut cache_dir = std::env::temp_dir();
