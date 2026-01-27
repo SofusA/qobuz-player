@@ -310,24 +310,26 @@ pub async fn run() -> Result<(), Error> {
             }
 
             #[cfg(feature = "rfid")]
-            if let Some(rfid_state) = rfid_state {
+            if let Some(rfid_state) = rfid_state.clone() {
                 let tracklist_receiver = player.tracklist();
                 let controls = player.controls();
                 let database = database.clone();
+
+                let broadcast_rfid = broadcast.clone(); // <-- vedi fix #2
                 tokio::spawn(async move {
                     if let Err(e) = qobuz_player_rfid::init(
                         rfid_state,
                         tracklist_receiver,
                         controls,
                         database,
-                        broadcast,
+                        broadcast_rfid,
                     )
                     .await
                     {
                         error_exit(e.into());
                     }
                 });
-            } if !disable_tui && rfid_state.is_none() {
+            } else if !disable_tui {
                 let position_receiver = player.position();
                 let tracklist_receiver = player.tracklist();
                 let status_receiver = player.status();
@@ -350,7 +352,7 @@ pub async fn run() -> Result<(), Error> {
                         error_exit(e.into());
                     };
                 });
-            };
+            }
 
             if audio_cache_time_to_live != 0 {
                 let clean_up_schedule = every(1).hour().perform(move || {
