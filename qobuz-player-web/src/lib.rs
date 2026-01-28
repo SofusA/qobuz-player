@@ -29,8 +29,8 @@ use tokio_stream::wrappers::BroadcastStream;
 use crate::{
     app_state::AppState,
     routes::{
-        album, api, artist, auth, controls, discover, favorites, now_playing, playlist, queue,
-        search,
+        album, api, artist, auth, controls, discover, favorites, genres, now_playing, playlist, 
+        queue, search,
     },
     views::templates,
 };
@@ -165,6 +165,7 @@ async fn create_router(
         .merge(playlist::routes())
         .merge(favorites::routes())
         .merge(discover::routes())
+        .merge(genres::routes())
         .merge(controls::routes())
         .layer(axum::middleware::from_fn_with_state(
             shared_state.clone(),
@@ -302,6 +303,19 @@ pub struct ServerSentEvent {
 pub struct Discover {
     pub albums: Vec<(String, Vec<AlbumSimple>)>,
     pub playlists: Vec<(String, Vec<Playlist>)>,
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+pub struct GenreData {
+    pub id: i64,
+    pub name: String,
+    pub slug: String,
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+pub struct GenreAlbums {
+    pub genre: GenreData,
+    pub albums: Vec<(String, Vec<AlbumSimple>)>,
 }
 
 type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;
