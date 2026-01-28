@@ -7,14 +7,22 @@ repository.workspace = true
 description.workspace = true
 
 [features]
+# Comportamento upstream: MPRIS e RFID abilitati di default.
+default = ["mpris", "rfid"]
+
+# Feature opzionali
+mpris = ["dep:qobuz-player-mpris"]
+rfid  = ["dep:qobuz-player-rfid", "qobuz-player-web/rfid"]
+
+# Feature esistente
 gpio = ["qobuz-player-gpio/gpio"]
 
 [dependencies]
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
-qobuz-player-mpris = { version = "*", path = "../qobuz-player-mpris" }
-qobuz-player-web = { version = "*", path = "../qobuz-player-web" }
+qobuz-player-mpris = { version = "*", path = "../qobuz-player-mpris", optional = true }
+qobuz-player-web = { version = "*", path = "../qobuz-player-web", default-features = false }
 qobuz-player-tui = { version = "*", path = "../qobuz-player-tui" }
-qobuz-player-rfid = { version = "*", path = "../qobuz-player-rfid" }
+qobuz-player-rfid = { version = "*", path = "../qobuz-player-rfid", optional = true }
 qobuz-player-gpio = { version = "*", path = "../qobuz-player-gpio", optional = true }
 
 clap.workspace = true
