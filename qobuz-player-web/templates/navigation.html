@@ -31,8 +31,16 @@
     Discover
   </a>
   <a
+    href="/genres"
+    preload="mouseover"
+    preload-images="true"
+    class="@if (active_page == 'Genres') {text-blue-500} @else {text-gray-500}"
+  >
+    @defer (icons/musical-note.html) {}
+    Genres
+  </a>
+  <a
     href="/favorites/albums"
-    href="/discover"
     preload="mouseover"
     class="@if (active_page == 'Favorites') {text-blue-500} @else {text-gray-500}"
   >
