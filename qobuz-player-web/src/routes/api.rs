@@ -16,6 +16,7 @@ use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/play", put(play))
+        .route("/api/play-pause", put(play_pause))
         .route("/api/pause", put(pause))
         .route("/api/previous", put(previous))
         .route("/api/next", put(next))
@@ -112,6 +113,10 @@ async fn play_track(
 
 async fn play(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     state.controls.play();
+}
+
+async fn play_pause(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    state.controls.play_pause();
 }
 
 async fn pause(State(state): State<Arc<AppState>>) -> impl IntoResponse {
