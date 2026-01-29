@@ -5,7 +5,6 @@ pub mod auth;
 pub mod controls;
 pub mod discover;
 pub mod favorites;
-pub mod genres;
 pub mod now_playing;
 pub mod playlist;
 pub mod queue;
