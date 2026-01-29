@@ -7,6 +7,7 @@ pub mod artist;
 pub mod artist_page;
 pub mod favorites;
 pub mod featured;
+pub mod genre;
 pub mod playlist;
 pub mod search_results;
 pub mod track;

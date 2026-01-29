@@ -4,19 +4,52 @@
       class="pt-safe-or-4 sticky top-0 flex max-h-full grow flex-col gap-4 bg-black/80 pb-2 backdrop-blur"
     >
       <h1 class="text-2xl">Discover</h1>
+      
+      <!-- Sub-navigation tabs -->
+      <div class="flex gap-4 border-b border-white/10">
+        <a 
+          href="/discover" 
+          class="pb-2 px-1 border-b-2 @if (active_tab == \"discover\") { border-white text-white } @else { border-transparent text-white/60 hover:text-white/80 }"
+        >
+          Discover
+        </a>
+        <a 
+          href="/discover/genres" 
+          class="pb-2 px-1 border-b-2 @if (active_tab == \"genres\") { border-white text-white } @else { border-transparent text-white/60 hover:text-white/80 }"
+        >
+          Genres
+        </a>
+      </div>
     </div>
 
-    @for (album_feature in discover.albums) {
-      <div class="flex flex-col gap-2">
-        <h3 class="text-lg">{{ album_feature[0] }}</h3>
-        @defer (list-albums-vertical.html; albums=album_feature[1]) {}
-      </div>
-    }
-    @for (playlist_feature in discover.playlists) {
-      <div class="flex flex-col gap-2">
-        <h3 class="text-lg">{{ playlist_feature[0] }}</h3>
-        @defer (list-playlists-vertical.html; playlists=playlist_feature[1]) {}
-      </div>
+    @if (active_tab == "discover") {
+      @for (album_feature in discover.albums) {
+        <div class="flex flex-col gap-2">
+          <h3 class="text-lg">{{ album_feature[0] }}</h3>
+          @defer (list-albums-vertical.html; albums=album_feature[1]) {}
+        </div>
+      }
+      @for (playlist_feature in discover.playlists) {
+        <div class="flex flex-col gap-2">
+          <h3 class="text-lg">{{ playlist_feature[0] }}</h3>
+          @defer (list-playlists-vertical.html; playlists=playlist_feature[1]) {}
+        </div>
+      }
+    } @else if (active_tab == "genres") {
+      <!-- Genre grid - using slug for cleaner URLs -->
+      @if (genres) {
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          @for (genre in genres) {
+            <a
+              href="/discover/genres/{{ genre.slug }}"
+              class="flex flex-col items-center justify-center rounded-lg bg-gray-800 p-6 transition-colors hover:bg-gray-700"
+              preload="mousedown"
+            >
+              <h3 class="text-center text-lg font-medium">{{ genre.name }}</h3>
+            </a>
+          }
+        </div>
+      }
     }
   </div>
 }

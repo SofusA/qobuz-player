@@ -83,6 +83,7 @@ impl App {
             Tab::Search => self.search.render(frame, tab_content_area),
             Tab::Queue => self.queue.render(frame, tab_content_area),
             Tab::Discover => self.discover.render(frame, tab_content_area),
+            Tab::Genres => self.genres.render(frame, tab_content_area),
         }
 
         if let AppState::Popup(popups) = &mut self.app_state {
