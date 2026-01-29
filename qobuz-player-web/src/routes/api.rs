@@ -1,4 +1,8 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    ops::{Add, Sub},
+    sync::Arc,
+    time::Duration,
+};
 
 use axum::{
     Json, Router,
@@ -21,6 +25,8 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/api/previous", put(previous))
         .route("/api/next", put(next))
         .route("/api/volume", post(set_volume))
+        .route("/api/volume/up", post(set_volume_up))
+        .route("/api/volume/down", post(set_volume_down))
         .route("/api/position", post(set_position))
         .route("/api/skip-to/{track_number}", put(skip_to))
         .route(
@@ -159,6 +165,28 @@ async fn set_volume(
     let formatted_volume = volume as f32 / 100.0;
 
     state.controls.set_volume(formatted_volume);
+}
+
+async fn set_volume_up(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let current_volume = state.volume_receiver.borrow();
+    let mut new_volume = current_volume.add(0.05);
+
+    if new_volume > 1.0 {
+        new_volume = 1.0
+    }
+
+    state.controls.set_volume(new_volume);
+}
+
+async fn set_volume_down(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let current_volume = state.volume_receiver.borrow();
+    let mut new_volume = current_volume.sub(0.05);
+
+    if new_volume < 0.0 {
+        new_volume = 0.0
+    }
+
+    state.controls.set_volume(new_volume);
 }
 
 async fn set_position(
