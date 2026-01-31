@@ -15,7 +15,6 @@ use qobuz_player_controls::{
     notification::{Notification, NotificationBroadcast},
 };
 use qobuz_player_models::{Album, AlbumSimple, Playlist};
-use qobuz_player_rfid::RfidState;
 use serde_json::json;
 use skabelon::Templates;
 use std::{convert::Infallible, env, sync::Arc};
@@ -39,6 +38,14 @@ mod app_state;
 mod assets;
 mod routes;
 mod views;
+mod rfid;
+
+#[cfg(feature = "rfid")]
+pub use qobuz_player_rfid::RfidState;
+
+#[cfg(not(feature = "rfid"))]
+#[derive(Debug, Clone, Default)]
+pub struct RfidState;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn init(
