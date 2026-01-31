@@ -1,6 +1,7 @@
 use crate::{
     discover::DiscoverState,
     favorites::FavoritesState,
+    genres::GenresState,
     now_playing::NowPlayingState,
     popup::{Popup, TrackPopupState},
     queue::QueueState,
@@ -62,6 +63,7 @@ pub struct App {
     pub search: SearchState,
     pub queue: QueueState,
     pub discover: DiscoverState,
+    pub genres: GenresState,
     pub broadcast: Arc<NotificationBroadcast>,
     pub notifications: NotificationList,
     pub full_screen: bool,
@@ -93,6 +95,7 @@ pub enum Tab {
     Search,
     Queue,
     Discover,
+    Genres,
 }
 
 impl fmt::Display for Tab {
@@ -102,12 +105,13 @@ impl fmt::Display for Tab {
             Tab::Search => write!(f, "Search"),
             Tab::Queue => write!(f, "Queue"),
             Tab::Discover => write!(f, "Discover"),
+            Tab::Genres => write!(f, "Genres"),
         }
     }
 }
 
 impl Tab {
-    pub const VALUES: [Self; 4] = [Tab::Favorites, Tab::Search, Tab::Queue, Tab::Discover];
+    pub const VALUES: [Self; 5] = [Tab::Favorites, Tab::Search, Tab::Queue, Tab::Discover, Tab::Genres];
 }
 
 #[derive(Default)]
@@ -262,6 +266,10 @@ impl App {
                 }
                 KeyCode::Char('4') => {
                     self.navigate_to_discover();
+                    self.should_draw = true;
+                }
+                KeyCode::Char('5') => {
+                    self.navigate_to_genres();
                     self.should_draw = true;
                 }
                 KeyCode::Char(' ') => {
@@ -434,6 +442,11 @@ impl App {
                             .handle_events(event, &self.client, &mut self.notifications)
                             .await
                     }
+                    Tab::Genres => {
+                        self.genres
+                            .handle_events(event, &self.client, &mut self.notifications)
+                            .await
+                    }
                 };
 
                 self.handle_output(key_event.code, screen_output).await;
@@ -460,6 +473,10 @@ impl App {
 
     fn navigate_to_discover(&mut self) {
         self.current_screen = Tab::Discover;
+    }
+
+    fn navigate_to_genres(&mut self) {
+        self.current_screen = Tab::Genres;
     }
 
     fn exit(&mut self) {

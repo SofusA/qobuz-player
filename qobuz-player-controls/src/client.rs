@@ -22,6 +22,8 @@ pub struct Client {
     favorites_cache: SimpleCache<Favorites>,
     featured_albums_cache: SimpleCache<Vec<(String, Vec<AlbumSimple>)>>,
     featured_playlists_cache: SimpleCache<Vec<(String, Vec<Playlist>)>>,
+    genres_cache: SimpleCache<Vec<qobuz_player_client::qobuz_models::genre::Genre>>,
+    genre_albums_cache: Cache<i64, Vec<(String, Vec<AlbumSimple>)>>,
     album_cache: Cache<String, Album>,
     artist_cache: Cache<u32, ArtistPage>,
     artist_albums_cache: Cache<u32, Vec<AlbumSimple>>,
@@ -61,6 +63,10 @@ impl Client {
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
             .build();
 
+        let genre_albums_cache = moka::future::CacheBuilder::new(1000)
+            .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
+            .build();
+
         Self {
             qobuz_client: Default::default(),
             username,
@@ -70,6 +76,8 @@ impl Client {
             favorites_cache: SimpleCache::new(Duration::days(1)),
             featured_albums_cache: SimpleCache::new(Duration::days(1)),
             featured_playlists_cache: SimpleCache::new(Duration::days(1)),
+            genres_cache: SimpleCache::new(Duration::days(7)),
+            genre_albums_cache,
             album_cache,
             artist_cache,
             artist_albums_cache,
@@ -378,5 +386,32 @@ impl Client {
             .await?;
         self.playlist_cache.invalidate(&playlist_id).await;
         Ok(res)
+    }
+
+    pub async fn genres(&self) -> Result<Vec<qobuz_player_client::qobuz_models::genre::Genre>> {
+        if let Some(cache) = self.genres_cache.get().await {
+            return Ok(cache);
+        }
+
+        let client = self.get_client().await?;
+        let genres = client.genres().await?;
+
+        self.genres_cache.set(genres.clone()).await;
+        Ok(genres)
+    }
+
+    pub async fn genre_albums(&self, genre_id: i64) -> Result<Vec<(String, Vec<AlbumSimple>)>> {
+        if let Some(cache) = self.genre_albums_cache.get(&genre_id).await {
+            return Ok(cache);
+        }
+
+        let client = self.get_client().await?;
+        let albums = client.genre_albums(genre_id).await?;
+
+        self.genre_albums_cache
+            .insert(genre_id, albums.clone())
+            .await;
+
+        Ok(albums)
     }
 }

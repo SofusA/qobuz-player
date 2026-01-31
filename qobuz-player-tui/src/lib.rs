@@ -13,6 +13,7 @@ use ui::center;
 mod app;
 mod discover;
 mod favorites;
+mod genres;
 mod now_playing;
 mod popup;
 mod queue;
@@ -59,6 +60,7 @@ pub async fn init(
         search: Default::default(),
         queue: QueueState::new(queue),
         discover: discover::DiscoverState::new(&client).await?,
+        genres: genres::GenresState::new(&client).await?,
         client,
     };
 
