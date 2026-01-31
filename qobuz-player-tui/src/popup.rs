@@ -128,6 +128,14 @@ impl TrackPopupState {
             track,
         }
     }
+
+    fn select_next(&mut self) {
+        self.playlists.select_next();
+    }
+
+    fn select_previous(&mut self) {
+        self.playlists.select_previous();
+    }
 }
 
 pub struct NewPlaylistPopupState {
@@ -371,19 +379,39 @@ impl Popup {
                             .await
                     }
                 },
-                Popup::Track(track_popup_state) => {
-                    track_popup_state
-                        .playlists
-                        .handle_events(key_event.code, client, notifications)
-                        .await
-                }
+                Popup::Track(track_popup_state) => match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        track_popup_state.select_previous();
+                        Ok(Output::Consumed)
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        track_popup_state.select_next();
+                        Ok(Output::Consumed)
+                    }
+                    KeyCode::Enter => {
+                        let index = track_popup_state.playlists.selected();
+                        let id = index
+                            .and_then(|index| track_popup_state.playlists.get(index))
+                            .map(|p| p.id);
+
+                        if let Some(id) = id {
+                            return Ok(Output::AddTrackToPlaylistAndPopPopup((
+                                track_popup_state.track.id,
+                                id,
+                            )));
+                        }
+
+                        Ok(Output::Consumed)
+                    }
+                    _ => Ok(Output::NotConsumed),
+                },
                 Popup::NewPlaylist(state) => match key_event.code {
                     KeyCode::Enter => {
                         let input = state.name.value();
                         client
                             .create_playlist(input.to_string(), false, Default::default(), None)
                             .await?;
-                        Ok(Output::PopPoputUpdateFavorites)
+                        Ok(Output::PopPopupUpdateFavorites)
                     }
                     _ => {
                         state.name.handle_event(&event);
@@ -394,10 +422,10 @@ impl Popup {
                     KeyCode::Enter => {
                         if state.confirm {
                             client.delete_playlist(state.id).await?;
-                            return Ok(Output::PopPoputUpdateFavorites);
+                            return Ok(Output::PopPopupUpdateFavorites);
                         }
 
-                        Ok(Output::PopPoputUpdateFavorites)
+                        Ok(Output::PopPopupUpdateFavorites)
                     }
                     KeyCode::Left | KeyCode::Right => {
                         state.confirm = !state.confirm;

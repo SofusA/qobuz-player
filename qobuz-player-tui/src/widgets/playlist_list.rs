@@ -43,6 +43,22 @@ impl PlaylistList {
         self.items.set_all_items(items);
     }
 
+    pub fn selected(&self) -> Option<usize> {
+        self.items.state.selected()
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Playlist> {
+        self.items.filter().get(index)
+    }
+
+    pub fn select_next(&mut self) {
+        self.items.state.select_next();
+    }
+
+    pub fn select_previous(&mut self) {
+        self.items.state.select_previous();
+    }
+
     pub async fn handle_events(
         &mut self,
         event: KeyCode,

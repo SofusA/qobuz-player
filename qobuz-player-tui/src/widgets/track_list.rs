@@ -84,7 +84,7 @@ impl TrackList {
                 let track = index.and_then(|index| self.items.filter().get(index));
 
                 if let Some(id) = track {
-                    return Ok(Output::AddTrackToPlaylist(id.clone()));
+                    return Ok(Output::AddTrackToPlaylistPopup(id.clone()));
                 }
                 Ok(Output::Consumed)
             }
