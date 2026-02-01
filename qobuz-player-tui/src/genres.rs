@@ -20,7 +20,7 @@ pub struct GenresState {
 }
 
 struct GenreItem {
-    id: i64,
+    id: u32,
     name: String,
     albums: Vec<(String, AlbumSimpleList)>,
 }
@@ -34,7 +34,7 @@ enum GenresMode {
 impl GenresState {
     pub async fn new(client: &Client) -> Result<Self> {
         let genres_list = client.genres().await?;
-        
+
         let genres = genres_list
             .into_iter()
             .map(|g| GenreItem {
@@ -56,7 +56,7 @@ impl GenresState {
         if self.genres[self.selected_genre].albums.is_empty() {
             let genre_id = self.genres[self.selected_genre].id;
             let albums = client.genre_albums(genre_id).await?;
-            
+
             self.genres[self.selected_genre].albums = albums
                 .into_iter()
                 .map(|x| (x.0, AlbumSimpleList::new(x.1)))
@@ -85,21 +85,19 @@ impl GenresState {
             .constraints([Constraint::Length(3), Constraint::Min(1)])
             .split(area);
 
-        // Title
         let title = Paragraph::new("Select a Genre")
             .style(Style::default().fg(Color::Cyan))
             .alignment(Alignment::Center);
         frame.render_widget(title, chunks[0]);
 
-        // Genres grid
         let items_per_row = 2;
-        let rows_needed = (self.genres.len() + items_per_row - 1) / items_per_row;
-        
+        let rows_needed = self.genres.len().div_ceil(items_per_row);
+
         let mut constraints = vec![];
         for _ in 0..rows_needed {
             constraints.push(Constraint::Length(3));
         }
-        
+
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints(constraints)
@@ -127,16 +125,14 @@ impl GenresState {
                     let genre_block = Paragraph::new(self.genres[genre_idx].name.as_str())
                         .style(style)
                         .alignment(Alignment::Center)
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .border_style(if is_selected {
-                                    Style::default().fg(Color::Cyan)
-                                } else {
-                                    Style::default().fg(Color::DarkGray)
-                                }),
-                        );
-                    
+                        .block(Block::default().borders(Borders::ALL).border_style(
+                            if is_selected {
+                                Style::default().fg(Color::Cyan)
+                            } else {
+                                Style::default().fg(Color::DarkGray)
+                            },
+                        ));
+
                     frame.render_widget(genre_block, cols[col_idx]);
                 }
             }
@@ -146,7 +142,11 @@ impl GenresState {
     fn render_genre_detail(&mut self, frame: &mut Frame, area: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Length(2), Constraint::Min(1)])
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Length(2),
+                Constraint::Min(1),
+            ])
             .split(area);
 
         // Back button and title
@@ -159,14 +159,15 @@ impl GenresState {
         // Sub tabs
         let albums = &self.genres[self.selected_genre].albums;
         let labels: Vec<_> = albums.iter().map(|a| a.0.as_str()).collect();
-        
+
         if !labels.is_empty() {
             let tabs = tab_bar(labels, self.selected_sub_tab);
             frame.render_widget(tabs, chunks[1]);
 
             // Album list
             if self.selected_sub_tab < albums.len() {
-                let list_state = &mut self.genres[self.selected_genre].albums[self.selected_sub_tab];
+                let list_state =
+                    &mut self.genres[self.selected_genre].albums[self.selected_sub_tab];
                 list_state.1.render(chunks[2], frame.buffer_mut());
             }
         } else {
@@ -184,14 +185,15 @@ impl GenresState {
         notifications: &mut NotificationList,
     ) -> Result<Output> {
         match event {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                match self.mode {
-                    GenresMode::GenreList => self.handle_genre_list_events(key_event.code, client).await,
-                    GenresMode::GenreDetail => {
-                        self.handle_genre_detail_events(key_event.code, client, notifications).await
-                    }
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self.mode {
+                GenresMode::GenreList => {
+                    self.handle_genre_list_events(key_event.code, client).await
                 }
-            }
+                GenresMode::GenreDetail => {
+                    self.handle_genre_detail_events(key_event.code, client, notifications)
+                        .await
+                }
+            },
             _ => Ok(Output::NotConsumed),
         }
     }

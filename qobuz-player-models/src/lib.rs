@@ -115,3 +115,9 @@ pub struct Playlist {
     pub image: Option<String>,
     pub tracks: Vec<Track>,
 }
+
+#[derive(Debug, Default, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct Genre {
+    pub name: String,
+    pub id: u32,
+}

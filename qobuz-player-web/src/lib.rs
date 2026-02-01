@@ -14,7 +14,7 @@ use qobuz_player_controls::{
     error::Error,
     notification::{Notification, NotificationBroadcast},
 };
-use qobuz_player_models::{Album, AlbumSimple, Playlist};
+use qobuz_player_models::{Album, AlbumSimple, Genre, Playlist};
 use qobuz_player_rfid::RfidState;
 use serde_json::json;
 use skabelon::Templates;
@@ -29,8 +29,8 @@ use tokio_stream::wrappers::BroadcastStream;
 use crate::{
     app_state::AppState,
     routes::{
-        album, api, artist, auth, controls, discover, favorites, now_playing, playlist, 
-        queue, search,
+        album, api, artist, auth, controls, discover, favorites, now_playing, playlist, queue,
+        search,
     },
     views::templates,
 };
@@ -305,15 +305,8 @@ pub struct Discover {
 }
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
-pub struct GenreData {
-    pub id: i64,
-    pub name: String,
-    pub slug: String,
-}
-
-#[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct GenreAlbums {
-    pub genre: GenreData,
+    pub genre: Genre,
     pub albums: Vec<(String, Vec<AlbumSimple>)>,
 }
 
@@ -337,11 +330,13 @@ fn ok_or_error_page<T>(
 ) -> Result<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
-        Err(err) => Err(state
-            .templates
-            .borrow()
-            .render("error-page.html", &json!({"error": err.to_string()}))
-            .into_response()),
+        Err(err) => Err(Html(
+            state
+                .templates
+                .borrow()
+                .render("error-page.html", &json!({"error": err.to_string()})),
+        )
+        .into_response()),
     }
 }
 

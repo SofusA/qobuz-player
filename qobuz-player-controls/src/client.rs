@@ -1,7 +1,7 @@
 use moka::future::Cache;
 use qobuz_player_client::{client::AudioQuality, qobuz_models::TrackURL};
 use qobuz_player_models::{
-    Album, AlbumSimple, Artist, ArtistPage, Favorites, Playlist, SearchResults, Track,
+    Album, AlbumSimple, Artist, ArtistPage, Favorites, Genre, Playlist, SearchResults, Track,
 };
 use std::sync::OnceLock;
 use time::Duration;
@@ -22,8 +22,8 @@ pub struct Client {
     favorites_cache: SimpleCache<Favorites>,
     featured_albums_cache: SimpleCache<Vec<(String, Vec<AlbumSimple>)>>,
     featured_playlists_cache: SimpleCache<Vec<(String, Vec<Playlist>)>>,
-    genres_cache: SimpleCache<Vec<qobuz_player_client::qobuz_models::genre::Genre>>,
-    genre_albums_cache: Cache<i64, Vec<(String, Vec<AlbumSimple>)>>,
+    genres_cache: SimpleCache<Vec<Genre>>,
+    genre_albums_cache: Cache<u32, Vec<(String, Vec<AlbumSimple>)>>,
     album_cache: Cache<String, Album>,
     artist_cache: Cache<u32, ArtistPage>,
     artist_albums_cache: Cache<u32, Vec<AlbumSimple>>,
@@ -388,7 +388,7 @@ impl Client {
         Ok(res)
     }
 
-    pub async fn genres(&self) -> Result<Vec<qobuz_player_client::qobuz_models::genre::Genre>> {
+    pub async fn genres(&self) -> Result<Vec<Genre>> {
         if let Some(cache) = self.genres_cache.get().await {
             return Ok(cache);
         }
@@ -400,7 +400,7 @@ impl Client {
         Ok(genres)
     }
 
-    pub async fn genre_albums(&self, genre_id: i64) -> Result<Vec<(String, Vec<AlbumSimple>)>> {
+    pub async fn genre_albums(&self, genre_id: u32) -> Result<Vec<(String, Vec<AlbumSimple>)>> {
         if let Some(cache) = self.genre_albums_cache.get(&genre_id).await {
             return Ok(cache);
         }
