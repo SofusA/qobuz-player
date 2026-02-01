@@ -1,7 +1,8 @@
 use moka::future::Cache;
 use qobuz_player_client::{client::AudioQuality, qobuz_models::TrackURL};
 use qobuz_player_models::{
-    Album, AlbumSimple, Artist, ArtistPage, Favorites, Genre, Playlist, SearchResults, Track,
+    Album, AlbumSimple, Artist, ArtistPage, Favorites, Genre, Playlist, PlaylistSimple,
+    SearchResults, Track,
 };
 use std::sync::OnceLock;
 use time::Duration;
@@ -24,6 +25,7 @@ pub struct Client {
     featured_playlists_cache: SimpleCache<Vec<(String, Vec<Playlist>)>>,
     genres_cache: SimpleCache<Vec<Genre>>,
     genre_albums_cache: Cache<u32, Vec<(String, Vec<AlbumSimple>)>>,
+    genre_playlists_cache: Cache<u32, Vec<PlaylistSimple>>,
     album_cache: Cache<String, Album>,
     artist_cache: Cache<u32, ArtistPage>,
     artist_albums_cache: Cache<u32, Vec<AlbumSimple>>,
@@ -67,6 +69,10 @@ impl Client {
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
             .build();
 
+        let genre_playlists_cache = moka::future::CacheBuilder::new(1000)
+            .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
+            .build();
+
         Self {
             qobuz_client: Default::default(),
             username,
@@ -78,6 +84,7 @@ impl Client {
             featured_playlists_cache: SimpleCache::new(Duration::days(1)),
             genres_cache: SimpleCache::new(Duration::days(7)),
             genre_albums_cache,
+            genre_playlists_cache,
             album_cache,
             artist_cache,
             artist_albums_cache,
@@ -413,5 +420,20 @@ impl Client {
             .await;
 
         Ok(albums)
+    }
+
+    pub async fn genre_playlists(&self, genre_id: u32) -> Result<Vec<PlaylistSimple>> {
+        if let Some(cache) = self.genre_playlists_cache.get(&genre_id).await {
+            return Ok(cache);
+        }
+
+        let client = self.get_client().await?;
+        let playlists = client.genre_playlists(genre_id).await?;
+
+        self.genre_playlists_cache
+            .insert(genre_id, playlists.clone())
+            .await;
+
+        Ok(playlists)
     }
 }

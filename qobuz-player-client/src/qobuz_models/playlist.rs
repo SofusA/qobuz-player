@@ -87,3 +87,20 @@ pub struct Playlists {
     pub total: i64,
     pub items: Vec<Playlist>,
 }
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlaylistSimple {
+    pub owner: Owner,
+    pub image: PlaylistSimpleImage,
+    pub description: String,
+    pub duration: i64,
+    pub tracks_count: i64,
+    pub name: String,
+    pub id: i64,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlaylistSimpleImage {
+    pub rectangle: String,
+    pub covers: Vec<String>,
+}

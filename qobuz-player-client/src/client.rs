@@ -9,7 +9,7 @@ use crate::{
         artist_page,
         favorites::Favorites,
         featured::{FeaturedAlbumsResponse, FeaturedPlaylistsResponse},
-        genre::{self, GenreResponse},
+        genre::{self, GenreFeaturedPlaylists, GenreResponse},
         playlist::{self, UserPlaylistsResult},
         search_results::SearchAllResults,
         track,
@@ -134,6 +134,7 @@ enum Endpoint {
     PlaylistFeatured,
     GenreList,
     GenreFeatured,
+    GenrePlaylists,
 }
 
 impl Display for Endpoint {
@@ -165,6 +166,7 @@ impl Display for Endpoint {
             Endpoint::PlaylistFeatured => "playlist/getFeatured",
             Endpoint::GenreList => "genre/list",
             Endpoint::GenreFeatured => "album/getFeatured",
+            Endpoint::GenrePlaylists => "discover/playlists",
         };
 
         f.write_str(endpoint)
@@ -262,7 +264,7 @@ impl Client {
         let response =
             get!(self, &endpoint, Some(&params)).map(|x| vec![("Editor picks".to_string(), x)])?;
 
-        Ok(parse_featured_playlists(
+        Ok(parse_featured_playlists_response(
             response,
             self.user_id,
             &self.max_audio_quality,
@@ -312,6 +314,25 @@ impl Client {
         ]);
 
         Ok(albums)
+    }
+
+    pub async fn genre_playlists(
+        &self,
+        genre_id: u32,
+    ) -> Result<Vec<qobuz_player_models::PlaylistSimple>> {
+        let endpoint = format!("{}{}", self.base_url, Endpoint::GenrePlaylists);
+
+        let genre_id = genre_id.to_string();
+
+        let params = vec![
+            ("genre_ids", genre_id.as_str()),
+            ("offset", "0"),
+            ("limit", "20"),
+        ];
+
+        let response = get!(self, &endpoint, Some(&params))?;
+
+        Ok(parse_genre_featured_playlists(response, self.user_id))
     }
 
     pub async fn user_playlists(&self) -> Result<Vec<qobuz_player_models::Playlist>> {
@@ -1077,7 +1098,7 @@ fn parse_featured_albums(
         .collect()
 }
 
-pub fn parse_featured_playlists(
+pub fn parse_featured_playlists_response(
     response: Vec<(String, FeaturedPlaylistsResponse)>,
     user_id: i64,
     max_audio_quality: &AudioQuality,
@@ -1096,6 +1117,17 @@ pub fn parse_featured_playlists(
 
             (featured_type, playlists)
         })
+        .collect()
+}
+
+pub fn parse_genre_featured_playlists(
+    response: GenreFeaturedPlaylists,
+    user_id: i64,
+) -> Vec<qobuz_player_models::PlaylistSimple> {
+    response
+        .items
+        .into_iter()
+        .map(|playlist| parse_playlist_simple(playlist, user_id))
         .collect()
 }
 
@@ -1329,6 +1361,19 @@ fn parse_playlist(
         tracks_count: playlist.tracks_count as u32,
         image,
         tracks,
+    }
+}
+fn parse_playlist_simple(
+    playlist: playlist::PlaylistSimple,
+    user_id: i64,
+) -> qobuz_player_models::PlaylistSimple {
+    qobuz_player_models::PlaylistSimple {
+        id: playlist.id as u32,
+        is_owned: user_id == playlist.owner.id,
+        title: playlist.name,
+        duration_seconds: playlist.duration as u32,
+        tracks_count: playlist.tracks_count as u32,
+        image: Some(playlist.image.rectangle),
     }
 }
 

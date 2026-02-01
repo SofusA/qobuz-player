@@ -14,7 +14,7 @@ use qobuz_player_controls::{
     error::Error,
     notification::{Notification, NotificationBroadcast},
 };
-use qobuz_player_models::{Album, AlbumSimple, Genre, Playlist};
+use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
 use serde_json::json;
 use skabelon::Templates;
@@ -302,12 +302,6 @@ pub struct ServerSentEvent {
 pub struct Discover {
     pub albums: Vec<(String, Vec<AlbumSimple>)>,
     pub playlists: Vec<(String, Vec<Playlist>)>,
-}
-
-#[derive(Clone, serde::Deserialize, serde::Serialize)]
-pub struct GenreAlbums {
-    pub genre: Genre,
-    pub albums: Vec<(String, Vec<AlbumSimple>)>,
 }
 
 type ResponseResult = std::result::Result<axum::response::Response, axum::response::Response>;

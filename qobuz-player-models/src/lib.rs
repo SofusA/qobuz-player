@@ -117,6 +117,16 @@ pub struct Playlist {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct PlaylistSimple {
+    pub is_owned: bool,
+    pub title: String,
+    pub duration_seconds: u32,
+    pub tracks_count: u32,
+    pub id: u32,
+    pub image: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Genre {
     pub name: String,
     pub id: u32,

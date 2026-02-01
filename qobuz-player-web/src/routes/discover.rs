@@ -9,7 +9,7 @@ use qobuz_player_controls::error::Error;
 use serde_json::json;
 use tokio::try_join;
 
-use crate::{AppState, Discover, GenreAlbums, ResponseResult, ok_or_broadcast, ok_or_error_page};
+use crate::{AppState, Discover, ResponseResult, ok_or_broadcast, ok_or_error_page};
 
 pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
     Router::new()
@@ -65,6 +65,7 @@ async fn genres_tab(State(state): State<Arc<AppState>>) -> ResponseResult {
 async fn genre_detail(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
     let genres = ok_or_error_page(&state, state.client.genres().await)?;
     let albums = ok_or_error_page(&state, state.client.genre_albums(id).await)?;
+    let playlists = ok_or_error_page(&state, state.client.genre_playlists(id).await)?;
 
     let genre = genres
         .into_iter()
@@ -75,12 +76,12 @@ async fn genre_detail(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -
 
     let genre = ok_or_broadcast(&state.broadcast, genre)?;
 
-    let genre_albums = GenreAlbums { genre, albums };
-
     Ok(state.render(
         "genre-detail.html",
         &json!({
-            "genre_albums": genre_albums,
+            "genre": genre,
+            "albums": albums,
+            "playlists": playlists
         }),
     ))
 }
