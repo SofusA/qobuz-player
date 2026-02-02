@@ -31,6 +31,14 @@ impl AlbumList {
         table.render(area, buf, &mut self.items.state);
     }
 
+    pub fn select_first(&mut self) {
+        self.items.state.select(Some(0));
+    }
+
+    pub fn filter(&self) -> &Vec<AlbumSimple> {
+        self.items.filter()
+    }
+
     pub fn set_filter(&mut self, items: Vec<AlbumSimple>) {
         self.items.set_filter(items);
     }
@@ -115,7 +123,7 @@ impl AlbumList {
     }
 }
 
-fn album_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
+pub fn album_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
     let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|album| {

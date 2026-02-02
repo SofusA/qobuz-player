@@ -9,7 +9,7 @@ use ratatui::{
 use crate::{
     app::{NotificationList, Output},
     ui::{block, tab_bar},
-    widgets::album_simple_list::AlbumSimpleList,
+    widgets::album_list::AlbumList,
 };
 
 pub struct GenresState {
@@ -22,7 +22,7 @@ pub struct GenresState {
 struct GenreItem {
     id: u32,
     name: String,
-    albums: Vec<(String, AlbumSimpleList)>,
+    albums: Vec<(String, AlbumList)>,
 }
 
 #[derive(PartialEq)]
@@ -59,7 +59,7 @@ impl GenresState {
 
             self.genres[self.selected_genre].albums = albums
                 .into_iter()
-                .map(|x| (x.0, AlbumSimpleList::new(x.1)))
+                .map(|x| (x.0, AlbumList::new(x.1)))
                 .collect();
         }
         Ok(())

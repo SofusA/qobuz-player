@@ -9,11 +9,11 @@ use tokio::try_join;
 use crate::{
     app::{NotificationList, Output},
     ui::{block, tab_bar},
-    widgets::{album_simple_list::AlbumSimpleList, playlist_list::PlaylistList},
+    widgets::{album_list::AlbumList, playlist_list::PlaylistList},
 };
 
 pub struct DiscoverState {
-    featured_albums: Vec<(String, AlbumSimpleList)>,
+    featured_albums: Vec<(String, AlbumList)>,
     featured_playlists: Vec<(String, PlaylistList)>,
     selected_sub_tab: usize,
 }
@@ -25,7 +25,7 @@ impl DiscoverState {
 
         let featured_albums = featured_albums
             .into_iter()
-            .map(|x| (x.0, AlbumSimpleList::new(x.1)))
+            .map(|x| (x.0, AlbumList::new(x.1)))
             .collect();
 
         let featured_playlists = featured_playlists

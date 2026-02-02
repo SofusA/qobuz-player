@@ -12,7 +12,7 @@ use crate::{
     app::{NotificationList, Output},
     ui::{block, center, centered_rect_fixed, render_input, tab_bar},
     widgets::{
-        album_simple_list::AlbumSimpleList,
+        album_list::AlbumList,
         playlist_list::PlaylistList,
         track_list::{TrackList, TrackListEvent},
     },
@@ -20,7 +20,7 @@ use crate::{
 
 pub struct ArtistPopupState {
     artist_name: String,
-    albums: AlbumSimpleList,
+    albums: AlbumList,
     show_top_track: bool,
     top_tracks: TrackList,
     id: u32,
@@ -37,7 +37,7 @@ impl ArtistPopupState {
 
         let mut state = Self {
             artist_name: artist.name.clone(),
-            albums: AlbumSimpleList::new(artist_albums),
+            albums: AlbumList::new(artist_albums),
             show_top_track: false,
             top_tracks: TrackList::new(artist_page.top_tracks),
             id: artist.id,
