@@ -115,7 +115,7 @@ impl AlbumList {
     }
 }
 
-fn album_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
+pub fn album_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
     let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|album| {

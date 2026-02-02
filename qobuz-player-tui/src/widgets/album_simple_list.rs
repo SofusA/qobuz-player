@@ -1,18 +1,11 @@
 use qobuz_player_controls::{Result, client::Client, notification::Notification};
 use qobuz_player_models::AlbumSimple;
-use ratatui::{
-    buffer::Buffer,
-    crossterm::event::KeyCode,
-    layout::{Constraint, Rect},
-    style::{Modifier, Stylize},
-    text::Line,
-    widgets::{Row, StatefulWidget, Table},
-};
+use ratatui::{buffer::Buffer, crossterm::event::KeyCode, layout::Rect, widgets::StatefulWidget};
 
 use crate::{
     app::{FilteredListState, NotificationList, Output},
     popup::{AlbumPopupState, Popup},
-    ui::{COLUMN_SPACING, ROW_HIGHLIGHT_STYLE, format_duration, mark_explicit_and_hifi},
+    widgets::album_list::album_table,
 };
 
 pub struct AlbumSimpleList {
@@ -26,7 +19,7 @@ impl AlbumSimpleList {
     }
 
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        let table = album_simple_table(self.items.filter());
+        let table = album_table(self.items.filter());
         table.render(area, buf, &mut self.items.state);
     }
 
@@ -109,36 +102,4 @@ impl AlbumSimpleList {
             _ => Ok(Output::NotConsumed),
         }
     }
-}
-
-fn album_simple_table<'a>(rows: &[AlbumSimple]) -> Table<'a> {
-    let body_rows: Vec<Row<'a>> = rows
-        .iter()
-        .map(|album| {
-            Row::new(vec![
-                mark_explicit_and_hifi(album.title.clone(), album.explicit, album.hires_available),
-                Line::from(album.artist.name.clone()),
-                Line::from(format_duration(album.duration_seconds)),
-            ])
-        })
-        .collect();
-
-    let is_empty = body_rows.is_empty();
-
-    let constraints = [
-        Constraint::Ratio(2, 3),
-        Constraint::Ratio(1, 3),
-        Constraint::Length(10),
-    ];
-
-    let mut table = Table::new(body_rows, constraints)
-        .row_highlight_style(ROW_HIGHLIGHT_STYLE)
-        .column_spacing(COLUMN_SPACING);
-
-    if !is_empty {
-        table =
-            table.header(Row::new(["Title", "Artist", "Duration"]).add_modifier(Modifier::BOLD));
-    }
-
-    table
 }
