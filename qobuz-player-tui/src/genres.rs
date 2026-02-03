@@ -169,13 +169,13 @@ impl GenresState {
         let tabs = tab_bar(labels, self.selected_sub_tab);
         frame.render_widget(tabs, chunks[1]);
 
-        // Album list
-        if self.selected_sub_tab < albums.len() {
-            let list_state = &mut self.genres[self.selected_genre].albums[self.selected_sub_tab];
-            list_state.1.render(chunks[2], frame.buffer_mut());
-        } else {
-            let list_state = &mut self.genres[self.selected_genre].playlists;
-            list_state.render(chunks[2], frame.buffer_mut());
+        match self.selected_mut() {
+            Selected::Album(album_list) => {
+                album_list.render(chunks[2], frame.buffer_mut());
+            }
+            Selected::Playlist(playlist_list) => {
+                playlist_list.render(chunks[2], frame.buffer_mut());
+            }
         }
     }
 
@@ -254,21 +254,31 @@ impl GenresState {
                 self.cycle_subtab();
                 Ok(Output::Consumed)
             }
-            _ => {
-                let albums = &mut self.genres[self.selected_genre].albums;
-                if self.selected_sub_tab < albums.len() {
-                    albums[self.selected_sub_tab]
-                        .1
-                        .handle_events(code, client, notifications)
-                        .await
-                } else {
-                    self.genres[self.selected_genre]
-                        .playlists
-                        .handle_events(code, client, notifications)
-                        .await
+            _ => match self.selected_mut() {
+                Selected::Album(album_list) => {
+                    return album_list.handle_events(code, client, notifications).await;
                 }
-            }
+                Selected::Playlist(playlist_list) => {
+                    return playlist_list
+                        .handle_events(code, client, notifications)
+                        .await;
+                }
+            },
         }
+    }
+
+    fn selected_mut(&mut self) -> Selected<'_> {
+        match self.is_album() {
+            false => Selected::Playlist(&mut self.genres[self.selected_genre].playlists),
+            true => Selected::Album(
+                &mut self.genres[self.selected_genre].albums[self.selected_sub_tab].1,
+            ),
+        }
+    }
+
+    fn is_album(&self) -> bool {
+        let album_count = self.genres[self.selected_genre].albums.len();
+        self.selected_sub_tab < album_count
     }
 
     fn cycle_subtab_backwards(&mut self) {
@@ -277,7 +287,13 @@ impl GenresState {
     }
 
     fn cycle_subtab(&mut self) {
-        let count = self.genres[self.selected_genre].albums.len() + 1;
+        let count = self.genres[self.selected_genre].albums.len();
+        let count = count + 1;
         self.selected_sub_tab = (self.selected_sub_tab + 1) % count;
     }
+}
+
+enum Selected<'a> {
+    Album(&'a mut AlbumList),
+    Playlist(&'a mut PlaylistList),
 }
