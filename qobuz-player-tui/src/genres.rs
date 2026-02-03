@@ -154,16 +154,18 @@ impl GenresState {
             ])
             .split(area);
 
-        // Back button and title
-        let title = format!("← Back  |  {}", self.genres[self.selected_genre].name);
+        let title = format!("← Back | {}", self.genres[self.selected_genre].name);
         let title_widget = Paragraph::new(title)
             .style(Style::default().fg(Color::Cyan))
             .alignment(Alignment::Left);
         frame.render_widget(title_widget, chunks[0]);
 
-        // Sub tabs
         let albums = &self.genres[self.selected_genre].albums;
-        let mut labels: Vec<_> = albums.iter().map(|a| a.0.as_str()).collect();
+        let mut labels: Vec<_> = albums
+            .iter()
+            .filter(|x| !x.1.all_items().is_empty())
+            .map(|a| a.0.as_str())
+            .collect();
         labels.push("Playlists");
 
         let tabs = tab_bar(labels, self.selected_sub_tab);
@@ -267,33 +269,55 @@ impl GenresState {
         }
     }
 
-    fn selected_mut(&mut self) -> Selected<'_> {
-        match self.is_album() {
-            false => Selected::Playlist(&mut self.genres[self.selected_genre].playlists),
-            true => Selected::Album(
-                &mut self.genres[self.selected_genre].albums[self.selected_sub_tab].1,
-            ),
+    fn current_subtab(&self) -> SubTab {
+        let filtered = self.non_empty_album_indices();
+        let album_count = filtered.len();
+
+        if self.selected_sub_tab < album_count {
+            SubTab::Album(filtered[self.selected_sub_tab])
+        } else {
+            SubTab::Playlist
         }
     }
 
-    fn is_album(&self) -> bool {
-        let album_count = self.genres[self.selected_genre].albums.len();
-        self.selected_sub_tab < album_count
+    fn selected_mut(&mut self) -> Selected<'_> {
+        match self.current_subtab() {
+            SubTab::Album(original_index) => {
+                Selected::Album(&mut self.genres[self.selected_genre].albums[original_index].1)
+            }
+            SubTab::Playlist => Selected::Playlist(&mut self.genres[self.selected_genre].playlists),
+        }
     }
 
-    fn cycle_subtab_backwards(&mut self) {
-        let count = self.genres[self.selected_genre].albums.len() + 1;
-        self.selected_sub_tab = (self.selected_sub_tab + count - 1) % count;
+    fn non_empty_album_indices(&self) -> Vec<usize> {
+        self.genres[self.selected_genre]
+            .albums
+            .iter()
+            .enumerate()
+            .filter(|(_, x)| !x.1.all_items().is_empty())
+            .map(|(i, _)| i)
+            .collect()
     }
 
     fn cycle_subtab(&mut self) {
-        let count = self.genres[self.selected_genre].albums.len();
-        let count = count + 1;
-        self.selected_sub_tab = (self.selected_sub_tab + 1) % count;
+        let album_count = self.non_empty_album_indices().len();
+        let total = album_count + 1;
+        self.selected_sub_tab = (self.selected_sub_tab + 1) % total;
+    }
+
+    fn cycle_subtab_backwards(&mut self) {
+        let album_count = self.non_empty_album_indices().len();
+        let total = album_count + 1;
+        self.selected_sub_tab = (self.selected_sub_tab + total - 1) % total;
     }
 }
 
 enum Selected<'a> {
     Album(&'a mut AlbumList),
     Playlist(&'a mut PlaylistList),
+}
+
+enum SubTab {
+    Album(usize),
+    Playlist,
 }
