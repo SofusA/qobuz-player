@@ -144,7 +144,13 @@ impl SearchState {
                     .collect(),
             );
             self.artists.set_all_items(search_results.artists);
-            self.playlists.set_all_items(search_results.playlists);
+            self.playlists.set_all_items(
+                search_results
+                    .playlists
+                    .into_iter()
+                    .map(|x| x.into())
+                    .collect(),
+            );
             self.tracks.set_all_items(search_results.tracks);
         }
 

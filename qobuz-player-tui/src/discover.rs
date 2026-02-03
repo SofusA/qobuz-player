@@ -30,7 +30,12 @@ impl DiscoverState {
 
         let featured_playlists = featured_playlists
             .into_iter()
-            .map(|x| (x.0, PlaylistList::new(x.1)))
+            .map(|x| {
+                (
+                    x.0,
+                    PlaylistList::new(x.1.into_iter().map(|x| x.into()).collect()),
+                )
+            })
             .collect();
 
         Ok(Self {

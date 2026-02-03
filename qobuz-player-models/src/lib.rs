@@ -116,6 +116,32 @@ pub struct Playlist {
     pub tracks: Vec<Track>,
 }
 
+impl From<Playlist> for PlaylistSimple {
+    fn from(value: Playlist) -> Self {
+        Self {
+            is_owned: value.is_owned,
+            title: value.title,
+            duration_seconds: value.duration_seconds,
+            tracks_count: value.tracks_count,
+            id: value.id,
+            image: value.image,
+        }
+    }
+}
+impl From<PlaylistSimple> for Playlist {
+    fn from(value: PlaylistSimple) -> Self {
+        Self {
+            is_owned: value.is_owned,
+            title: value.title,
+            duration_seconds: value.duration_seconds,
+            tracks_count: value.tracks_count,
+            id: value.id,
+            image: value.image,
+            tracks: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct PlaylistSimple {
     pub is_owned: bool,

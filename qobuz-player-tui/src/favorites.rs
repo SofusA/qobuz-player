@@ -36,7 +36,9 @@ impl FavoritesState {
             filter: Default::default(),
             albums: AlbumList::new(favorites.albums),
             artists: ArtistList::new(favorites.artists),
-            playlists: PlaylistList::new(favorites.playlists),
+            playlists: PlaylistList::new(
+                favorites.playlists.into_iter().map(|x| x.into()).collect(),
+            ),
             tracks: TrackList::new(favorites.tracks),
             sub_tab: Default::default(),
         })

@@ -9,7 +9,7 @@ use ratatui::{
 use crate::{
     app::{NotificationList, Output},
     ui::{block, tab_bar},
-    widgets::album_list::AlbumList,
+    widgets::{album_list::AlbumList, playlist_list::PlaylistList},
 };
 
 pub struct GenresState {
@@ -23,6 +23,7 @@ struct GenreItem {
     id: u32,
     name: String,
     albums: Vec<(String, AlbumList)>,
+    playlists: PlaylistList,
 }
 
 #[derive(PartialEq)]
@@ -40,7 +41,8 @@ impl GenresState {
             .map(|g| GenreItem {
                 id: g.id,
                 name: g.name,
-                albums: Vec::new(),
+                albums: Default::default(),
+                playlists: Default::default(),
             })
             .collect();
 
@@ -52,16 +54,19 @@ impl GenresState {
         })
     }
 
-    async fn load_genre_albums(&mut self, client: &Client) -> Result<()> {
-        if self.genres[self.selected_genre].albums.is_empty() {
-            let genre_id = self.genres[self.selected_genre].id;
-            let albums = client.genre_albums(genre_id).await?;
+    async fn load_genre(&mut self, client: &Client) -> Result<()> {
+        let genre_id = self.genres[self.selected_genre].id;
 
-            self.genres[self.selected_genre].albums = albums
-                .into_iter()
-                .map(|x| (x.0, AlbumList::new(x.1)))
-                .collect();
-        }
+        let albums = client.genre_albums(genre_id).await?;
+        let playlists = client.genre_playlists(genre_id).await?;
+
+        self.genres[self.selected_genre].albums = albums
+            .into_iter()
+            .map(|x| (x.0, AlbumList::new(x.1)))
+            .collect();
+
+        self.genres[self.selected_genre].playlists = PlaylistList::new(playlists);
+
         Ok(())
     }
 }
@@ -158,23 +163,19 @@ impl GenresState {
 
         // Sub tabs
         let albums = &self.genres[self.selected_genre].albums;
-        let labels: Vec<_> = albums.iter().map(|a| a.0.as_str()).collect();
+        let mut labels: Vec<_> = albums.iter().map(|a| a.0.as_str()).collect();
+        labels.push("Playlists");
 
-        if !labels.is_empty() {
-            let tabs = tab_bar(labels, self.selected_sub_tab);
-            frame.render_widget(tabs, chunks[1]);
+        let tabs = tab_bar(labels, self.selected_sub_tab);
+        frame.render_widget(tabs, chunks[1]);
 
-            // Album list
-            if self.selected_sub_tab < albums.len() {
-                let list_state =
-                    &mut self.genres[self.selected_genre].albums[self.selected_sub_tab];
-                list_state.1.render(chunks[2], frame.buffer_mut());
-            }
+        // Album list
+        if self.selected_sub_tab < albums.len() {
+            let list_state = &mut self.genres[self.selected_genre].albums[self.selected_sub_tab];
+            list_state.1.render(chunks[2], frame.buffer_mut());
         } else {
-            let loading = Paragraph::new("Loading albums...")
-                .style(Style::default().fg(Color::Yellow))
-                .alignment(Alignment::Center);
-            frame.render_widget(loading, chunks[2]);
+            let list_state = &mut self.genres[self.selected_genre].playlists;
+            list_state.render(chunks[2], frame.buffer_mut());
         }
     }
 
@@ -225,7 +226,7 @@ impl GenresState {
                 Ok(Output::Consumed)
             }
             KeyCode::Enter => {
-                self.load_genre_albums(client).await?;
+                self.load_genre(client).await?;
                 self.mode = GenresMode::GenreDetail;
                 self.selected_sub_tab = 0;
                 Ok(Output::Consumed)
@@ -261,23 +262,22 @@ impl GenresState {
                         .handle_events(code, client, notifications)
                         .await
                 } else {
-                    Ok(Output::NotConsumed)
+                    self.genres[self.selected_genre]
+                        .playlists
+                        .handle_events(code, client, notifications)
+                        .await
                 }
             }
         }
     }
 
     fn cycle_subtab_backwards(&mut self) {
-        let count = self.genres[self.selected_genre].albums.len();
-        if count > 0 {
-            self.selected_sub_tab = (self.selected_sub_tab + count - 1) % count;
-        }
+        let count = self.genres[self.selected_genre].albums.len() + 1;
+        self.selected_sub_tab = (self.selected_sub_tab + count - 1) % count;
     }
 
     fn cycle_subtab(&mut self) {
-        let count = self.genres[self.selected_genre].albums.len();
-        if count > 0 {
-            self.selected_sub_tab = (self.selected_sub_tab + 1) % count;
-        }
+        let count = self.genres[self.selected_genre].albums.len() + 1;
+        self.selected_sub_tab = (self.selected_sub_tab + 1) % count;
     }
 }

@@ -1,5 +1,5 @@
 use qobuz_player_controls::{Result, client::Client, notification::Notification};
-use qobuz_player_models::Playlist;
+use qobuz_player_models::PlaylistSimple;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::KeyCode,
@@ -17,11 +17,11 @@ use crate::{
 
 #[derive(Default)]
 pub struct PlaylistList {
-    items: FilteredListState<Playlist>,
+    items: FilteredListState<PlaylistSimple>,
 }
 
 impl PlaylistList {
-    pub fn new(playlists: Vec<Playlist>) -> Self {
+    pub fn new(playlists: Vec<PlaylistSimple>) -> Self {
         let playlists = FilteredListState::new(playlists);
         Self { items: playlists }
     }
@@ -31,15 +31,15 @@ impl PlaylistList {
         table.render(area, buf, &mut self.items.state);
     }
 
-    pub fn set_filter(&mut self, items: Vec<Playlist>) {
+    pub fn set_filter(&mut self, items: Vec<PlaylistSimple>) {
         self.items.set_filter(items);
     }
 
-    pub fn all_items(&self) -> &Vec<Playlist> {
+    pub fn all_items(&self) -> &Vec<PlaylistSimple> {
         self.items.all_items()
     }
 
-    pub fn set_all_items(&mut self, items: Vec<Playlist>) {
+    pub fn set_all_items(&mut self, items: Vec<PlaylistSimple>) {
         self.items.set_all_items(items);
     }
 
@@ -47,7 +47,7 @@ impl PlaylistList {
         self.items.state.selected()
     }
 
-    pub fn get(&self, index: usize) -> Option<&Playlist> {
+    pub fn get(&self, index: usize) -> Option<&PlaylistSimple> {
         self.items.filter().get(index)
     }
 
@@ -145,7 +145,7 @@ impl PlaylistList {
     }
 }
 
-fn playlist_list<'a>(rows: &[Playlist]) -> Table<'a> {
+fn playlist_list<'a>(rows: &[PlaylistSimple]) -> Table<'a> {
     let body_rows: Vec<Row<'a>> = rows
         .iter()
         .map(|playlist| {

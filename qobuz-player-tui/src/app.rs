@@ -111,7 +111,13 @@ impl fmt::Display for Tab {
 }
 
 impl Tab {
-    pub const VALUES: [Self; 5] = [Tab::Favorites, Tab::Search, Tab::Queue, Tab::Discover, Tab::Genres];
+    pub const VALUES: [Self; 5] = [
+        Tab::Favorites,
+        Tab::Search,
+        Tab::Queue,
+        Tab::Discover,
+        Tab::Genres,
+    ];
 }
 
 #[derive(Default)]
@@ -220,7 +226,9 @@ impl App {
 
         self.favorites.albums.set_all_items(favorites.albums);
         self.favorites.artists.set_all_items(favorites.artists);
-        self.favorites.playlists.set_all_items(favorites.playlists);
+        self.favorites
+            .playlists
+            .set_all_items(favorites.playlists.into_iter().map(|x| x.into()).collect());
         self.favorites.tracks.set_all_items(favorites.tracks);
         self.favorites.filter.reset();
     }
@@ -324,6 +332,7 @@ impl App {
                     favs.playlists
                         .into_iter()
                         .filter(|p| p.is_owned)
+                        .map(|x| x.into())
                         .collect::<Vec<_>>()
                 });
 
