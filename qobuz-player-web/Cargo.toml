@@ -6,9 +6,13 @@ edition.workspace = true
 license-file.workspace = true
 repository.workspace = true
 
+[features]
+default = ["rfid"]
+rfid = ["dep:qobuz-player-rfid"]
+
 [dependencies]
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
-qobuz-player-rfid = { version = "*", path = "../qobuz-player-rfid" }
+qobuz-player-rfid = { version = "*", path = "../qobuz-player-rfid", optional = true }
 qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
 axum.workspace = true

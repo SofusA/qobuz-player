@@ -7,7 +7,7 @@ use qobuz_player_controls::{
     notification::{Notification, NotificationBroadcast},
 };
 use qobuz_player_models::Favorites;
-use qobuz_player_rfid::RfidState;
+use crate::RfidState;
 use serde_json::json;
 use skabelon::Templates;
 use std::sync::Arc;

@@ -4,7 +4,7 @@
 
 Powered by [Qobuz](https://www.qobuz.com). Requires a paid subscription. This does not allow you to listen for free.
 
-The player includes a terminal ui, a web-ui and a RFID player. 
+The player includes a terminal ui, a web-ui and a RFID player.  
 The web interface is ideal for a setup with a single board computer, e.g. Raspberry Pi, connected to the speaker system and controlled with a smartphone or tablet.
 
 ### Terminal UI
@@ -26,19 +26,19 @@ Read more [in the wiki](https://github.com/SofusA/qobuz-player/wiki/RFID-player)
 - High resolution audio: Supports up to 24bit/192Khz (max quality Qobuz offers)
 - MPRIS support (control via [playerctl](https://github.com/altdesktop/playerctl) or other D-Bus client)
 - Gap-less playback
-- Web UI 
-- Terminal UI 
+- Web UI
+- Terminal UI
 
 ## Installation
+
 ### Fonts
 The terminal ui needs a [nerdfont](https://www.nerdfonts.com/) to display icons for explicit and hi-resolution.
 
 ### Download Release
-
 Download the tar.gz file for your supported OS from the releases page, extract the file and execute `qobuz-player` or copy it to your `$PATH`.
 
 ### Installation with cargo
-```
+```bash
 cargo install --git https://github.com/SofusA/qobuz-player
 ```
 ### Installation from the aur (unofficial)
@@ -46,16 +46,43 @@ Users on arch-linux (based) systems can install it from the aur as [qobuz-player
 ### Build from source
 
 Linux dependencies: `alsa-sys-devel`, `just`.
-```
-cargo build
+
+Default build (**MPRIS + RFID enabled**):
+```bash
+cargo build --release -p qobuz-player
 ```
 
+Minimal build (**no MPRIS, no RFID**):
+```bash
+cargo build --release -p qobuz-player --no-default-features
+```
+
+Build with only **MPRIS**:
+```bash
+cargo build --release -p qobuz-player --no-default-features --features mpris
+```
+
+Build with only **RFID**:
+```bash
+cargo build --release -p qobuz-player --no-default-features --features rfid
+```
+
+Build with **both** (explicit, same as default):
+```bash
+cargo build --release -p qobuz-player --no-default-features --features mpris,rfid
+```
+
+
+Notes:
+- If `mpris` is not compiled, `--disable-mpris` is not available.
+- If `rfid` is not compiled, using `--rfid` will exit with an error.
+
 ## Development
-1. Setup sqlx: `just create-env-file`. Only needed once. 
-2. Init sqlite database: `init-database`.
+1. Setup sqlx: `just create-env-file`. Only needed once.
+2. Init sqlite database: `just init-database`.
 3. For webui development in `qobuz-player-web`:
-  - `npm i`. Install npm dependencies. 
-  - `npm run watch`. Watch for style changes. 
+  - `npm i`. Install npm dependencies.
+  - `npm run watch`. Watch for style changes.
 
 ## Get started
 
@@ -73,7 +100,7 @@ qobuz-player config password
 qobuz-player
 
 # open player with web ui
-qobuz-player open --web 
+qobuz-player open --web
 ```
 
 ## Web UI
@@ -86,4 +113,4 @@ Go to `http://localhost:9888` to view the UI.
 Feature requests, issues and contributions are very welcome.
 
 ## Credits
-Qobuz-player started as a fork of [hifi.rs](https://github.com/iamdb/hifi.rs) but has since diverged. 
+Qobuz-player started as a fork of [hifi.rs](https://github.com/iamdb/hifi.rs) but has since diverged.
