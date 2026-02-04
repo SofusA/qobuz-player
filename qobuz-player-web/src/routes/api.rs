@@ -25,8 +25,8 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/api/previous", put(previous))
         .route("/api/next", put(next))
         .route("/api/volume", post(set_volume))
-        .route("/api/volume/up", post(set_volume_up))
-        .route("/api/volume/down", post(set_volume_down))
+        .route("/api/volume/up", put(set_volume_up))
+        .route("/api/volume/down", put(set_volume_down))
         .route("/api/position", post(set_position))
         .route("/api/skip-to/{track_number}", put(skip_to))
         .route(
