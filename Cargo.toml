@@ -52,5 +52,5 @@ rppal = "0.22"
 ratatui-image = { version = "10", default-features = false, features = ["image-defaults", "crossterm"] }
 tui-input = "0.15"
 image = "0.25"
-skabelon = "0.1.18"
+skabelon = "0.2.0"
 parking_lot = "0.12.5"
