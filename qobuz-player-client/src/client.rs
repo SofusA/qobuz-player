@@ -15,7 +15,8 @@ use crate::{
         track,
     },
 };
-use base64::{Engine as _, engine::general_purpose};
+use base64::{Engine, engine::general_purpose};
+use regex::Regex;
 use reqwest::{
     Method, Response, StatusCode,
     header::{HeaderMap, HeaderValue},
@@ -971,87 +972,96 @@ struct Secrets {
     app_id: String,
 }
 
-// ported from https://github.com/vitiko98/qobuz-dl/blob/master/qobuz_dl/bundle.py
-// Retrieve the app_id and generate the secrets needed to authenticate
 async fn get_secrets(client: &reqwest::Client) -> Result<Secrets> {
-    tracing::debug!("fetching login page");
     let play_url = "https://play.qobuz.com";
-    let login_page = client.get(format!("{play_url}/login")).send().await?;
 
-    let contents = login_page.text().await.or(Err(Error::Login))?;
+    let login_html = client
+        .get(format!("{play_url}/login"))
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await
+        .map_err(|_| Error::Login)?;
 
-    let bundle_regex = regex::Regex::new(
+    let bundle_regex = Regex::new(
         r#"<script src="(/resources/\d+\.\d+\.\d+-[a-z0-9]\d{3}/bundle\.js)"></script>"#,
     )
-    .or(Err(Error::Login))?;
+    .map_err(|_| Error::Login)?;
 
-    let app_id_regex = regex::Regex::new(
+    let app_id_regex = Regex::new(
         r#"production:\{api:\{appId:"(?P<app_id>\d{9})",appSecret:"(?P<app_secret>\w{32})""#,
     )
-    .or(Err(Error::Login))?;
-    let seed_regex = regex::Regex::new(
+    .map_err(|_| Error::AppID)?;
+
+    let seed_regex = Regex::new(
         r#"[a-z]\.initialSeed\("(?P<seed>[\w=]+)",window\.utimezone\.(?P<timezone>[a-z]+)\)"#,
     )
-    .or(Err(Error::Login))?;
+    .map_err(|_| Error::Login)?;
+
+    let bundle_path = bundle_regex
+        .captures(&login_html)
+        .and_then(|c| c.get(1))
+        .ok_or(Error::AppID)?
+        .as_str();
+
+    let bundle_html = client
+        .get(format!("{play_url}{bundle_path}"))
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await
+        .map_err(|_| Error::AppID)?;
+
+    let app_captures = app_id_regex.captures(&bundle_html).ok_or(Error::AppID)?;
+    let app_id = app_captures
+        .name("app_id")
+        .ok_or(Error::AppID)?
+        .as_str()
+        .to_owned();
 
     let mut secrets = HashMap::new();
 
-    let app_id = if let Some(captures) = bundle_regex.captures(contents.as_str()) {
-        let bundle_path = captures.get(1).map_or("", |m| m.as_str());
-        let bundle_url = format!("{play_url}{bundle_path}");
-        if let Ok(bundle_page) = client.get(bundle_url).send().await {
-            if let Ok(bundle_contents) = bundle_page.text().await {
-                if let Some(captures) = app_id_regex.captures(bundle_contents.as_str()) {
-                    let found_app_id = captures
-                        .name("app_id")
-                        .map_or("".to_string(), |m| m.as_str().to_string());
+    for seed_cap in seed_regex.captures_iter(&bundle_html) {
+        let seed = seed_cap.name("seed").ok_or(Error::Login)?.as_str();
+        let mut timezone = seed_cap
+            .name("timezone")
+            .ok_or(Error::Login)?
+            .as_str()
+            .to_owned();
 
-                    let seed_data = seed_regex.captures_iter(bundle_contents.as_str());
+        capitalize(timezone.as_mut_str());
 
-                    seed_data.for_each(|s| {
-                            let seed = s.name("seed").map_or("", |m| m.as_str()).to_string();
-                            let mut timezone =
-                                s.name("timezone").map_or("", |m| m.as_str()).to_string();
-                            capitalize(timezone.as_mut_str());
+        let info_re_str = format!(
+            r#"name:"\w+/(?P<timezone>{}([a-z]?))",info:"(?P<info>[\w=]+)",extras:"(?P<extras>[\w=]+)""#,
+            timezone
+        );
+        let info_re = Regex::new(&info_re_str).map_err(|_| Error::Login)?;
 
-                            let info_regex = format!(r#"name:"\w+/(?P<timezone>{}([a-z]?))",info:"(?P<info>[\w=]+)",extras:"(?P<extras>[\w=]+)""#, &timezone);
-                            regex::Regex::new(info_regex.as_str())
-                                .expect("Unable to create regex")
-                                .captures_iter(bundle_contents.as_str())
-                                .for_each(|c| {
-                                    let timezone =
-                                        c.name("timezone").map_or("", |m| m.as_str()).to_string();
-                                    let info =
-                                        c.name("info").map_or("", |m| m.as_str()).to_string();
-                                    let extras =
-                                        c.name("extras").map_or("", |m| m.as_str()).to_string();
+        for c in info_re.captures_iter(&bundle_html) {
+            let tz_full = c.name("timezone").ok_or(Error::Login)?.as_str().to_owned();
+            let info = c.name("info").ok_or(Error::Login)?.as_str();
+            let extras = c.name("extras").ok_or(Error::Login)?.as_str();
 
-                                    let chars = format!("{seed}{info}{extras}");
+            let chars = format!("{seed}{info}{extras}");
 
-                                    let encoded_secret = chars[..chars.len() - 44].to_string();
-                                    let decoded_secret = general_purpose::URL_SAFE
-                                        .decode(encoded_secret)
-                                        .expect("failed to decode base64 secret");
-                                    let secret_utf8 = std::str::from_utf8(&decoded_secret)
-                                        .expect("failed to convert base64 to string")
-                                        .to_string();
-
-                                    secrets.insert(timezone, secret_utf8);
-                                });
-                        });
-                    found_app_id
-                } else {
-                    return Err(Error::AppID);
-                }
-            } else {
-                return Err(Error::AppID);
+            if chars.len() <= 44 {
+                continue;
             }
-        } else {
-            return Err(Error::AppID);
+
+            let encoded_secret = &chars[..chars.len() - 44];
+
+            let decoded = general_purpose::URL_SAFE
+                .decode(encoded_secret)
+                .map_err(|_| Error::Login)?;
+            let secret = std::str::from_utf8(&decoded)
+                .map_err(|_| Error::Login)?
+                .to_owned();
+
+            secrets.insert(tz_full, secret);
         }
-    } else {
-        return Err(Error::AppID);
-    };
+    }
 
     Ok(Secrets { secrets, app_id })
 }
