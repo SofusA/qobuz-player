@@ -2,6 +2,7 @@ use std::{
     io::{Write, stdin, stdout},
     path::PathBuf,
     sync::Arc,
+    time::Duration,
 };
 
 use clap::{Parser, Subcommand};
@@ -40,6 +41,14 @@ enum Commands {
         #[clap(short, long)]
         /// Provide max audio quality (overrides any configured value)
         max_audio_quality: Option<AudioQuality>,
+
+        #[clap(long)]
+        /// Delay playback when changing state from paused to playing in milliseconds
+        state_change_delay_ms: Option<u64>,
+
+        #[clap(short, long)]
+        /// Delay playback when changing sample rate in milliseconds
+        sample_rate_change_delay_ms: Option<u64>,
 
         #[clap(short, long, default_value_t = false)]
         /// Disable the TUI interface
@@ -159,6 +168,8 @@ pub async fn run() -> Result<(), Error> {
         username: Default::default(),
         password: Default::default(),
         max_audio_quality: Default::default(),
+        state_change_delay_ms: Default::default(),
+        sample_rate_change_delay_ms: Default::default(),
         disable_tui: Default::default(),
         #[cfg(target_os = "linux")]
         disable_mpris: Default::default(),
@@ -176,6 +187,8 @@ pub async fn run() -> Result<(), Error> {
             username,
             password,
             max_audio_quality,
+            state_change_delay_ms,
+            sample_rate_change_delay_ms,
             disable_tui,
             #[cfg(target_os = "linux")]
             disable_mpris,
@@ -216,6 +229,9 @@ pub async fn run() -> Result<(), Error> {
                     .ok_or(Error::PasswordMissing)?,
             };
 
+            let state_change_delay = state_change_delay_ms.map(Duration::from_millis);
+            let sample_rate_change_delay = sample_rate_change_delay_ms.map(Duration::from_millis);
+
             let max_audio_quality = max_audio_quality.unwrap_or_else(|| {
                 database_configuration
                     .max_audio_quality
@@ -233,6 +249,8 @@ pub async fn run() -> Result<(), Error> {
                 broadcast.clone(),
                 audio_cache,
                 database.clone(),
+                state_change_delay,
+                sample_rate_change_delay,
             )?;
 
             let rfid_state = rfid.then(RfidState::default);

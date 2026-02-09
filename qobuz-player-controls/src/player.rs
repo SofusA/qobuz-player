@@ -6,6 +6,7 @@ use tokio::{
         mpsc,
         watch::{self, Receiver, Sender},
     },
+    time::sleep,
 };
 
 use crate::{
@@ -45,9 +46,12 @@ pub struct Player {
     next_track_is_queried: bool,
     next_track_in_sink_queue: bool,
     downloader: Downloader,
+    state_change_delay: Option<Duration>,
+    sample_rate_change_delay: Option<Duration>,
 }
 
 impl Player {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         tracklist: Tracklist,
         client: Arc<Client>,
@@ -55,6 +59,8 @@ impl Player {
         broadcast: Arc<NotificationBroadcast>,
         audio_cache_dir: PathBuf,
         database: Arc<Database>,
+        state_change_delay: Option<Duration>,
+        sample_rate_change_delay: Option<Duration>,
     ) -> Result<Self> {
         let (volume, volume_receiver) = watch::channel(volume);
         let sink = Sink::new(volume_receiver)?;
@@ -88,6 +94,8 @@ impl Player {
             next_track_in_sink_queue: false,
             next_track_is_queried: false,
             downloader,
+            state_change_delay,
+            sample_rate_change_delay,
         })
     }
 
@@ -125,6 +133,7 @@ impl Player {
     async fn play(&mut self) -> Result<()> {
         tracing::info!("Play");
 
+        self.wait_for_state_change_delay().await;
         let track = self.tracklist_rx.borrow().current_track().cloned();
 
         if self.sink.is_empty()
@@ -139,6 +148,16 @@ impl Player {
         }
 
         Ok(())
+    }
+
+    async fn wait_for_state_change_delay(&self) {
+        if let Some(delay) = self.state_change_delay
+            && *self.target_status.borrow() == Status::Paused
+        {
+            self.set_target_status(Status::Buffering);
+            tracing::info!("Waiting for state change delay");
+            sleep(delay).await;
+        }
     }
 
     fn pause(&mut self) {
@@ -167,6 +186,7 @@ impl Player {
             .ensure_track_is_downloaded(track_url, track)
             .await
         {
+            self.wait_for_state_change_delay().await;
             let query_result = self.sink.query_track(&track_path)?;
 
             if next_track {
@@ -560,9 +580,13 @@ impl Player {
             Some(next_track) => {
                 if !self.next_track_in_sink_queue {
                     tracing::info!(
-                        "Track finished and next track is not in queue. Resetting queue"
+                        "Track finished and next track is not in queue. Resetting queue, and querying track."
                     );
                     self.sink.clear()?;
+                    if let Some(delay) = self.sample_rate_change_delay {
+                        tracing::info!("Waiting for sample rate change delay");
+                        sleep(delay).await;
+                    }
                     self.query_track(next_track, false).await?;
                 }
             }
@@ -579,10 +603,9 @@ impl Player {
         Ok(())
     }
 
-    fn done_buffering(&mut self, path: PathBuf) -> Result<()> {
-        if *self.target_status.borrow() != Status::Playing {
-            self.set_target_status(Status::Playing);
-        }
+    async fn done_buffering(&mut self, path: PathBuf) -> Result<()> {
+        self.wait_for_state_change_delay().await;
+        self.set_target_status(Status::Playing);
 
         tracing::info!("Done buffering track: {}", path.to_string_lossy());
 
@@ -618,7 +641,7 @@ impl Player {
 
                 Ok(_) = self.done_buffering.changed() => {
                     let path = self.done_buffering.borrow_and_update().clone();
-                    if let Err(err) = self.done_buffering(path) {
+                    if let Err(err) = self.done_buffering(path).await {
                         self.broadcast.send_error(err.to_string());
                     };
                 }
