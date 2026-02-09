@@ -46,7 +46,7 @@ enum Commands {
         /// Delay playback when changing state from paused to playing in milliseconds
         state_change_delay_ms: Option<u64>,
 
-        #[clap(short, long)]
+        #[clap(long)]
         /// Delay playback when changing sample rate in milliseconds
         sample_rate_change_delay_ms: Option<u64>,
 
