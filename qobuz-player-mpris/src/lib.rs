@@ -6,7 +6,7 @@ use mpris_server::{
     zbus::{self, fdo},
 };
 use qobuz_player_controls::{
-    ExitSender, PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver,
+    ExitSender, PositionReceiver, AppResult, Status, StatusReceiver, TracklistReceiver,
     VolumeReceiver, controls::Controls, error::Error,
 };
 use qobuz_player_models::Track;
@@ -207,7 +207,7 @@ pub async fn init(
     mut status_receiver: StatusReceiver,
     controls: Controls,
     exit_sender: ExitSender,
-) -> Result<()> {
+) -> AppResult<()> {
     let mut exit_receiver = exit_sender.subscribe();
 
     let Ok(server) = Server::new(

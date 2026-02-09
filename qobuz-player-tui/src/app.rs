@@ -12,7 +12,7 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use futures::StreamExt;
 use image::load_from_memory;
 use qobuz_player_controls::{
-    PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver,
+    PositionReceiver, AppResult, Status, StatusReceiver, TracklistReceiver,
     client::Client,
     controls::Controls,
     notification::{Notification, NotificationBroadcast},
@@ -233,7 +233,7 @@ impl App {
         self.favorites.filter.reset();
     }
 
-    async fn handle_output(&mut self, key_code: KeyCode, output: Result<Output>) {
+    async fn handle_output(&mut self, key_code: KeyCode, output: AppResult<Output>) {
         let output = match output {
             Ok(res) => res,
             Err(err) => {

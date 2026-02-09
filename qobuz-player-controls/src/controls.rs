@@ -47,6 +47,9 @@ pub enum ControlCommand {
     ReorderQueue {
         new_order: Vec<usize>,
     },
+    NewQueue {
+        tracks: Vec<u32>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -160,6 +163,12 @@ impl Controls {
     pub fn reorder_queue(&self, new_order: Vec<usize>) {
         self.tx
             .send(ControlCommand::ReorderQueue { new_order })
+            .expect("infallible");
+    }
+
+    pub fn new_queue(&self, tracks: Vec<u32>) {
+        self.tx
+            .send(ControlCommand::NewQueue { tracks })
             .expect("infallible");
     }
 }

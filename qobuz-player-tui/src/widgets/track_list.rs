@@ -1,5 +1,5 @@
 use qobuz_player_controls::{
-    Result, client::Client, controls::Controls, notification::Notification,
+    AppResult, client::Client, controls::Controls, notification::Notification,
 };
 use qobuz_player_models::Track;
 use ratatui::{
@@ -66,7 +66,7 @@ impl TrackList {
         controls: &Controls,
         notifications: &mut NotificationList,
         event_type: TrackListEvent,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match event {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.items.state.select_next();

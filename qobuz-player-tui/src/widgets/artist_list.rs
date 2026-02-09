@@ -1,4 +1,4 @@
-use qobuz_player_controls::{Result, client::Client, notification::Notification};
+use qobuz_player_controls::{AppResult, client::Client, notification::Notification};
 use qobuz_player_models::Artist;
 use ratatui::{
     buffer::Buffer,
@@ -54,7 +54,7 @@ impl ArtistList {
         event: KeyCode,
         client: &Client,
         notifications: &mut NotificationList,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match event {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.items.state.select_next();

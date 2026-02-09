@@ -16,7 +16,7 @@ pub mod simple_cache;
 pub mod sink;
 pub mod tracklist;
 
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+pub type AppResult<T, E = Error> = std::result::Result<T, E>;
 
 pub type PositionReceiver = watch::Receiver<Duration>;
 pub type VolumeReceiver = watch::Receiver<f32>;

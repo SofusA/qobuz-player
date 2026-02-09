@@ -1,4 +1,4 @@
-use qobuz_player_controls::{Result, client::Client, controls::Controls};
+use qobuz_player_controls::{AppResult, client::Client, controls::Controls};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
@@ -69,7 +69,7 @@ impl SearchState {
         client: &Client,
         controls: &Controls,
         notifications: &mut NotificationList,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match &mut self.editing {
@@ -132,7 +132,7 @@ impl SearchState {
         }
     }
 
-    async fn update_search(&mut self, client: &Client) -> Result<()> {
+    async fn update_search(&mut self, client: &Client) -> AppResult<()> {
         if !self.filter.value().trim().is_empty() {
             let search_results = client.search(self.filter.value().to_string()).await?;
 

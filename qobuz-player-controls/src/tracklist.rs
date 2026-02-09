@@ -24,11 +24,7 @@ pub struct TopTracklist {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub struct SingleTracklist {
-    pub track_title: String,
-    pub album_id: Option<String>,
-    pub image: Option<String>,
-}
+pub struct SingleTracklist {}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TracklistType {
@@ -70,6 +66,10 @@ impl Tracklist {
             .iter()
             .find(|t| t.status == TrackStatus::Playing)
             .map(|x| x.id)
+    }
+
+    pub fn next_track_id(&self) -> Option<u32> {
+        self.next_track().map(|x| x.id)
     }
 
     pub fn current_position(&self) -> usize {
@@ -135,11 +135,13 @@ impl Tracklist {
                 link: Some(format!("/artist/{}", tracklist.id)),
                 cover_link,
             },
-            TracklistType::Track(tracklist) => Entity {
+            TracklistType::Track(_) => Entity {
                 title: current_track
                     .as_ref()
                     .and_then(|track| track.album_title.clone()),
-                link: tracklist.album_id.as_ref().map(|id| format!("/album/{id}")),
+                link: current_track
+                    .as_ref()
+                    .and_then(|track| track.album_id.as_ref().map(|id| format!("/album/{id}"))),
                 cover_link,
             },
             TracklistType::None => Entity {

@@ -11,7 +11,7 @@ use axum::{
     routing::{get, post, put},
 };
 use axum_extra::extract::Form;
-use qobuz_player_controls::{Result, client::Client, notification::Notification};
+use qobuz_player_controls::{AppResult, client::Client, notification::Notification};
 use qobuz_player_models::{AlbumSimple, Artist, Playlist, Track};
 use serde::Deserialize;
 
@@ -204,7 +204,7 @@ async fn favorite_albums(State(state): State<Arc<AppState>>) -> impl IntoRespons
     }
 }
 
-async fn get_favorite_albums(client: &Client) -> Result<Vec<AlbumSimple>> {
+async fn get_favorite_albums(client: &Client) -> AppResult<Vec<AlbumSimple>> {
     let favorites = client.favorites().await?;
     Ok(favorites.albums)
 }
@@ -216,7 +216,7 @@ async fn favorite_artists(State(state): State<Arc<AppState>>) -> impl IntoRespon
     }
 }
 
-async fn get_favorite_artists(client: &Client) -> Result<Vec<Artist>> {
+async fn get_favorite_artists(client: &Client) -> AppResult<Vec<Artist>> {
     let favorites = client.favorites().await?;
     Ok(favorites.artists)
 }
@@ -228,7 +228,7 @@ async fn favorite_playlists(State(state): State<Arc<AppState>>) -> impl IntoResp
     }
 }
 
-async fn get_favorite_playlists(client: &Client) -> Result<Vec<Playlist>> {
+async fn get_favorite_playlists(client: &Client) -> AppResult<Vec<Playlist>> {
     let favorites = client.favorites().await?;
     Ok(favorites.playlists)
 }
@@ -240,7 +240,7 @@ async fn favorite_tracks(State(state): State<Arc<AppState>>) -> impl IntoRespons
     }
 }
 
-async fn get_favorite_tracks(client: &Client) -> Result<Vec<Track>> {
+async fn get_favorite_tracks(client: &Client) -> AppResult<Vec<Track>> {
     let favorites = client.favorites().await?;
     Ok(favorites.tracks)
 }

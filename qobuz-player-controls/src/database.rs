@@ -1,4 +1,4 @@
-use crate::{AudioQuality, Error, Result, Tracklist};
+use crate::{AudioQuality, Error, AppResult, Tracklist};
 use serde_json::to_string;
 use sqlx::types::Json;
 use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
@@ -9,7 +9,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn new() -> Result<Self> {
+    pub async fn new() -> AppResult<Self> {
         let database_url = if let Ok(url) = std::env::var("DATABASE_URL") {
             PathBuf::from(url.replace("sqlite://", ""))
         } else {
@@ -39,7 +39,7 @@ impl Database {
         Database::init(pool).await
     }
 
-    async fn init(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<Self> {
+    async fn init(pool: sqlx::Pool<sqlx::Sqlite>) -> AppResult<Self> {
         sqlx::migrate!("./migrations").run(&pool).await?;
 
         create_credentials_row(&pool).await?;
@@ -48,7 +48,7 @@ impl Database {
         Ok(Self { pool })
     }
 
-    pub async fn set_username(&self, username: String) -> Result<()> {
+    pub async fn set_username(&self, username: String) -> AppResult<()> {
         sqlx::query!(
             r#"
             UPDATE credentials
@@ -62,7 +62,7 @@ impl Database {
         Ok(())
     }
 
-    pub async fn set_password(&self, password: String) -> Result<()> {
+    pub async fn set_password(&self, password: String) -> AppResult<()> {
         let md5_pw = format!("{:x}", md5::compute(password));
         sqlx::query!(
             r#"
@@ -78,7 +78,7 @@ impl Database {
         Ok(())
     }
 
-    pub async fn set_tracklist(&self, tracklist: &Tracklist) -> Result<()> {
+    pub async fn set_tracklist(&self, tracklist: &Tracklist) -> AppResult<()> {
         let serialized = to_string(&tracklist)?;
 
         sqlx::query!(
@@ -114,7 +114,7 @@ impl Database {
         row.ok().map(|x| x.tracklist.0)
     }
 
-    pub async fn set_volume(&self, volume: f32) -> Result<()> {
+    pub async fn set_volume(&self, volume: f32) -> AppResult<()> {
         sqlx::query!(
             r#"
            delete from volume
@@ -148,7 +148,7 @@ impl Database {
         row.ok().map(|x| x.volume as f32)
     }
 
-    pub async fn set_max_audio_quality(&self, quality: AudioQuality) -> Result<()> {
+    pub async fn set_max_audio_quality(&self, quality: AudioQuality) -> AppResult<()> {
         let quality_id = quality as i32;
 
         sqlx::query!(
@@ -165,7 +165,7 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_credentials(&self) -> Result<DatabaseCredentials> {
+    pub async fn get_credentials(&self) -> AppResult<DatabaseCredentials> {
         Ok(sqlx::query_as!(
             DatabaseCredentials,
             r#"
@@ -177,7 +177,7 @@ impl Database {
         .await?)
     }
 
-    pub async fn get_configuration(&self) -> Result<DatabaseConfiguration> {
+    pub async fn get_configuration(&self) -> AppResult<DatabaseConfiguration> {
         Ok(sqlx::query_as!(
             DatabaseConfiguration,
             r#"
@@ -193,7 +193,7 @@ impl Database {
         &self,
         rfid_id: String,
         reference: ReferenceType,
-    ) -> Result<()> {
+    ) -> AppResult<()> {
         match reference {
             ReferenceType::Album(id) => {
                 let id = Some(id);
@@ -242,7 +242,7 @@ impl Database {
         }
     }
 
-    pub async fn clean_up_cache_entries(&self, older_than: time::Duration) -> Result<Vec<PathBuf>> {
+    pub async fn clean_up_cache_entries(&self, older_than: time::Duration) -> AppResult<Vec<PathBuf>> {
         let cutoff = time::OffsetDateTime::now_utc() - older_than;
         let cutoff_str = cutoff
             .format(&time::format_description::well_known::Rfc3339)
@@ -348,7 +348,7 @@ struct VolumeDb {
     volume: f64,
 }
 
-async fn create_credentials_row(pool: &Pool<Sqlite>) -> Result<()> {
+async fn create_credentials_row(pool: &Pool<Sqlite>) -> AppResult<()> {
     let rowid = 1;
 
     sqlx::query!(
@@ -362,7 +362,7 @@ async fn create_credentials_row(pool: &Pool<Sqlite>) -> Result<()> {
     Ok(())
 }
 
-async fn create_configuration(pool: &Pool<Sqlite>) -> Result<()> {
+async fn create_configuration(pool: &Pool<Sqlite>) -> AppResult<()> {
     let rowid = 1;
     sqlx::query!(
         r#"

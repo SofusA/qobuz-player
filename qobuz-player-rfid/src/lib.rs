@@ -1,5 +1,5 @@
 use qobuz_player_controls::{
-    Result, TracklistReceiver,
+    AppResult, TracklistReceiver,
     controls::Controls,
     database::{Database, LinkRequest, ReferenceType},
     error::Error,
@@ -23,7 +23,7 @@ pub async fn init(
     controls: Controls,
     database: Arc<Database>,
     broadcast: Arc<NotificationBroadcast>,
-) -> Result<()> {
+) -> AppResult<()> {
     let mut reader = tokio::io::BufReader::new(tokio::io::stdin());
     let mut out = tokio::io::stdout();
     let mut line = String::new();

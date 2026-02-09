@@ -1,4 +1,4 @@
-use qobuz_player_controls::Result;
+use qobuz_player_controls::AppResult;
 use qobuz_player_controls::client::Client;
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
@@ -33,7 +33,7 @@ enum GenresMode {
 }
 
 impl GenresState {
-    pub async fn new(client: &Client) -> Result<Self> {
+    pub async fn new(client: &Client) -> AppResult<Self> {
         let genres_list = client.genres().await?;
 
         let genres = genres_list
@@ -54,7 +54,7 @@ impl GenresState {
         })
     }
 
-    async fn load_genre(&mut self, client: &Client) -> Result<()> {
+    async fn load_genre(&mut self, client: &Client) -> AppResult<()> {
         let genre_id = self.genres[self.selected_genre].id;
 
         let albums = client.genre_albums(genre_id).await?;
@@ -186,7 +186,7 @@ impl GenresState {
         event: Event,
         client: &Client,
         notifications: &mut NotificationList,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self.mode {
                 GenresMode::GenreList => {
@@ -201,7 +201,7 @@ impl GenresState {
         }
     }
 
-    async fn handle_genre_list_events(&mut self, code: KeyCode, client: &Client) -> Result<Output> {
+    async fn handle_genre_list_events(&mut self, code: KeyCode, client: &Client) -> AppResult<Output> {
         match code {
             KeyCode::Up | KeyCode::Char('k') => {
                 if self.selected_genre >= 2 {
@@ -242,7 +242,7 @@ impl GenresState {
         code: KeyCode,
         client: &Client,
         notifications: &mut NotificationList,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match code {
             KeyCode::Esc | KeyCode::Char('q') => {
                 self.mode = GenresMode::GenreList;

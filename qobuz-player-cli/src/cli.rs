@@ -63,6 +63,10 @@ enum Commands {
         /// Disable the mpris interface
         disable_mpris: bool,
 
+        #[clap(long, default_value_t = false)]
+        /// Enable qobuz connect (experimental)
+        connect: bool,
+
         #[clap(short, long, default_value_t = false)]
         /// Start web server with web api and ui
         web: bool,
@@ -127,11 +131,21 @@ pub enum Error {
     PasswordMissing,
     #[snafu(display("Error reading error prompt"))]
     PasswordError,
+    #[snafu(display("{error}"))]
+    ConnectError { error: String },
 }
 
 impl From<qobuz_player_controls::error::Error> for Error {
     fn from(error: qobuz_player_controls::error::Error) -> Self {
         Error::PlayerError {
+            error: error.to_string(),
+        }
+    }
+}
+
+impl From<qobuz_player_connect::Error> for Error {
+    fn from(error: qobuz_player_connect::Error) -> Self {
+        Error::ConnectError {
             error: error.to_string(),
         }
     }
@@ -173,6 +187,7 @@ pub async fn run() -> Result<(), Error> {
         disable_tui: Default::default(),
         #[cfg(target_os = "linux")]
         disable_mpris: Default::default(),
+        connect: Default::default(),
         web: Default::default(),
         web_secret: Default::default(),
         rfid: Default::default(),
@@ -192,6 +207,7 @@ pub async fn run() -> Result<(), Error> {
             disable_tui,
             #[cfg(target_os = "linux")]
             disable_mpris,
+            connect,
             web,
             web_secret,
             rfid,
@@ -239,7 +255,7 @@ pub async fn run() -> Result<(), Error> {
                     .expect("This should always convert")
             });
 
-            let client = Arc::new(Client::new(username, password, max_audio_quality));
+            let client = Arc::new(Client::new(username, password, max_audio_quality.clone()));
 
             let broadcast = Arc::new(NotificationBroadcast::new());
             let mut player = Player::new(
@@ -252,6 +268,32 @@ pub async fn run() -> Result<(), Error> {
                 state_change_delay,
                 sample_rate_change_delay,
             )?;
+
+            let app_id = client.app_id().await?.to_string();
+
+            if connect {
+                let position_receiver = player.position();
+                let tracklist_receiver = player.tracklist();
+                let volume_receiver = player.volume();
+                let status_receiver = player.status();
+                let controls = player.controls();
+
+                tokio::spawn(async move {
+                    if let Err(e) = qobuz_player_connect::init(
+                        &app_id,
+                        controls,
+                        position_receiver,
+                        tracklist_receiver,
+                        status_receiver,
+                        volume_receiver,
+                        max_audio_quality,
+                    )
+                    .await
+                    {
+                        error_exit(e.into());
+                    }
+                });
+            }
 
             let rfid_state = rfid.then(RfidState::default);
 
