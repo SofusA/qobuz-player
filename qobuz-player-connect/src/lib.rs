@@ -20,6 +20,7 @@ struct ConnectState {
     status_receiver: StatusReceiver,
     volume_receiver: VolumeReceiver,
     audio_quality: i32,
+    connected: bool,
 }
 
 pub async fn init(
@@ -40,6 +41,7 @@ pub async fn init(
         status_receiver,
         volume_receiver: volume_receiver.clone(),
         audio_quality,
+        connected: false,
     };
 
     connect_state.run(app_id).await?;
@@ -50,7 +52,7 @@ pub async fn init(
 fn current_state(
     status: &Status,
     position: &Duration,
-    _tracklist: &Tracklist, // TODO
+    tracklist: &Tracklist,
 ) -> QueueRendererState {
     let mut response_state = msg::QueueRendererState::default();
 
@@ -64,8 +66,8 @@ fn current_state(
         Status::Buffering => BufferState::Buffering,
     };
 
-    // response_state.current_queue_item_id = tracklist.currently_playing().map(|x| x as i32);
-    // response_state.next_queue_item_id = tracklist.next_track_id().map(|x| x as i32);
+    response_state.current_queue_item_id = Some(tracklist.current_position() as i32);
+    response_state.next_queue_item_id = tracklist.next_track_position().map(|x| x as i32);
 
     response_state.set_playing_state(current_state);
     response_state.set_buffer_state(buffering_state);
@@ -98,6 +100,9 @@ fn convert_volume(volume: f32) -> u32 {
 
 impl ConnectState {
     async fn handle_position_changed(&mut self, session: &DeviceSession) -> qonductor::Result<()> {
+        if !self.connected {
+            return Ok(());
+        }
         let position = {
             let position = self.position_receiver.borrow_and_update();
             *position
@@ -112,6 +117,9 @@ impl ConnectState {
     }
 
     async fn handle_tracklist_changed(&mut self, session: &DeviceSession) -> qonductor::Result<()> {
+        if !self.connected {
+            return Ok(());
+        }
         let tracklist = self.tracklist_receiver.borrow_and_update().clone();
         let position = {
             let position = self.position_receiver.borrow();
@@ -126,6 +134,9 @@ impl ConnectState {
     }
 
     async fn handle_volume_changed(&mut self, session: &DeviceSession) -> qonductor::Result<()> {
+        if !self.connected {
+            return Ok(());
+        }
         let volume = convert_volume(*self.volume_receiver.borrow_and_update());
         tracing::info!("Updating volume state after volume change");
         session.report_volume(volume).await?;
@@ -133,6 +144,9 @@ impl ConnectState {
     }
 
     async fn handle_status_changed(&mut self, session: &DeviceSession) -> qonductor::Result<()> {
+        if !self.connected {
+            return Ok(());
+        }
         let position = {
             let position = self.position_receiver.borrow();
             *position
@@ -174,7 +188,7 @@ impl ConnectState {
         }
     }
 
-    fn handle_event(&self, event: SessionEvent) {
+    fn handle_event(&mut self, event: SessionEvent) {
         match event {
             SessionEvent::Command(command) => match command {
                 Command::SetState { cmd, respond } => {
@@ -245,7 +259,10 @@ impl ConnectState {
                 }
             },
             SessionEvent::Notification(n) => match n {
-                Notification::Connected => tracing::info!("Connected!"),
+                Notification::Connected => {
+                    self.connected = true;
+                    tracing::info!("Connected!")
+                }
                 Notification::DeviceRegistered { renderer_id, .. } => {
                     tracing::info!("Ignoring device registered as renderer {}", renderer_id);
                 }
@@ -339,6 +356,7 @@ impl ConnectState {
                 }
                 Notification::Disconnected { session_id, reason } => {
                     tracing::info!("Disconnect: {}, {:?}", session_id, reason);
+                    self.connected = false;
                 }
                 Notification::SessionClosed { device_uuid } => {
                     tracing::info!("Session closed: {:?}", device_uuid);

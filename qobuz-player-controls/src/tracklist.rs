@@ -81,6 +81,15 @@ impl Tracklist {
             .unwrap_or(0)
     }
 
+    pub fn next_track_position(&self) -> Option<usize> {
+        let current = self.current_position();
+
+        match current <= self.total() {
+            true => Some(current),
+            false => None,
+        }
+    }
+
     pub fn list_type(&self) -> &TracklistType {
         &self.list_type
     }
