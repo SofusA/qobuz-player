@@ -51,6 +51,7 @@ pub enum ControlCommand {
         tracks: Vec<u32>,
         play: bool,
     },
+    ClearQueue,
 }
 
 #[derive(Debug, Clone)]
@@ -170,6 +171,12 @@ impl Controls {
     pub fn new_queue(&self, tracks: Vec<u32>, play: bool) {
         self.tx
             .send(ControlCommand::NewQueue { tracks, play })
+            .expect("infallible");
+    }
+
+    pub fn clear_queue(&self) {
+        self.tx
+            .send(ControlCommand::ClearQueue)
             .expect("infallible");
     }
 }

@@ -23,23 +23,19 @@ pub struct TopTracklist {
     pub image: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub struct SingleTracklist {}
-
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TracklistType {
     Album(AlbumTracklist),
     Playlist(PlaylistTracklist),
     TopTracks(TopTracklist),
-    Track(SingleTracklist),
     #[default]
-    None,
+    Tracks,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Tracklist {
-    pub queue: Vec<Track>,
-    pub list_type: TracklistType,
+    queue: Vec<Track>,
+    list_type: TracklistType,
 }
 
 pub struct Entity {
@@ -49,8 +45,11 @@ pub struct Entity {
 }
 
 impl Tracklist {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(list_type: TracklistType, tracks: Vec<Track>) -> Self {
+        Self {
+            queue: tracks,
+            list_type,
+        }
     }
 
     pub fn queue(&self) -> &Vec<Track> {
@@ -70,6 +69,28 @@ impl Tracklist {
 
     pub fn next_track_id(&self) -> Option<u32> {
         self.next_track().map(|x| x.id)
+    }
+
+    pub fn remove_track(&mut self, index: usize) {
+        self.queue.remove(index);
+    }
+
+    pub fn push_track(&mut self, track: Track) {
+        self.queue.push(track);
+    }
+
+    pub fn insert_track(&mut self, index: usize, track: Track) {
+        self.queue.insert(index, track);
+    }
+
+    pub fn reorder_queue(&mut self, new_order: Vec<usize>) {
+        if new_order.iter().enumerate().all(|(i, &v)| i == v) {
+            return;
+        }
+
+        let reordered: Vec<_> = new_order.iter().map(|&i| self.queue[i].clone()).collect();
+
+        self.queue = reordered;
     }
 
     pub fn current_position(&self) -> usize {
@@ -144,18 +165,13 @@ impl Tracklist {
                 link: Some(format!("/artist/{}", tracklist.id)),
                 cover_link,
             },
-            TracklistType::Track(_) => Entity {
+            TracklistType::Tracks => Entity {
                 title: current_track
                     .as_ref()
                     .and_then(|track| track.album_title.clone()),
                 link: current_track
                     .as_ref()
                     .and_then(|track| track.album_id.as_ref().map(|id| format!("/album/{id}"))),
-                cover_link,
-            },
-            TracklistType::None => Entity {
-                title: None,
-                link: None,
                 cover_link,
             },
         }

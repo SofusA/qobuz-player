@@ -272,10 +272,11 @@ impl ConnectState {
                     self.controls.new_queue(track_ids, false);
                 }
                 Notification::SessionState(session_state) => {
-                    tracing::info!("Session State: {:?}", session_state);
+                    tracing::info!("Ignoring session state message: {:?}", session_state);
                 }
                 Notification::QueueCleared(queue_cleared) => {
                     tracing::info!("Queue cleared: {:?}", queue_cleared);
+                    self.controls.clear_queue();
                 }
                 Notification::QueueLoadTracks(queue) => {
                     tracing::info!("Queue load tracks: {:?}", queue);
@@ -284,9 +285,11 @@ impl ConnectState {
                     self.controls.new_queue(track_ids, true);
                 }
                 Notification::QueueTracksAdded(queue_tracks_added) => {
+                    // Added in end of queue
                     tracing::info!("Queue tracks added: {:?}", queue_tracks_added);
                 }
                 Notification::QueueTracksInserted(queue_tracks_inserted) => {
+                    // Next in queue
                     tracing::info!("Queue tracks inserted: {:?}", queue_tracks_inserted);
                 }
                 Notification::QueueTracksRemoved(queue_tracks_removed) => {

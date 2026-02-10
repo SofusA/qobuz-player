@@ -17,7 +17,7 @@ use crate::{
     downloader::Downloader,
     notification::{Notification, NotificationBroadcast},
     sink::QueryTrackResult,
-    tracklist::{SingleTracklist, TracklistType},
+    tracklist::TracklistType,
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
@@ -329,9 +329,6 @@ impl Player {
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
 
-        let mut tracklist = Tracklist::new();
-        tracklist.list_type = TracklistType::Track(SingleTracklist {});
-
         let mut tracks = vec![];
         for track_id in track_ids {
             let track = self.client.track(track_id).await?;
@@ -341,7 +338,8 @@ impl Player {
         if let Some(track) = tracks.first_mut() {
             track.status = TrackStatus::Playing;
         }
-        tracklist.queue = tracks;
+
+        let tracklist = Tracklist::new(TracklistType::Tracks, tracks);
 
         if play && let Some(first_track) = tracklist.current_track() {
             tracing::info!("New queue starting with: {}", first_track.title);
@@ -350,6 +348,17 @@ impl Player {
 
         self.broadcast_tracklist(tracklist).await?;
 
+        Ok(())
+    }
+
+    async fn clear_queue(&mut self) -> AppResult<()> {
+        self.pause();
+        self.sink.clear()?;
+        self.next_track_is_queried = false;
+        self.next_track_in_sink_queue = false;
+
+        let tracklist = Tracklist::default();
+        self.broadcast_tracklist(tracklist).await?;
         Ok(())
     }
 
@@ -364,10 +373,7 @@ impl Player {
         let mut track: Track = self.client.track(track_id).await?;
         track.status = TrackStatus::Playing;
 
-        let tracklist = Tracklist {
-            list_type: TracklistType::Track(SingleTracklist {}),
-            queue: vec![track],
-        };
+        let tracklist = Tracklist::new(TracklistType::Tracks, vec![track]);
 
         self.new_queue(tracklist).await
     }
@@ -382,14 +388,14 @@ impl Player {
             .filter(|t| !t.available)
             .count() as i32;
 
-        let mut tracklist = Tracklist {
-            queue: album.tracks.into_iter().filter(|t| t.available).collect(),
-            list_type: TracklistType::Album(tracklist::AlbumTracklist {
+        let mut tracklist = Tracklist::new(
+            TracklistType::Album(tracklist::AlbumTracklist {
                 title: album.title,
                 id: album.id,
                 image: Some(album.image),
             }),
-        };
+            album.tracks.into_iter().filter(|t| t.available).collect(),
+        );
 
         tracklist.skip_to_track(index as i32 - unstreamable_tracks_to_index);
         self.new_queue(tracklist).await
@@ -401,14 +407,14 @@ impl Player {
         let unstreamable_tracks_to_index =
             tracks.iter().take(index).filter(|t| !t.available).count() as i32;
 
-        let mut tracklist = Tracklist {
-            queue: tracks.into_iter().filter(|t| t.available).collect(),
-            list_type: TracklistType::TopTracks(tracklist::TopTracklist {
+        let mut tracklist = Tracklist::new(
+            TracklistType::TopTracks(tracklist::TopTracklist {
                 artist_name: artist.name,
                 id: artist_id,
                 image: artist.image,
             }),
-        };
+            tracks.into_iter().filter(|t| t.available).collect(),
+        );
 
         tracklist.skip_to_track(index as i32 - unstreamable_tracks_to_index);
         self.new_queue(tracklist).await
@@ -439,14 +445,14 @@ impl Player {
             tracks.shuffle(&mut rand::rng());
         }
 
-        let mut tracklist = Tracklist {
-            queue: tracks,
-            list_type: TracklistType::Playlist(tracklist::PlaylistTracklist {
+        let mut tracklist = Tracklist::new(
+            TracklistType::Playlist(tracklist::PlaylistTracklist {
                 title: playlist.title,
                 id: playlist.id,
                 image: playlist.image,
             }),
-        };
+            tracks,
+        );
 
         tracklist.skip_to_track(index as i32 - unstreamable_tracks_to_index);
         self.new_queue(tracklist).await
@@ -455,7 +461,7 @@ impl Player {
     async fn remove_index_from_queue(&mut self, index: usize) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
 
-        tracklist.queue.remove(index);
+        tracklist.remove_track(index);
         self.update_queue(tracklist).await?;
         let notification = Notification::Info("Queue updated".into());
         self.broadcast.send(notification);
@@ -468,7 +474,7 @@ impl Player {
 
         let notification = Notification::Info(format!("{} added to queue", track.title.clone()));
 
-        tracklist.queue.push(track);
+        tracklist.push_track(track);
         self.update_queue(tracklist).await?;
         self.broadcast.send(notification);
         Ok(())
@@ -481,25 +487,16 @@ impl Player {
         let notification = Notification::Info(format!("{} playing next", track.title.clone()));
 
         let current_index = tracklist.current_position();
-        tracklist.queue.insert(current_index + 1, track);
+        tracklist.insert_track(current_index + 1, track);
         self.update_queue(tracklist).await?;
         self.broadcast.send(notification);
         Ok(())
     }
 
     async fn reorder_queue(&mut self, new_order: Vec<usize>) -> AppResult<()> {
-        if new_order.iter().enumerate().all(|(i, &v)| i == v) {
-            return Ok(());
-        }
-
         let mut tracklist = self.tracklist_rx.borrow().clone();
 
-        let reordered: Vec<_> = new_order
-            .iter()
-            .map(|&i| tracklist.queue[i].clone())
-            .collect();
-
-        tracklist.queue = reordered;
+        tracklist.reorder_queue(new_order);
 
         self.update_queue(tracklist).await?;
         let notification = Notification::Info("Queue updated".into());
@@ -595,6 +592,7 @@ impl Player {
             ControlCommand::PlayTrackNext { id } => self.play_track_next(id).await?,
             ControlCommand::ReorderQueue { new_order } => self.reorder_queue(new_order).await?,
             ControlCommand::NewQueue { tracks, play } => self.new_track_queue(tracks, play).await?,
+            ControlCommand::ClearQueue => self.clear_queue().await?,
         }
         Ok(())
     }
