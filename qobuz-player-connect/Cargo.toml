@@ -10,6 +10,6 @@ description.workspace = true
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
 qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
-qonductor = { git = "https://github.com/nickblt/qonductor" }
+qonductor.workspace = true
 tokio.workspace = true
 tracing.workspace = true
