@@ -324,7 +324,7 @@ impl Player {
         Ok(())
     }
 
-    async fn new_track_queue(&mut self, track_ids: Vec<u32>) -> AppResult<()> {
+    async fn new_track_queue(&mut self, track_ids: Vec<u32>, play: bool) -> AppResult<()> {
         self.sink.clear()?;
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
@@ -341,8 +341,12 @@ impl Player {
         if let Some(track) = tracks.first_mut() {
             track.status = TrackStatus::Playing;
         }
-
         tracklist.queue = tracks;
+
+        if play && let Some(first_track) = tracklist.current_track() {
+            tracing::info!("New queue starting with: {}", first_track.title);
+            self.query_track(first_track, false).await?;
+        }
 
         self.broadcast_tracklist(tracklist).await?;
 
@@ -590,7 +594,7 @@ impl Player {
             }
             ControlCommand::PlayTrackNext { id } => self.play_track_next(id).await?,
             ControlCommand::ReorderQueue { new_order } => self.reorder_queue(new_order).await?,
-            ControlCommand::NewQueue { tracks } => self.new_track_queue(tracks).await?,
+            ControlCommand::NewQueue { tracks, play } => self.new_track_queue(tracks, play).await?,
         }
         Ok(())
     }

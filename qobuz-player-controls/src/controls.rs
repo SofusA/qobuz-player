@@ -49,6 +49,7 @@ pub enum ControlCommand {
     },
     NewQueue {
         tracks: Vec<u32>,
+        play: bool,
     },
 }
 
@@ -166,9 +167,9 @@ impl Controls {
             .expect("infallible");
     }
 
-    pub fn new_queue(&self, tracks: Vec<u32>) {
+    pub fn new_queue(&self, tracks: Vec<u32>, play: bool) {
         self.tx
-            .send(ControlCommand::NewQueue { tracks })
+            .send(ControlCommand::NewQueue { tracks, play })
             .expect("infallible");
     }
 }

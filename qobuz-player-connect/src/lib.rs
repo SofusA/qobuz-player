@@ -179,6 +179,7 @@ impl ConnectState {
             SessionEvent::Command(command) => match command {
                 Command::SetState { cmd, respond } => {
                     tracing::info!("Set state message received");
+                    tracing::info!("{:?}", cmd);
                     let response = msg::QueueRendererState::default();
 
                     match cmd.playing_state() {
@@ -193,9 +194,23 @@ impl ConnectState {
                     let position = cmd
                         .current_position
                         .map(|x| Duration::from_millis(x.into()));
+
                     if let Some(position) = position {
                         self.controls.seek(position);
                     }
+
+                    let current_position = self.tracklist_receiver.borrow().current_position();
+                    let tracklist_position = cmd
+                        .current_queue_item
+                        .and_then(|x| x.queue_item_id)
+                        .map(|x| x as usize);
+
+                    if let Some(tracklist_position) = tracklist_position
+                        && current_position != tracklist_position
+                    {
+                        self.controls.skip_to_position(tracklist_position, true);
+                    }
+
                     respond.send(response);
                 }
                 Command::SetActive { respond, cmd: _cmd } => {
@@ -232,10 +247,12 @@ impl ConnectState {
             SessionEvent::Notification(n) => match n {
                 Notification::Connected => tracing::info!("Connected!"),
                 Notification::DeviceRegistered { renderer_id, .. } => {
-                    tracing::info!("Registered as renderer {}", renderer_id);
+                    tracing::info!("Ignoring device registered as renderer {}", renderer_id);
                 }
                 Notification::QueueState(queue) => {
                     tracing::info!("Queue state message: {:?}", queue);
+                    let track_ids = queue.tracks.into_iter().flat_map(|x| x.track_id).collect();
+                    self.controls.new_queue(track_ids, false);
                 }
                 Notification::SessionState(session_state) => {
                     tracing::info!("Session State: {:?}", session_state);
@@ -247,7 +264,7 @@ impl ConnectState {
                     tracing::info!("Queue load tracks: {:?}", queue);
 
                     let track_ids = queue.tracks.into_iter().flat_map(|x| x.track_id).collect();
-                    self.controls.new_queue(track_ids);
+                    self.controls.new_queue(track_ids, true);
                 }
                 Notification::QueueTracksAdded(queue_tracks_added) => {
                     tracing::info!("Queue tracks added: {:?}", queue_tracks_added);
@@ -321,7 +338,7 @@ impl ConnectState {
                     tracing::info!("Restore state: {:?}", srvr_ctrl_renderer_state_updated);
                 }
                 Notification::Disconnected { session_id, reason } => {
-                    tracing::info!("Disconnect: {}, {:?}. Exit?", session_id, reason);
+                    tracing::info!("Disconnect: {}, {:?}", session_id, reason);
                 }
                 Notification::SessionClosed { device_uuid } => {
                     tracing::info!("Session closed: {:?}", device_uuid);
