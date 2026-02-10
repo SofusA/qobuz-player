@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 use time::Duration;
 use tokio::sync::Mutex;
 
-use crate::{error::Error, simple_cache::SimpleCache};
+use crate::{AppResult, error::Error, simple_cache::SimpleCache};
 
 type QobuzClient = qobuz_player_client::client::Client;
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -36,6 +36,10 @@ pub struct Client {
 }
 
 impl Client {
+    pub async fn app_id(&self) -> AppResult<&str> {
+        let client = self.get_client().await?;
+        Ok(client.app_id())
+    }
     pub fn new(username: String, password: String, max_audio_quality: AudioQuality) -> Self {
         let album_cache = moka::future::CacheBuilder::new(1000)
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24 * 7))

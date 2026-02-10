@@ -1,9 +1,9 @@
-use qobuz_player_controls::{Result, StatusReceiver, error::Error};
+use qobuz_player_controls::{AppResult, StatusReceiver, error::Error};
 use rppal::gpio::Gpio;
 
 const GPIO: u8 = 23;
 
-pub async fn init(mut status_receiver: StatusReceiver) -> Result<()> {
+pub async fn init(mut status_receiver: StatusReceiver) -> AppResult<()> {
     let mut pin = Gpio::new()
         .or(Err(Error::GpioUnavailable { pin: GPIO }))?
         .get(GPIO)

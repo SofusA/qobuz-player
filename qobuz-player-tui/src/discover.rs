@@ -1,4 +1,4 @@
-use qobuz_player_controls::Result;
+use qobuz_player_controls::AppResult;
 use qobuz_player_controls::client::Client;
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
@@ -19,7 +19,7 @@ pub struct DiscoverState {
 }
 
 impl DiscoverState {
-    pub async fn new(client: &Client) -> Result<Self> {
+    pub async fn new(client: &Client) -> AppResult<Self> {
         let (featured_albums, featured_playlists) =
             try_join!(client.featured_albums(), client.featured_playlists(),)?;
 
@@ -94,7 +94,7 @@ impl DiscoverState {
         event: Event,
         client: &Client,
         notifications: &mut NotificationList,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match key_event.code {

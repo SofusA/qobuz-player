@@ -1,4 +1,4 @@
-use qobuz_player_controls::{Result, client::Client, controls::Controls};
+use qobuz_player_controls::{AppResult, client::Client, controls::Controls};
 use qobuz_player_models::{Album, Artist, Playlist, PlaylistSimple, Track};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
@@ -27,7 +27,7 @@ pub struct ArtistPopupState {
 }
 
 impl ArtistPopupState {
-    pub async fn new(artist: &Artist, client: &Client) -> Result<Self> {
+    pub async fn new(artist: &Artist, client: &Client) -> AppResult<Self> {
         let id = artist.id;
         let (artist_page, artist_albums) =
             try_join!(client.artist_page(id), client.artist_albums(id))?;
@@ -317,7 +317,7 @@ impl Popup {
         client: &Client,
         controls: &Controls,
         notifications: &mut NotificationList,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match self {
                 Popup::Album(album_state) => {

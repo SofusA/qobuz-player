@@ -207,6 +207,10 @@ macro_rules! post {
 }
 
 impl Client {
+    pub fn app_id(&self) -> &str {
+        &self.app_id
+    }
+
     pub async fn featured_albums(
         &self,
     ) -> Result<Vec<(String, Vec<qobuz_player_models::AlbumSimple>)>> {

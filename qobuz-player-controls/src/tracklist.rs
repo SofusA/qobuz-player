@@ -23,27 +23,19 @@ pub struct TopTracklist {
     pub image: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub struct SingleTracklist {
-    pub track_title: String,
-    pub album_id: Option<String>,
-    pub image: Option<String>,
-}
-
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TracklistType {
     Album(AlbumTracklist),
     Playlist(PlaylistTracklist),
     TopTracks(TopTracklist),
-    Track(SingleTracklist),
     #[default]
-    None,
+    Tracks,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Tracklist {
-    pub queue: Vec<Track>,
-    pub list_type: TracklistType,
+    queue: Vec<QueueItem>,
+    list_type: TracklistType,
 }
 
 pub struct Entity {
@@ -52,13 +44,35 @@ pub struct Entity {
     pub cover_link: Option<String>,
 }
 
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct QueueItem {
+    pub track: Track,
+    pub id: u64,
+}
+
 impl Tracklist {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(list_type: TracklistType, tracks: Vec<Track>) -> Self {
+        let queue = tracks
+            .into_iter()
+            .enumerate()
+            .map(|(i, track)| QueueItem {
+                track,
+                id: i as u64,
+            })
+            .collect();
+
+        Self { queue, list_type }
     }
 
-    pub fn queue(&self) -> &Vec<Track> {
-        &self.queue
+    pub fn new_with_id(list_type: TracklistType, items: Vec<QueueItem>) -> Self {
+        Self {
+            queue: items,
+            list_type,
+        }
+    }
+
+    pub fn queue(&self) -> Vec<&Track> {
+        self.queue.iter().map(|x| &x.track).collect()
     }
 
     pub fn total(&self) -> usize {
@@ -68,17 +82,65 @@ impl Tracklist {
     pub fn currently_playing(&self) -> Option<u32> {
         self.queue
             .iter()
-            .find(|t| t.status == TrackStatus::Playing)
-            .map(|x| x.id)
+            .find(|t| t.track.status == TrackStatus::Playing)
+            .map(|x| x.track.id)
+    }
+
+    pub fn next_track_id(&self) -> Option<u32> {
+        self.next_track().map(|x| x.id)
+    }
+
+    pub fn remove_track(&mut self, index: usize) {
+        self.queue.remove(index);
+    }
+
+    pub fn push_track(&mut self, track: Track) {
+        let id = (self.total() + 1) as u64;
+        let item = QueueItem { track, id };
+        self.queue.push(item);
+    }
+
+    pub fn insert_track(&mut self, index: usize, track: Track) {
+        let id = (self.total() + 1) as u64;
+        let item = QueueItem { track, id };
+        self.queue.insert(index, item);
+    }
+
+    pub fn reorder_queue(&mut self, new_order: Vec<usize>) {
+        if new_order.iter().enumerate().all(|(i, &v)| i == v) {
+            return;
+        }
+
+        let reordered: Vec<_> = new_order.iter().map(|&i| self.queue[i].clone()).collect();
+
+        self.queue = reordered;
     }
 
     pub fn current_position(&self) -> usize {
         self.queue
             .iter()
             .enumerate()
-            .find(|t| t.1.status == TrackStatus::Playing)
+            .find(|t| t.1.track.status == TrackStatus::Playing)
             .map(|x| x.0)
             .unwrap_or(0)
+    }
+
+    pub fn current_queue_id(&self) -> Option<u64> {
+        self.queue
+            .iter()
+            .find(|t| t.track.status == TrackStatus::Playing)
+            .map(|x| x.id)
+    }
+
+    pub fn next_track_queue_id(&self) -> Option<u64> {
+        let current = self.current_position();
+
+        if current >= self.total() {
+            return None;
+        }
+
+        let next = self.queue.get(current + 1);
+        next.map(|x| x.id)
     }
 
     pub fn list_type(&self) -> &TracklistType {
@@ -86,18 +148,18 @@ impl Tracklist {
     }
 
     pub fn reset(&mut self) {
-        for track in self.queue.iter_mut() {
+        for track in self.queue.iter_mut().map(|x| &mut x.track) {
             if track.status == TrackStatus::Played || track.status == TrackStatus::Playing {
                 track.status = TrackStatus::Unplayed;
             }
         }
 
-        if let Some(first_track) = self
+        if let Some(first_item) = self
             .queue
             .iter_mut()
-            .find(|t| t.status == TrackStatus::Unplayed)
+            .find(|t| t.track.status == TrackStatus::Unplayed)
         {
-            first_track.status = TrackStatus::Playing;
+            first_item.track.status = TrackStatus::Playing;
         }
     }
 
@@ -108,11 +170,14 @@ impl Tracklist {
             return None;
         }
 
-        Some(self.queue.index(next_position))
+        Some(&self.queue.index(next_position).track)
     }
 
     pub fn current_track(&self) -> Option<&Track> {
-        self.queue.iter().find(|t| t.status == TrackStatus::Playing)
+        self.queue
+            .iter()
+            .map(|x| &x.track)
+            .find(|t| t.status == TrackStatus::Playing)
     }
 
     pub fn entity_playing(&self) -> Entity {
@@ -135,16 +200,13 @@ impl Tracklist {
                 link: Some(format!("/artist/{}", tracklist.id)),
                 cover_link,
             },
-            TracklistType::Track(tracklist) => Entity {
+            TracklistType::Tracks => Entity {
                 title: current_track
                     .as_ref()
                     .and_then(|track| track.album_title.clone()),
-                link: tracklist.album_id.as_ref().map(|id| format!("/album/{id}")),
-                cover_link,
-            },
-            TracklistType::None => Entity {
-                title: None,
-                link: None,
+                link: current_track
+                    .as_ref()
+                    .and_then(|track| track.album_id.as_ref().map(|id| format!("/album/{id}"))),
                 cover_link,
             },
         }
@@ -157,7 +219,7 @@ impl Tracklist {
 
         let mut new_track: Option<&Track> = None;
 
-        for queue_item in self.queue.iter_mut().enumerate() {
+        for queue_item in self.queue.iter_mut().map(|x| &mut x.track).enumerate() {
             let queue_item_position = queue_item.0 as i32;
 
             match queue_item_position.cmp(&new_position) {

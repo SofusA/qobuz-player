@@ -10,14 +10,14 @@ use tokio::{
 };
 
 use crate::{
-    ExitReceiver, PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver,
+    AppResult, ExitReceiver, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
     VolumeReceiver,
-    controls::{ControlCommand, Controls},
+    controls::{ControlCommand, Controls, NewQueueItem},
     database::Database,
     downloader::Downloader,
     notification::{Notification, NotificationBroadcast},
     sink::QueryTrackResult,
-    tracklist::{SingleTracklist, TracklistType},
+    tracklist::{QueueItem, TracklistType},
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
@@ -61,7 +61,7 @@ impl Player {
         database: Arc<Database>,
         state_change_delay: Option<Duration>,
         sample_rate_change_delay: Option<Duration>,
-    ) -> Result<Self> {
+    ) -> AppResult<Self> {
         let (volume, volume_receiver) = watch::channel(volume);
         let sink = Sink::new(volume_receiver)?;
 
@@ -119,7 +119,7 @@ impl Player {
         self.tracklist_tx.subscribe()
     }
 
-    async fn play_pause(&mut self) -> Result<()> {
+    async fn play_pause(&mut self) -> AppResult<()> {
         let target_status = *self.target_status.borrow();
 
         match target_status {
@@ -130,7 +130,7 @@ impl Player {
         Ok(())
     }
 
-    async fn play(&mut self) -> Result<()> {
+    async fn play(&mut self) -> AppResult<()> {
         tracing::info!("Play");
 
         self.wait_for_state_change_delay().await;
@@ -169,7 +169,7 @@ impl Player {
         self.target_status.send(status).expect("infallible");
     }
 
-    async fn query_track(&mut self, track: &Track, next_track: bool) -> Result<()> {
+    async fn query_track(&mut self, track: &Track, next_track: bool) -> AppResult<()> {
         tracing::info!(
             "Querying {} track: {}",
             if next_track { "next" } else { "current" },
@@ -211,26 +211,26 @@ impl Player {
         Ok(())
     }
 
-    async fn set_volume(&self, volume: f32) -> Result<()> {
+    async fn set_volume(&self, volume: f32) -> AppResult<()> {
         self.volume.send(volume)?;
         self.sink.sync_volume();
         self.database.set_volume(volume).await?;
         Ok(())
     }
 
-    async fn broadcast_tracklist(&self, tracklist: Tracklist) -> Result<()> {
+    async fn broadcast_tracklist(&self, tracklist: Tracklist) -> AppResult<()> {
         self.database.set_tracklist(&tracklist).await?;
         self.tracklist_tx.send(tracklist)?;
         Ok(())
     }
 
-    fn seek(&mut self, duration: Duration) -> Result<()> {
+    fn seek(&mut self, duration: Duration) -> AppResult<()> {
         self.sink.seek(duration)?;
         self.position.send(self.sink.position())?;
         Ok(())
     }
 
-    fn jump_forward(&mut self) -> Result<()> {
+    fn jump_forward(&mut self) -> AppResult<()> {
         let duration = self
             .tracklist_rx
             .borrow()
@@ -251,7 +251,7 @@ impl Player {
         Ok(())
     }
 
-    fn jump_backward(&mut self) -> Result<()> {
+    fn jump_backward(&mut self) -> AppResult<()> {
         let current_position = self.sink.position();
 
         if current_position.as_millis() < 10000 {
@@ -265,7 +265,7 @@ impl Player {
         Ok(())
     }
 
-    async fn skip_to_position(&mut self, new_position: i32, force: bool) -> Result<()> {
+    async fn skip_to_position(&mut self, new_position: i32, force: bool) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         let current_position = tracklist.current_position();
 
@@ -297,19 +297,19 @@ impl Player {
         Ok(())
     }
 
-    async fn next(&mut self) -> Result<()> {
+    async fn next(&mut self) -> AppResult<()> {
         let current_position = self.tracklist_rx.borrow().current_position();
         self.skip_to_position((current_position + 1) as i32, true)
             .await
     }
 
-    async fn previous(&mut self) -> Result<()> {
+    async fn previous(&mut self) -> AppResult<()> {
         let current_position = self.tracklist_rx.borrow().current_position();
         self.skip_to_position(current_position as i32 - 1, false)
             .await
     }
 
-    async fn new_queue(&mut self, tracklist: Tracklist) -> Result<()> {
+    async fn new_queue(&mut self, tracklist: Tracklist) -> AppResult<()> {
         self.sink.clear()?;
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
@@ -324,30 +324,65 @@ impl Player {
         Ok(())
     }
 
-    async fn update_queue(&mut self, tracklist: Tracklist) -> Result<()> {
+    async fn new_track_queue(&mut self, items: Vec<NewQueueItem>, play: bool) -> AppResult<()> {
+        self.sink.clear()?;
+        self.next_track_is_queried = false;
+        self.next_track_in_sink_queue = false;
+
+        let mut queue_items = vec![];
+        for item in items {
+            let track = self.client.track(item.track_id).await?;
+            let queue_item = QueueItem {
+                track,
+                id: item.queue_id,
+            };
+            queue_items.push(queue_item);
+        }
+
+        if let Some(item) = queue_items.first_mut() {
+            item.track.status = TrackStatus::Playing;
+        }
+
+        let tracklist = Tracklist::new_with_id(TracklistType::Tracks, queue_items);
+
+        if play && let Some(first_track) = tracklist.current_track() {
+            tracing::info!("New queue starting with: {}", first_track.title);
+            self.query_track(first_track, false).await?;
+        }
+
+        self.broadcast_tracklist(tracklist).await?;
+
+        Ok(())
+    }
+
+    async fn clear_queue(&mut self) -> AppResult<()> {
+        self.pause();
+        self.sink.clear()?;
+        self.next_track_is_queried = false;
+        self.next_track_in_sink_queue = false;
+
+        let tracklist = Tracklist::default();
+        self.broadcast_tracklist(tracklist).await?;
+        Ok(())
+    }
+
+    async fn update_queue(&mut self, tracklist: Tracklist) -> AppResult<()> {
         self.next_track_is_queried = false;
         self.sink.clear_queue()?;
         self.broadcast_tracklist(tracklist).await?;
         Ok(())
     }
 
-    async fn play_track(&mut self, track_id: u32) -> Result<()> {
+    async fn play_track(&mut self, track_id: u32) -> AppResult<()> {
         let mut track: Track = self.client.track(track_id).await?;
         track.status = TrackStatus::Playing;
 
-        let tracklist = Tracklist {
-            list_type: TracklistType::Track(SingleTracklist {
-                track_title: track.title.clone(),
-                album_id: track.album_id.clone(),
-                image: track.image.clone(),
-            }),
-            queue: vec![track],
-        };
+        let tracklist = Tracklist::new(TracklistType::Tracks, vec![track]);
 
         self.new_queue(tracklist).await
     }
 
-    async fn play_album(&mut self, album_id: &str, index: usize) -> Result<()> {
+    async fn play_album(&mut self, album_id: &str, index: usize) -> AppResult<()> {
         let album: Album = self.client.album(album_id).await?;
 
         let unstreamable_tracks_to_index = album
@@ -357,39 +392,44 @@ impl Player {
             .filter(|t| !t.available)
             .count() as i32;
 
-        let mut tracklist = Tracklist {
-            queue: album.tracks.into_iter().filter(|t| t.available).collect(),
-            list_type: TracklistType::Album(tracklist::AlbumTracklist {
+        let mut tracklist = Tracklist::new(
+            TracklistType::Album(tracklist::AlbumTracklist {
                 title: album.title,
                 id: album.id,
                 image: Some(album.image),
             }),
-        };
+            album.tracks.into_iter().filter(|t| t.available).collect(),
+        );
 
         tracklist.skip_to_track(index as i32 - unstreamable_tracks_to_index);
         self.new_queue(tracklist).await
     }
 
-    async fn play_top_tracks(&mut self, artist_id: u32, index: usize) -> Result<()> {
+    async fn play_top_tracks(&mut self, artist_id: u32, index: usize) -> AppResult<()> {
         let artist = self.client.artist_page(artist_id).await?;
         let tracks = artist.top_tracks;
         let unstreamable_tracks_to_index =
             tracks.iter().take(index).filter(|t| !t.available).count() as i32;
 
-        let mut tracklist = Tracklist {
-            queue: tracks.into_iter().filter(|t| t.available).collect(),
-            list_type: TracklistType::TopTracks(tracklist::TopTracklist {
+        let mut tracklist = Tracklist::new(
+            TracklistType::TopTracks(tracklist::TopTracklist {
                 artist_name: artist.name,
                 id: artist_id,
                 image: artist.image,
             }),
-        };
+            tracks.into_iter().filter(|t| t.available).collect(),
+        );
 
         tracklist.skip_to_track(index as i32 - unstreamable_tracks_to_index);
         self.new_queue(tracklist).await
     }
 
-    async fn play_playlist(&mut self, playlist_id: u32, index: usize, shuffle: bool) -> Result<()> {
+    async fn play_playlist(
+        &mut self,
+        playlist_id: u32,
+        index: usize,
+        shuffle: bool,
+    ) -> AppResult<()> {
         let playlist = self.client.playlist(playlist_id).await?;
 
         let unstreamable_tracks_to_index = playlist
@@ -409,67 +449,58 @@ impl Player {
             tracks.shuffle(&mut rand::rng());
         }
 
-        let mut tracklist = Tracklist {
-            queue: tracks,
-            list_type: TracklistType::Playlist(tracklist::PlaylistTracklist {
+        let mut tracklist = Tracklist::new(
+            TracklistType::Playlist(tracklist::PlaylistTracklist {
                 title: playlist.title,
                 id: playlist.id,
                 image: playlist.image,
             }),
-        };
+            tracks,
+        );
 
         tracklist.skip_to_track(index as i32 - unstreamable_tracks_to_index);
         self.new_queue(tracklist).await
     }
 
-    async fn remove_index_from_queue(&mut self, index: usize) -> Result<()> {
+    async fn remove_index_from_queue(&mut self, index: usize) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
 
-        tracklist.queue.remove(index);
+        tracklist.remove_track(index);
         self.update_queue(tracklist).await?;
         let notification = Notification::Info("Queue updated".into());
         self.broadcast.send(notification);
         Ok(())
     }
 
-    async fn add_track_to_queue(&mut self, id: u32) -> Result<()> {
+    async fn add_track_to_queue(&mut self, id: u32) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         let track = self.client.track(id).await?;
 
         let notification = Notification::Info(format!("{} added to queue", track.title.clone()));
 
-        tracklist.queue.push(track);
+        tracklist.push_track(track);
         self.update_queue(tracklist).await?;
         self.broadcast.send(notification);
         Ok(())
     }
 
-    async fn play_track_next(&mut self, id: u32) -> Result<()> {
+    async fn play_track_next(&mut self, id: u32) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         let track = self.client.track(id).await?;
 
         let notification = Notification::Info(format!("{} playing next", track.title.clone()));
 
         let current_index = tracklist.current_position();
-        tracklist.queue.insert(current_index + 1, track);
+        tracklist.insert_track(current_index + 1, track);
         self.update_queue(tracklist).await?;
         self.broadcast.send(notification);
         Ok(())
     }
 
-    async fn reorder_queue(&mut self, new_order: Vec<usize>) -> Result<()> {
-        if new_order.iter().enumerate().all(|(i, &v)| i == v) {
-            return Ok(());
-        }
-
+    async fn reorder_queue(&mut self, new_order: Vec<usize>) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
 
-        let reordered: Vec<_> = new_order
-            .iter()
-            .map(|&i| tracklist.queue[i].clone())
-            .collect();
-
-        tracklist.queue = reordered;
+        tracklist.reorder_queue(new_order);
 
         self.update_queue(tracklist).await?;
         let notification = Notification::Info("Queue updated".into());
@@ -477,7 +508,7 @@ impl Player {
         Ok(())
     }
 
-    async fn tick(&mut self) -> Result<()> {
+    async fn tick(&mut self) -> AppResult<()> {
         if *self.target_status.borrow() != Status::Playing {
             return Ok(());
         }
@@ -511,7 +542,7 @@ impl Player {
         Ok(())
     }
 
-    async fn handle_message(&mut self, notification: ControlCommand) -> Result<()> {
+    async fn handle_message(&mut self, notification: ControlCommand) -> AppResult<()> {
         match notification {
             ControlCommand::Album { id, index } => {
                 self.play_album(&id, index).await?;
@@ -564,11 +595,13 @@ impl Player {
             }
             ControlCommand::PlayTrackNext { id } => self.play_track_next(id).await?,
             ControlCommand::ReorderQueue { new_order } => self.reorder_queue(new_order).await?,
+            ControlCommand::NewQueue { items, play } => self.new_track_queue(items, play).await?,
+            ControlCommand::ClearQueue => self.clear_queue().await?,
         }
         Ok(())
     }
 
-    async fn track_finished(&mut self) -> Result<()> {
+    async fn track_finished(&mut self) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
 
         let current_position = tracklist.current_position();
@@ -603,7 +636,7 @@ impl Player {
         Ok(())
     }
 
-    async fn done_buffering(&mut self, path: PathBuf) -> Result<()> {
+    async fn done_buffering(&mut self, path: PathBuf) -> AppResult<()> {
         self.wait_for_state_change_delay().await;
         self.set_target_status(Status::Playing);
 
@@ -616,7 +649,7 @@ impl Player {
         Ok(())
     }
 
-    pub async fn player_loop(&mut self, mut exit_receiver: ExitReceiver) -> Result<()> {
+    pub async fn player_loop(&mut self, mut exit_receiver: ExitReceiver) -> AppResult<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(INTERVAL_MS));
 
         loop {

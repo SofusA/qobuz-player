@@ -8,7 +8,7 @@ use axum::{
 };
 use futures::stream::Stream;
 use qobuz_player_controls::{
-    PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
+    PositionReceiver, AppResult, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
     controls::Controls,
     error::Error,
@@ -52,7 +52,7 @@ pub async fn init(
     rfid_state: Option<RfidState>,
     broadcast: Arc<NotificationBroadcast>,
     client: Arc<Client>,
-) -> Result<()> {
+) -> AppResult<()> {
     let interface = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&interface)
         .await
@@ -270,7 +270,7 @@ async fn sse_handler(
     State(state): State<Arc<AppState>>,
 ) -> (
     axum::http::HeaderMap,
-    Sse<impl Stream<Item = Result<Event, Infallible>>>,
+    Sse<impl Stream<Item = AppResult<Event, Infallible>>>,
 ) {
     let rx = state.tx.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(|result| match result {
@@ -309,8 +309,8 @@ type ResponseResult = std::result::Result<axum::response::Response, axum::respon
 #[allow(clippy::result_large_err)]
 fn ok_or_send_error_toast<T>(
     state: &AppState,
-    value: Result<T, qobuz_player_controls::error::Error>,
-) -> Result<T, axum::response::Response> {
+    value: AppResult<T, qobuz_player_controls::error::Error>,
+) -> AppResult<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
         Err(err) => Err(state.send_toast(Notification::Error(err.to_string()))),
@@ -320,8 +320,8 @@ fn ok_or_send_error_toast<T>(
 #[allow(clippy::result_large_err)]
 fn ok_or_error_page<T>(
     state: &AppState,
-    value: Result<T, qobuz_player_controls::error::Error>,
-) -> Result<T, axum::response::Response> {
+    value: AppResult<T, qobuz_player_controls::error::Error>,
+) -> AppResult<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
         Err(err) => Err(Html(
@@ -337,8 +337,8 @@ fn ok_or_error_page<T>(
 #[allow(clippy::result_large_err, unused)]
 fn ok_or_broadcast<T>(
     broadcast: &NotificationBroadcast,
-    value: Result<T, qobuz_player_controls::error::Error>,
-) -> Result<T, axum::response::Response> {
+    value: AppResult<T, qobuz_player_controls::error::Error>,
+) -> AppResult<T, axum::response::Response> {
     match value {
         Ok(value) => Ok(value),
         Err(err) => {

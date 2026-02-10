@@ -16,10 +16,8 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            install_alsa: true
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            install_alsa: true
           - os: macos-latest
             target: x86_64-apple-darwin
           - os: macos-latest
@@ -35,11 +33,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Linux dependencies
+      - name: Install dependencies
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libasound2-dev
+          sudo apt-get install -y pkg-config libasound2-dev protobuf-compiler
+
+      - name: Install dependencies
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install protobuf
+
+      - name: Install dependencies
+        if: startsWith(matrix.os, 'windows')
+        shell: pwsh
+        run: |
+            choco install protoc -y
 
       - name: Build and upload binary
         uses: taiki-e/upload-rust-binary-action@v1

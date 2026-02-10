@@ -1,7 +1,7 @@
 use axum::response::{Html, IntoResponse, Response};
 use futures::try_join;
 use qobuz_player_controls::{
-    PositionReceiver, Result, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
+    PositionReceiver, AppResult, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
     controls::Controls,
     notification::{Notification, NotificationBroadcast},
@@ -98,11 +98,11 @@ impl AppState {
         _ = self.tx.send(event);
     }
 
-    pub async fn get_favorites(&self) -> Result<Favorites> {
+    pub async fn get_favorites(&self) -> AppResult<Favorites> {
         self.client.favorites().await
     }
 
-    pub async fn get_album(&self, id: &str) -> Result<AlbumData> {
+    pub async fn get_album(&self, id: &str) -> AppResult<AlbumData> {
         let (album, suggested_albums) =
             try_join!(self.client.album(id), self.client.suggested_albums(id))?;
 
@@ -112,7 +112,7 @@ impl AppState {
         })
     }
 
-    pub async fn is_album_favorite(&self, id: &str) -> Result<bool> {
+    pub async fn is_album_favorite(&self, id: &str) -> AppResult<bool> {
         let favorites = self.get_favorites().await?;
         Ok(favorites.albums.iter().any(|album| album.id == id))
     }

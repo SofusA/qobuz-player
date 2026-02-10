@@ -47,6 +47,11 @@ pub enum ControlCommand {
     ReorderQueue {
         new_order: Vec<usize>,
     },
+    NewQueue {
+        items: Vec<NewQueueItem>,
+        play: bool,
+    },
+    ClearQueue,
 }
 
 #[derive(Debug, Clone)]
@@ -162,4 +167,22 @@ impl Controls {
             .send(ControlCommand::ReorderQueue { new_order })
             .expect("infallible");
     }
+
+    pub fn new_queue(&self, items: Vec<NewQueueItem>, play: bool) {
+        self.tx
+            .send(ControlCommand::NewQueue { items, play })
+            .expect("infallible");
+    }
+
+    pub fn clear_queue(&self) {
+        self.tx
+            .send(ControlCommand::ClearQueue)
+            .expect("infallible");
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct NewQueueItem {
+    pub track_id: u32,
+    pub queue_id: u64,
 }

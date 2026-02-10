@@ -1,4 +1,4 @@
-use qobuz_player_controls::{Result, client::Client, controls::Controls};
+use qobuz_player_controls::{AppResult, client::Client, controls::Controls};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
@@ -28,7 +28,7 @@ pub struct FavoritesState {
 }
 
 impl FavoritesState {
-    pub async fn new(client: &Client) -> Result<Self> {
+    pub async fn new(client: &Client) -> AppResult<Self> {
         let favorites = client.favorites().await?;
 
         Ok(Self {
@@ -84,7 +84,7 @@ impl FavoritesState {
         client: &Client,
         controls: &Controls,
         notifications: &mut NotificationList,
-    ) -> Result<Output> {
+    ) -> AppResult<Output> {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match &mut self.editing {

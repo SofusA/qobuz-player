@@ -3,7 +3,7 @@ use std::sync::Arc;
 use app::{App, get_current_state};
 use favorites::FavoritesState;
 use qobuz_player_controls::{
-    ExitSender, PositionReceiver, Result, StatusReceiver, TracklistReceiver, client::Client,
+    AppResult, ExitSender, PositionReceiver, StatusReceiver, TracklistReceiver, client::Client,
     controls::Controls, error::Error, notification::NotificationBroadcast,
 };
 use queue::QueueState;
@@ -32,14 +32,14 @@ pub async fn init(
     status_receiver: StatusReceiver,
     exit_sender: ExitSender,
     disable_tui_album_cover: bool,
-) -> Result<()> {
+) -> AppResult<()> {
     let mut terminal = ratatui::init();
 
     draw_loading_screen(&mut terminal);
 
     let tracklist_value = tracklist_receiver.borrow().clone();
     let status_value = *status_receiver.borrow();
-    let queue = tracklist_value.queue().clone();
+    let queue = tracklist_value.queue().into_iter().cloned().collect();
     let now_playing = get_current_state(tracklist_value, status_value).await;
 
     let mut app = App {

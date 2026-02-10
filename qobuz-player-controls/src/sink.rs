@@ -12,7 +12,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::error::Error;
-use crate::{Result, VolumeReceiver};
+use crate::{AppResult, VolumeReceiver};
 
 pub struct Sink {
     output_stream: Option<rodio::OutputStream>,
@@ -25,7 +25,7 @@ pub struct Sink {
 }
 
 impl Sink {
-    pub fn new(volume: VolumeReceiver) -> Result<Self> {
+    pub fn new(volume: VolumeReceiver) -> AppResult<Self> {
         let (track_finished, _) = watch::channel(());
         Ok(Self {
             sink: Default::default(),
@@ -70,7 +70,7 @@ impl Sink {
         }
     }
 
-    pub fn seek(&self, duration: Duration) -> Result<()> {
+    pub fn seek(&self, duration: Duration) -> AppResult<()> {
         if let Some(sink) = &self.sink {
             match sink.try_seek(duration) {
                 Ok(_) => {
@@ -83,7 +83,7 @@ impl Sink {
         Ok(())
     }
 
-    pub fn clear(&mut self) -> Result<()> {
+    pub fn clear(&mut self) -> AppResult<()> {
         tracing::info!("Clearing sink");
         self.clear_queue()?;
         self.sink = None;
@@ -98,7 +98,7 @@ impl Sink {
         Ok(())
     }
 
-    pub fn clear_queue(&mut self) -> Result<()> {
+    pub fn clear_queue(&mut self) -> AppResult<()> {
         tracing::info!("Clearing sink queue");
         *self.duration_played.lock() = Default::default();
 
@@ -112,7 +112,7 @@ impl Sink {
         self.sink.is_none()
     }
 
-    pub fn query_track(&mut self, track_path: &Path) -> Result<QueryTrackResult> {
+    pub fn query_track(&mut self, track_path: &Path) -> AppResult<QueryTrackResult> {
         tracing::info!("Sink query track: {}", track_path.to_string_lossy());
 
         let file = fs::File::open(track_path).map_err(|err| Error::StreamError {
@@ -185,7 +185,7 @@ fn set_volume(sink: &rodio::Sink, volume: &f32) {
     sink.set_volume(volume);
 }
 
-fn open_default_stream(sample_rate: u32) -> Result<rodio::OutputStream> {
+fn open_default_stream(sample_rate: u32) -> AppResult<rodio::OutputStream> {
     rodio::OutputStreamBuilder::from_default_device()
         .and_then(|x| x.with_sample_rate(sample_rate).open_stream())
         .or_else(|original_err| {
