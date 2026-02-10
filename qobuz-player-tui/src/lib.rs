@@ -39,7 +39,7 @@ pub async fn init(
 
     let tracklist_value = tracklist_receiver.borrow().clone();
     let status_value = *status_receiver.borrow();
-    let queue = tracklist_value.queue().clone();
+    let queue = tracklist_value.queue().into_iter().cloned().collect();
     let now_playing = get_current_state(tracklist_value, status_value).await;
 
     let mut app = App {

@@ -2,7 +2,8 @@ use std::time::{Duration, SystemTime};
 
 use qobuz_player_controls::{
     AudioQuality, PositionReceiver, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
-    controls::Controls, tracklist::Tracklist,
+    controls::{Controls, NewQueueItem},
+    tracklist::Tracklist,
 };
 
 pub use qonductor::Error;
@@ -66,8 +67,8 @@ fn current_state(
         Status::Buffering => BufferState::Buffering,
     };
 
-    response_state.current_queue_item_id = Some(tracklist.current_position() as i32);
-    response_state.next_queue_item_id = tracklist.next_track_position().map(|x| x as i32);
+    response_state.current_queue_item_id = tracklist.current_queue_id().map(|x| x as i32);
+    response_state.next_queue_item_id = tracklist.next_track_queue_id().map(|x| x as i32);
 
     response_state.set_playing_state(current_state);
     response_state.set_buffer_state(buffering_state);
@@ -268,8 +269,15 @@ impl ConnectState {
                 }
                 Notification::QueueState(queue) => {
                     tracing::info!("Queue state message: {:?}", queue);
-                    let track_ids = queue.tracks.into_iter().flat_map(|x| x.track_id).collect();
-                    self.controls.new_queue(track_ids, false);
+                    let queue_items = queue
+                        .tracks
+                        .into_iter()
+                        .map(|x| NewQueueItem {
+                            track_id: x.track_id(),
+                            queue_id: x.queue_item_id(),
+                        })
+                        .collect();
+                    self.controls.new_queue(queue_items, false);
                 }
                 Notification::SessionState(session_state) => {
                     tracing::info!("Ignoring session state message: {:?}", session_state);
@@ -281,8 +289,15 @@ impl ConnectState {
                 Notification::QueueLoadTracks(queue) => {
                     tracing::info!("Queue load tracks: {:?}", queue);
 
-                    let track_ids = queue.tracks.into_iter().flat_map(|x| x.track_id).collect();
-                    self.controls.new_queue(track_ids, true);
+                    let queue_items = queue
+                        .tracks
+                        .into_iter()
+                        .map(|x| NewQueueItem {
+                            track_id: x.track_id(),
+                            queue_id: x.queue_item_id(),
+                        })
+                        .collect();
+                    self.controls.new_queue(queue_items, false);
                 }
                 Notification::QueueTracksAdded(queue_tracks_added) => {
                     // Added in end of queue

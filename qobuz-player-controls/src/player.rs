@@ -12,12 +12,12 @@ use tokio::{
 use crate::{
     AppResult, ExitReceiver, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
     VolumeReceiver,
-    controls::{ControlCommand, Controls},
+    controls::{ControlCommand, Controls, NewQueueItem},
     database::Database,
     downloader::Downloader,
     notification::{Notification, NotificationBroadcast},
     sink::QueryTrackResult,
-    tracklist::TracklistType,
+    tracklist::{QueueItem, TracklistType},
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
@@ -324,22 +324,26 @@ impl Player {
         Ok(())
     }
 
-    async fn new_track_queue(&mut self, track_ids: Vec<u32>, play: bool) -> AppResult<()> {
+    async fn new_track_queue(&mut self, items: Vec<NewQueueItem>, play: bool) -> AppResult<()> {
         self.sink.clear()?;
         self.next_track_is_queried = false;
         self.next_track_in_sink_queue = false;
 
-        let mut tracks = vec![];
-        for track_id in track_ids {
-            let track = self.client.track(track_id).await?;
-            tracks.push(track);
+        let mut queue_items = vec![];
+        for item in items {
+            let track = self.client.track(item.track_id).await?;
+            let queue_item = QueueItem {
+                track,
+                id: item.queue_id,
+            };
+            queue_items.push(queue_item);
         }
 
-        if let Some(track) = tracks.first_mut() {
-            track.status = TrackStatus::Playing;
+        if let Some(item) = queue_items.first_mut() {
+            item.track.status = TrackStatus::Playing;
         }
 
-        let tracklist = Tracklist::new(TracklistType::Tracks, tracks);
+        let tracklist = Tracklist::new_with_id(TracklistType::Tracks, queue_items);
 
         if play && let Some(first_track) = tracklist.current_track() {
             tracing::info!("New queue starting with: {}", first_track.title);
@@ -591,7 +595,7 @@ impl Player {
             }
             ControlCommand::PlayTrackNext { id } => self.play_track_next(id).await?,
             ControlCommand::ReorderQueue { new_order } => self.reorder_queue(new_order).await?,
-            ControlCommand::NewQueue { tracks, play } => self.new_track_queue(tracks, play).await?,
+            ControlCommand::NewQueue { items, play } => self.new_track_queue(items, play).await?,
             ControlCommand::ClearQueue => self.clear_queue().await?,
         }
         Ok(())
