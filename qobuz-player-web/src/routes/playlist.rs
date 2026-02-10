@@ -183,7 +183,7 @@ async fn link(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl I
     let Some(rfid_state) = state.rfid_state.clone() else {
         return;
     };
-    qobuz_player_rfid::link(
+    crate::rfid::link(
         rfid_state,
         qobuz_player_controls::database::LinkRequest::Playlist(id),
         state.broadcast.clone(),

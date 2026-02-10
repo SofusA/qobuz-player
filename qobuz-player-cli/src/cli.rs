@@ -10,7 +10,7 @@ use qobuz_player_controls::{
     AudioQuality, client::Client, database::Database, notification::NotificationBroadcast,
     player::Player,
 };
-use qobuz_player_rfid::RfidState;
+use qobuz_player_web::RfidState;
 use snafu::prelude::*;
 use tokio::sync::broadcast;
 use tokio_schedule::{Job, every};
@@ -58,7 +58,7 @@ enum Commands {
         /// Disable the album cover image in TUI
         disable_tui_album_cover: bool,
 
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "mpris"))]
         #[clap(long, default_value_t = false)]
         /// Disable the mpris interface
         disable_mpris: bool,
@@ -171,7 +171,7 @@ pub async fn run() -> Result<(), Error> {
         state_change_delay_ms: Default::default(),
         sample_rate_change_delay_ms: Default::default(),
         disable_tui: Default::default(),
-        #[cfg(target_os = "linux")]
+        #[cfg(all(target_os = "linux", feature = "mpris"))]
         disable_mpris: Default::default(),
         web: Default::default(),
         web_secret: Default::default(),
@@ -190,7 +190,7 @@ pub async fn run() -> Result<(), Error> {
             state_change_delay_ms,
             sample_rate_change_delay_ms,
             disable_tui,
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "mpris"))]
             disable_mpris,
             web,
             web_secret,
@@ -202,12 +202,26 @@ pub async fn run() -> Result<(), Error> {
             audio_cache_time_to_live,
             disable_tui_album_cover,
         } => {
+            // In some feature combinations these flags may not be used.
+            #[cfg(all(not(feature = "mpris"), not(feature = "rfid")))]
+            let _ = (disable_tui, disable_tui_album_cover);
+
+            #[cfg(all(feature = "mpris", not(feature = "rfid")))]
+            let _ = (disable_tui, disable_tui_album_cover);
+
             let database_credentials = database.get_credentials().await?;
             let database_configuration = database.get_configuration().await?;
             let tracklist = database.get_tracklist().await.unwrap_or_default();
             let volume = database.get_volume().await.unwrap_or(1.0);
 
             let (exit_sender, exit_receiver) = broadcast::channel(5);
+
+            #[cfg(all(not(feature = "mpris"), not(feature = "rfid")))]
+            let _ = &exit_sender;
+
+            #[cfg(all(feature = "mpris", not(feature = "rfid")))]
+            let _ = &exit_sender;
+
 
             let audio_cache = audio_cache.unwrap_or_else(|| {
                 let mut cache_dir = std::env::temp_dir();
@@ -255,7 +269,14 @@ pub async fn run() -> Result<(), Error> {
 
             let rfid_state = rfid.then(RfidState::default);
 
-            #[cfg(target_os = "linux")]
+            #[cfg(not(feature = "rfid"))]
+            if rfid {
+                error_exit(Error::PlayerError {
+                    error: "RFID support not compiled in this build".to_string(),
+                });
+            }
+
+            #[cfg(all(target_os = "linux", feature = "mpris"))]
             if !disable_mpris {
                 let position_receiver = player.position();
                 let tracklist_receiver = player.tracklist();
@@ -278,6 +299,7 @@ pub async fn run() -> Result<(), Error> {
                     }
                 });
             }
+
 
             if web {
                 let position_receiver = player.position();
@@ -319,17 +341,20 @@ pub async fn run() -> Result<(), Error> {
                 });
             }
 
-            if let Some(rfid_state) = rfid_state {
+            #[cfg(feature = "rfid")]
+            if let Some(rfid_state) = rfid_state.clone() {
                 let tracklist_receiver = player.tracklist();
                 let controls = player.controls();
                 let database = database.clone();
+
+                let broadcast_rfid = broadcast.clone(); // <-- vedi fix #2
                 tokio::spawn(async move {
                     if let Err(e) = qobuz_player_rfid::init(
                         rfid_state,
                         tracklist_receiver,
                         controls,
                         database,
-                        broadcast,
+                        broadcast_rfid,
                     )
                     .await
                     {
@@ -359,7 +384,7 @@ pub async fn run() -> Result<(), Error> {
                         error_exit(e.into());
                     };
                 });
-            };
+            }
 
             if audio_cache_time_to_live != 0 {
                 let clean_up_schedule = every(1).hour().perform(move || {
