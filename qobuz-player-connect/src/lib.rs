@@ -83,6 +83,10 @@ fn current_state(
         timestamp,
         value: position,
     });
+
+    let current_duration_ms = tracklist.current_track().map(|x| x.duration_seconds * 1000);
+    response_state.duration = current_duration_ms;
+
     response_state
 }
 
@@ -268,7 +272,6 @@ impl ConnectState {
                     tracing::info!("Ignoring device registered as renderer {}", renderer_id);
                 }
                 Notification::QueueState(queue) => {
-                    tracing::info!("Queue state message: {:?}", queue);
                     let queue_items = queue
                         .tracks
                         .into_iter()
@@ -282,8 +285,7 @@ impl ConnectState {
                 Notification::SessionState(session_state) => {
                     tracing::info!("Ignoring session state message: {:?}", session_state);
                 }
-                Notification::QueueCleared(queue_cleared) => {
-                    tracing::info!("Queue cleared: {:?}", queue_cleared);
+                Notification::QueueCleared(_) => {
                     self.controls.clear_queue();
                 }
                 Notification::QueueLoadTracks(queue) => {
