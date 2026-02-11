@@ -15,7 +15,7 @@
       class="sortable overflow-hidden"
       hx-post="/playlist/reorder"
       hx-trigger="end"
-      hx-swap="none"
+      hx-swap="#tracks"
     >
       <input type="hidden" name="playlist_id" value="{{ playlist.id }}" />
       @for (track in playlist.tracks) {

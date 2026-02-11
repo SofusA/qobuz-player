@@ -63,8 +63,6 @@ async fn remove_track_from_playlist_action(
         .playlist_delete_track(req.playlist_id, &[req.track_id])
         .await;
     let res = ok_or_send_error_toast(&state, res)?;
-    let res = state.client.playlist(res.id).await;
-    let res = ok_or_send_error_toast(&state, res)?;
 
     Ok(state.render("playlist-edit-tracks.html", &json!({"playlist": res,})))
 }
@@ -106,8 +104,6 @@ async fn reorder_tracks(
         )
         .await;
 
-    let res = ok_or_send_error_toast(&state, res)?;
-    let res = state.client.playlist(res.id).await;
     let res = ok_or_send_error_toast(&state, res)?;
 
     Ok(state.render("playlist-edit-tracks.html", &json!({"playlist": res,})))

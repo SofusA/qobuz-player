@@ -367,9 +367,9 @@ impl Client {
         track_ids: &[u32],
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
-        let res = client.playlist_add_track(playlist_id, track_ids).await?;
+        client.playlist_add_track(playlist_id, track_ids).await?;
         self.playlist_cache.invalidate(&playlist_id).await;
-        Ok(res)
+        self.playlist(playlist_id).await
     }
 
     pub async fn playlist_delete_track(
@@ -378,11 +378,11 @@ impl Client {
         playlist_track_ids: &[u64],
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
-        let res = client
+        client
             .playlist_delete_track(playlist_id, playlist_track_ids)
             .await?;
         self.playlist_cache.invalidate(&playlist_id).await;
-        Ok(res)
+        self.playlist(playlist_id).await
     }
 
     pub async fn update_playlist_track_position(
@@ -392,11 +392,11 @@ impl Client {
         playlist_track_id: u64,
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
-        let res = client
+        client
             .update_playlist_track_position(index, playlist_id, playlist_track_id)
             .await?;
         self.playlist_cache.invalidate(&playlist_id).await;
-        Ok(res)
+        self.playlist(playlist_id).await
     }
 
     pub async fn genres(&self) -> Result<Vec<Genre>> {
