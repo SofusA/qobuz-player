@@ -5,7 +5,6 @@ use ratatui::{
     prelude::*,
     widgets::*,
 };
-use tokio::try_join;
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
@@ -21,24 +20,52 @@ use crate::{
 pub struct ArtistPopupState {
     artist_name: String,
     albums: AlbumList,
-    show_top_track: bool,
+    singles: AlbumList,
+    live: AlbumList,
+    compilations: AlbumList,
+    selected_sub_tab: usize,
     top_tracks: TrackList,
     id: u32,
+}
+
+enum SelectedArtistPopupSubtabMut<'a> {
+    Albums(&'a mut AlbumList),
+    TopTracks(&'a mut TrackList),
+}
+
+enum SelectedArtistPopupSubtab<'a> {
+    Albums(&'a AlbumList),
+    TopTracks(&'a TrackList),
+}
+
+struct Tab<'a> {
+    name: &'a str,
+    is_empty: bool,
+}
+
+enum TabKind {
+    Albums,
+    TopTracks,
+    Singles,
+    Live,
+    Compilations,
 }
 
 impl ArtistPopupState {
     pub async fn new(artist: &Artist, client: &Client) -> AppResult<Self> {
         let id = artist.id;
-        let (artist_page, artist_albums) =
-            try_join!(client.artist_page(id), client.artist_albums(id))?;
+        let artist_page = client.artist_page(id).await?;
 
-        let is_album_empty = artist_albums.is_empty();
+        let is_album_empty = artist_page.albums.is_empty();
         let is_top_tracks_empty = artist_page.top_tracks.is_empty();
 
         let mut state = Self {
             artist_name: artist.name.clone(),
-            albums: AlbumList::new(artist_albums),
-            show_top_track: false,
+            albums: AlbumList::new(artist_page.albums),
+            singles: AlbumList::new(artist_page.singles),
+            live: AlbumList::new(artist_page.live),
+            compilations: AlbumList::new(artist_page.compilations),
+            selected_sub_tab: 0,
             top_tracks: TrackList::new(artist_page.top_tracks),
             id: artist.id,
         };
@@ -51,6 +78,108 @@ impl ArtistPopupState {
         }
 
         Ok(state)
+    }
+
+    fn cycle_subtab_backwards(&mut self) {
+        let count = self.tabs().len();
+        self.selected_sub_tab = (self.selected_sub_tab + count - 1) % count;
+    }
+
+    fn cycle_subtab(&mut self) {
+        let count = self.tabs().len();
+        self.selected_sub_tab = (self.selected_sub_tab + count + 1) % count;
+    }
+
+    fn visible_tab_kinds(&self) -> Vec<TabKind> {
+        let mut tabs = vec![];
+
+        if !self.albums.filter().is_empty() {
+            tabs.push(TabKind::Albums);
+        }
+        if !self.top_tracks.filter().is_empty() {
+            tabs.push(TabKind::TopTracks);
+        }
+        if !self.singles.filter().is_empty() {
+            tabs.push(TabKind::Singles);
+        }
+        if !self.live.filter().is_empty() {
+            tabs.push(TabKind::Live);
+        }
+        if !self.compilations.filter().is_empty() {
+            tabs.push(TabKind::Compilations);
+        }
+
+        tabs
+    }
+
+    fn current_state_mut(&'_ mut self) -> Option<SelectedArtistPopupSubtabMut<'_>> {
+        let visible_tabs = self.visible_tab_kinds();
+        let tab = visible_tabs.get(self.selected_sub_tab)?;
+
+        match tab {
+            TabKind::Albums => Some(SelectedArtistPopupSubtabMut::Albums(&mut self.albums)),
+            TabKind::TopTracks => Some(SelectedArtistPopupSubtabMut::TopTracks(
+                &mut self.top_tracks,
+            )),
+            TabKind::Singles => Some(SelectedArtistPopupSubtabMut::Albums(&mut self.singles)),
+            TabKind::Live => Some(SelectedArtistPopupSubtabMut::Albums(&mut self.live)),
+            TabKind::Compilations => {
+                Some(SelectedArtistPopupSubtabMut::Albums(&mut self.compilations))
+            }
+        }
+    }
+
+    fn current_state(&self) -> Option<SelectedArtistPopupSubtab<'_>> {
+        let visible_tabs = self.visible_tab_kinds();
+        let tab = visible_tabs.get(self.selected_sub_tab)?;
+
+        match tab {
+            TabKind::Albums => Some(SelectedArtistPopupSubtab::Albums(&self.albums)),
+            TabKind::TopTracks => Some(SelectedArtistPopupSubtab::TopTracks(&self.top_tracks)),
+            TabKind::Singles => Some(SelectedArtistPopupSubtab::Albums(&self.singles)),
+            TabKind::Live => Some(SelectedArtistPopupSubtab::Albums(&self.live)),
+            TabKind::Compilations => Some(SelectedArtistPopupSubtab::Albums(&self.compilations)),
+        }
+    }
+
+    fn current_row_count(&self) -> usize {
+        let current_state = self.current_state();
+        match current_state {
+            Some(state) => match state {
+                SelectedArtistPopupSubtab::Albums(album_list) => album_list.filter().len(),
+                SelectedArtistPopupSubtab::TopTracks(track_list) => track_list.filter().len(),
+            },
+            None => 0,
+        }
+    }
+
+    fn tabs(&self) -> Vec<&str> {
+        vec![
+            Tab {
+                name: "Albums",
+                is_empty: self.albums.filter().is_empty(),
+            },
+            Tab {
+                name: "Top Tracks",
+                is_empty: self.top_tracks.filter().is_empty(),
+            },
+            Tab {
+                name: "Singles",
+                is_empty: self.singles.filter().is_empty(),
+            },
+            Tab {
+                name: "Live",
+                is_empty: self.live.filter().is_empty(),
+            },
+            Tab {
+                name: "Compilations",
+                is_empty: self.compilations.filter().is_empty(),
+            },
+        ]
+        .into_iter()
+        .filter(|t| !t.is_empty)
+        .map(|x| x.name)
+        .collect()
     }
 }
 
@@ -150,6 +279,7 @@ impl NewPlaylistPopupState {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum Popup {
     Artist(ArtistPopupState),
     Album(AlbumPopupState),
@@ -178,15 +308,7 @@ impl Popup {
                     .render(block.inner(area), frame.buffer_mut(), false);
             }
             Popup::Artist(artist) => {
-                let max_visible_rows: u16 = 15;
-                let album_rows = (artist.albums.filter().len() as u16).min(max_visible_rows);
-                let top_track_rows =
-                    (artist.top_tracks.filter().len() as u16).min(max_visible_rows);
-                let visible_rows = if artist.show_top_track {
-                    top_track_rows
-                } else {
-                    album_rows
-                };
+                let visible_rows = (artist.current_row_count() + 1).min(15) as u16;
 
                 let tabs_height: u16 = 2;
                 let border_height: u16 = 2;
@@ -201,10 +323,7 @@ impl Popup {
 
                 let outer_block = block(Some(&artist.artist_name));
 
-                let tabs = tab_bar(
-                    ["Albums", "Top Tracks"].into(),
-                    if artist.show_top_track { 1 } else { 0 },
-                );
+                let tabs = tab_bar(artist.tabs(), artist.selected_sub_tab);
 
                 frame.render_widget(Clear, area);
                 frame.render_widget(&outer_block, area);
@@ -218,12 +337,15 @@ impl Popup {
 
                 frame.render_widget(tabs, chunks[0]);
 
-                if artist.show_top_track {
-                    artist
-                        .top_tracks
-                        .render(chunks[1], frame.buffer_mut(), true);
-                } else {
-                    artist.albums.render(chunks[1], frame.buffer_mut());
+                if let Some(state) = artist.current_state_mut() {
+                    match state {
+                        SelectedArtistPopupSubtabMut::Albums(album_list) => {
+                            album_list.render(chunks[1], frame.buffer_mut())
+                        }
+                        SelectedArtistPopupSubtabMut::TopTracks(track_list) => {
+                            track_list.render(chunks[1], frame.buffer_mut(), true)
+                        }
+                    }
                 }
             }
             Popup::Playlist(playlist_state) => {
@@ -333,30 +455,40 @@ impl Popup {
                         .await
                 }
                 Popup::Artist(artist_popup_state) => match key_event.code {
-                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Right | KeyCode::Char('l') => {
-                        artist_popup_state.show_top_track = !artist_popup_state.show_top_track;
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        artist_popup_state.cycle_subtab_backwards();
                         Ok(Output::Consumed)
                     }
-                    _ => match artist_popup_state.show_top_track {
-                        true => {
-                            return artist_popup_state
-                                .top_tracks
-                                .handle_events(
-                                    key_event.code,
-                                    client,
-                                    controls,
-                                    notifications,
-                                    TrackListEvent::Artist(artist_popup_state.id),
-                                )
-                                .await;
+
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        artist_popup_state.cycle_subtab();
+                        Ok(Output::Consumed)
+                    }
+                    _ => {
+                        let artist_id = artist_popup_state.id;
+                        let current_state = artist_popup_state.current_state_mut();
+                        match current_state {
+                            Some(state) => match state {
+                                SelectedArtistPopupSubtabMut::Albums(album_list) => {
+                                    album_list
+                                        .handle_events(key_event.code, client, notifications)
+                                        .await
+                                }
+                                SelectedArtistPopupSubtabMut::TopTracks(track_list) => {
+                                    track_list
+                                        .handle_events(
+                                            key_event.code,
+                                            client,
+                                            controls,
+                                            notifications,
+                                            TrackListEvent::Artist(artist_id),
+                                        )
+                                        .await
+                                }
+                            },
+                            None => Ok(Output::Consumed),
                         }
-                        false => {
-                            return artist_popup_state
-                                .albums
-                                .handle_events(key_event.code, client, notifications)
-                                .await;
-                        }
-                    },
+                    }
                 },
                 Popup::Playlist(playlist_popup_state) => match key_event.code {
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::Right | KeyCode::Char('l') => {

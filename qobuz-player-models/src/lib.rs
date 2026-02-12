@@ -103,6 +103,11 @@ pub struct ArtistPage {
     pub image: Option<String>,
     pub top_tracks: Vec<Track>,
     pub description: Option<String>,
+    pub similar_artists: Vec<Artist>,
+    pub albums: Vec<AlbumSimple>,
+    pub singles: Vec<AlbumSimple>,
+    pub live: Vec<AlbumSimple>,
+    pub compilations: Vec<AlbumSimple>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
