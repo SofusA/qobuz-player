@@ -71,6 +71,26 @@ impl TryFrom<i64> for AudioQuality {
     }
 }
 
+enum ReleaseType {
+    Albums,
+    EPsAndSingles,
+    Live,
+    Compilations,
+    // Other,
+}
+
+impl ReleaseType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ReleaseType::Albums => "album",
+            ReleaseType::EPsAndSingles => "epSingle",
+            ReleaseType::Live => "live",
+            ReleaseType::Compilations => "compilation",
+            // ReleaseType::Other => "other",
+        }
+    }
+}
+
 pub async fn new(
     username: &str,
     password: &str,
@@ -174,38 +194,6 @@ impl Display for Endpoint {
     }
 }
 
-macro_rules! get {
-    ($self:ident, $endpoint:expr, $params:expr) => {
-        match $self.make_get_call($endpoint, $params).await {
-            Ok(response) => match serde_json::from_str(response.as_str()) {
-                Ok(item) => Ok(item),
-                Err(error) => Err(Error::DeserializeJSON {
-                    message: error.to_string(),
-                }),
-            },
-            Err(error) => Err(Error::Api {
-                message: error.to_string(),
-            }),
-        }
-    };
-}
-
-macro_rules! post {
-    ($self:ident, $endpoint:expr, $form:expr) => {
-        match $self.make_post_call($endpoint, $form).await {
-            Ok(response) => match serde_json::from_str(response.as_str()) {
-                Ok(item) => Ok(item),
-                Err(error) => Err(Error::DeserializeJSON {
-                    message: error.to_string(),
-                }),
-            },
-            Err(error) => Err(Error::Api {
-                message: error.to_string(),
-            }),
-        }
-    };
-}
-
 impl Client {
     pub fn app_id(&self) -> &str {
         &self.app_id
@@ -219,14 +207,15 @@ impl Client {
         let make_call = |type_string| {
             let params = vec![("type", type_string), ("offset", "0"), ("limit", "20")];
             let endpoint = endpoint.clone();
-            async move { get!(self, &endpoint, Some(&params)) }
+            async move { self.get(&endpoint, Some(&params)).await }
         };
 
-        let album_of_the_week: AlbumOfTheWeekQuery = get!(
-            self,
-            &format!("{}{}", self.base_url, Endpoint::AlbumOfTheWeek),
-            None
-        )?;
+        let album_of_the_week: AlbumOfTheWeekQuery = self
+            .get(
+                &format!("{}{}", self.base_url, Endpoint::AlbumOfTheWeek),
+                None,
+            )
+            .await?;
 
         let album_of_the_week = album_of_the_week
             .items
@@ -266,8 +255,10 @@ impl Client {
 
         let params = vec![("type", type_string), ("offset", "0"), ("limit", "20")];
 
-        let response =
-            get!(self, &endpoint, Some(&params)).map(|x| vec![("Editor picks".to_string(), x)])?;
+        let response = self
+            .get(&endpoint, Some(&params))
+            .await
+            .map(|x| vec![("Editor picks".to_string(), x)])?;
 
         Ok(parse_featured_playlists_response(
             response,
@@ -278,7 +269,7 @@ impl Client {
 
     pub async fn genres(&self) -> Result<Vec<qobuz_player_models::Genre>> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::GenreList);
-        let response: GenreResponse = get!(self, &endpoint, None)?;
+        let response: GenreResponse = self.get(&endpoint, None).await?;
         let genres: Vec<_> = response.genres.items.into_iter().map(parse_genre).collect();
 
         Ok(genres)
@@ -299,7 +290,7 @@ impl Client {
                 ("limit", "20"),
             ];
             let endpoint = endpoint.clone();
-            async move { get!(self, &endpoint, Some(&params)) }
+            async move { self.get(&endpoint, Some(&params)).await }
         };
 
         let (a, b, c, d, e) = try_join!(
@@ -335,7 +326,7 @@ impl Client {
             ("limit", "20"),
         ];
 
-        let response = get!(self, &endpoint, Some(&params))?;
+        let response = self.get(&endpoint, Some(&params)).await?;
 
         Ok(parse_genre_featured_playlists(response, self.user_id))
     }
@@ -344,7 +335,7 @@ impl Client {
         let endpoint = format!("{}{}", self.base_url, Endpoint::UserPlaylist);
         let params = vec![("limit", "500"), ("extra", "tracks"), ("offset", "0")];
 
-        let response: UserPlaylistsResult = get!(self, &endpoint, Some(&params))?;
+        let response: UserPlaylistsResult = self.get(&endpoint, Some(&params)).await?;
 
         Ok(response
             .playlists
@@ -363,7 +354,7 @@ impl Client {
             ("playlist_id", id_string.as_str()),
             ("offset", "0"),
         ];
-        let response = get!(self, &endpoint, Some(&params))?;
+        let response = self.get(&endpoint, Some(&params)).await?;
 
         Ok(parse_playlist(
             response,
@@ -398,7 +389,7 @@ impl Client {
         form_data.insert("is_public", is_public.as_str());
         form_data.insert("description", description.as_str());
 
-        let response = post!(self, &endpoint, form_data)?;
+        let response = self.post(&endpoint, form_data).await?;
         Ok(parse_playlist(
             response,
             self.user_id,
@@ -413,7 +404,7 @@ impl Client {
         let playlist_id = playlist_id.to_string();
         form_data.insert("playlist_id", playlist_id.as_str());
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn playlist_add_track(
@@ -436,7 +427,7 @@ impl Client {
         form_data.insert("track_ids", track_ids.as_str());
         // form_data.insert("no_duplicate", "true");
 
-        let response = post!(self, &endpoint, form_data)?;
+        let response = self.post(&endpoint, form_data).await?;
         Ok(parse_playlist(
             response,
             self.user_id,
@@ -462,7 +453,7 @@ impl Client {
         form_data.insert("playlist_id", playlist_id.as_str());
         form_data.insert("playlist_track_ids", track_ids.as_str());
 
-        let response = post!(self, &endpoint, form_data)?;
+        let response = self.post(&endpoint, form_data).await?;
         Ok(parse_playlist(
             response,
             self.user_id,
@@ -487,7 +478,7 @@ impl Client {
         form_data.insert("playlist_track_ids", track_id.as_str());
         form_data.insert("insert_before", index.as_str());
 
-        let response = post!(self, &endpoint, form_data)?;
+        let response = self.post(&endpoint, form_data).await?;
         Ok(parse_playlist(
             response,
             self.user_id,
@@ -516,7 +507,7 @@ impl Client {
         let limit = limit.to_string();
         let params = vec![("limit", limit.as_str())];
 
-        let response: Favorites = get!(self, &endpoint, Some(&params))?;
+        let response: Favorites = self.get(&endpoint, Some(&params)).await?;
 
         let Favorites {
             albums,
@@ -553,7 +544,7 @@ impl Client {
         let id = id.to_string();
         form_data.insert("track_ids", id.as_str());
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn remove_favorite_track(&self, id: u32) -> Result<SuccessfulResponse> {
@@ -562,7 +553,7 @@ impl Client {
         let id = id.to_string();
         form_data.insert("track_ids", id.as_str());
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn add_favorite_album(&self, id: &str) -> Result<SuccessfulResponse> {
@@ -570,7 +561,7 @@ impl Client {
         let mut form_data = HashMap::new();
         form_data.insert("album_ids", id);
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn remove_favorite_album(&self, id: &str) -> Result<SuccessfulResponse> {
@@ -578,7 +569,7 @@ impl Client {
         let mut form_data = HashMap::new();
         form_data.insert("album_ids", id);
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn add_favorite_artist(&self, id: u32) -> Result<SuccessfulResponse> {
@@ -587,7 +578,7 @@ impl Client {
         let mut form_data = HashMap::new();
         form_data.insert("artist_ids", id.as_str());
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn remove_favorite_artist(&self, id: u32) -> Result<SuccessfulResponse> {
@@ -596,7 +587,7 @@ impl Client {
         let mut form_data = HashMap::new();
         form_data.insert("artist_ids", id.as_str());
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn add_favorite_playlist(&self, id: u32) -> Result<SuccessfulResponse> {
@@ -605,7 +596,7 @@ impl Client {
         let mut form_data = HashMap::new();
         form_data.insert("playlist_id", id.as_str());
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn remove_favorite_playlist(&self, id: u32) -> Result<SuccessfulResponse> {
@@ -614,7 +605,7 @@ impl Client {
         let mut form_data = HashMap::new();
         form_data.insert("playlist_id", id.as_str());
 
-        post!(self, &endpoint, form_data)
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn search_all(
@@ -626,7 +617,7 @@ impl Client {
         let limit = limit.to_string();
         let params = vec![("query", query), ("limit", &limit)];
 
-        let response = get!(self, &endpoint, Some(&params))?;
+        let response = self.get(&endpoint, Some(&params)).await?;
 
         Ok(parse_search_results(
             response,
@@ -644,7 +635,7 @@ impl Client {
             ("limit", "500"),
         ];
 
-        let response = get!(self, &endpoint, Some(&params))?;
+        let response = self.get(&endpoint, Some(&params)).await?;
 
         Ok(parse_album(response, &self.max_audio_quality))
     }
@@ -654,7 +645,7 @@ impl Client {
         let track_id_string = track_id.to_string();
         let params = vec![("track_id", track_id_string.as_str())];
 
-        let response = get!(self, &endpoint, Some(&params))?;
+        let response = self.get(&endpoint, Some(&params)).await?;
         Ok(parse_track(response, &self.max_audio_quality))
     }
 
@@ -665,7 +656,7 @@ impl Client {
         let endpoint = format!("{}{}", self.base_url, Endpoint::AlbumSuggest);
         let params = vec![("album_id", album_id)];
 
-        let response: AlbumSuggestionResponse = get!(self, &endpoint, Some(&params))?;
+        let response: AlbumSuggestionResponse = self.get(&endpoint, Some(&params)).await?;
 
         Ok(response
             .albums
@@ -688,9 +679,63 @@ impl Client {
             ("sort", "relevant"),
         ];
 
-        let response = get!(self, &endpoint, Some(&params))?;
+        let (artist_page, albums, singles, live, compilations, similar_artists) = try_join!(
+            self.get(&endpoint, Some(&params)),
+            self.artist_releases(artist_id, ReleaseType::Albums, None),
+            self.artist_releases(artist_id, ReleaseType::EPsAndSingles, None),
+            self.artist_releases(artist_id, ReleaseType::Live, None),
+            self.artist_releases(artist_id, ReleaseType::Compilations, None),
+            self.similar_artists(artist_id, None),
+        )?;
 
-        Ok(parse_artist_page(response))
+        Ok(parse_artist_page(
+            artist_page,
+            albums,
+            singles,
+            live,
+            compilations,
+            similar_artists,
+        ))
+    }
+
+    async fn get<T>(&self, endpoint: &str, params: Option<&[(&str, &str)]>) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let response = self
+            .make_get_call(endpoint, params)
+            .await
+            .map_err(|error| Error::Api {
+                message: error.to_string(),
+            })?;
+
+        let item = serde_json::from_str::<T>(response.as_str()).map_err(|error| {
+            Error::DeserializeJSON {
+                message: error.to_string(),
+            }
+        })?;
+
+        Ok(item)
+    }
+
+    async fn post<T>(&self, endpoint: &str, params: HashMap<&str, &str>) -> Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let response = self
+            .make_post_call(endpoint, params)
+            .await
+            .map_err(|error| Error::Api {
+                message: error.to_string(),
+            })?;
+
+        let item = serde_json::from_str::<T>(response.as_str()).map_err(|error| {
+            Error::DeserializeJSON {
+                message: error.to_string(),
+            }
+        })?;
+
+        Ok(item)
     }
 
     pub async fn similar_artists(
@@ -709,7 +754,7 @@ impl Client {
             ("offset", "0"),
         ];
 
-        let response: Result<ArtistsResponse> = get!(self, &endpoint, Some(&params));
+        let response: Result<ArtistsResponse> = self.get(&endpoint, Some(&params)).await;
 
         Ok(response
             .map(|res| res.artists)?
@@ -719,9 +764,10 @@ impl Client {
             .collect())
     }
 
-    pub async fn artist_releases(
+    async fn artist_releases(
         &self,
         artist_id: u32,
+        release_type: ReleaseType,
         limit: Option<i32>,
     ) -> Result<Vec<qobuz_player_models::AlbumSimple>> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::ArtistReleases);
@@ -732,14 +778,14 @@ impl Client {
         let params = vec![
             ("artist_id", artistid_string.as_str()),
             ("limit", &limit),
-            ("release_type", "album"),
+            ("release_type", release_type.as_str()),
             ("sort", "release_date"),
             ("offset", "0"),
             ("track_size", "1"),
         ];
 
-        let response: Result<ReleaseQuery> = get!(self, &endpoint, Some(&params));
-        let response = response?.items;
+        let response: ReleaseQuery = self.get(&endpoint, Some(&params)).await?;
+        let response = response.items;
 
         Ok(response
             .into_iter()
@@ -1295,14 +1341,26 @@ fn image_to_string(value: artist_page::Image) -> String {
     )
 }
 
-fn parse_artist_page(value: artist_page::ArtistPage) -> qobuz_player_models::ArtistPage {
-    let artist_image_url = value.images.portrait.map(image_to_string);
+fn parse_artist_page(
+    artist: artist_page::ArtistPage,
+    albums: Vec<qobuz_player_models::AlbumSimple>,
+    singles: Vec<qobuz_player_models::AlbumSimple>,
+    live: Vec<qobuz_player_models::AlbumSimple>,
+    compilations: Vec<qobuz_player_models::AlbumSimple>,
+    similar_artists: Vec<qobuz_player_models::Artist>,
+) -> qobuz_player_models::ArtistPage {
+    let artist_image_url = artist.images.portrait.map(image_to_string);
 
     qobuz_player_models::ArtistPage {
-        id: value.id,
-        name: value.name.display.clone(),
+        id: artist.id,
+        name: artist.name.display.clone(),
         image: artist_image_url.clone(),
-        top_tracks: value
+        albums,
+        singles,
+        live,
+        compilations,
+        similar_artists,
+        top_tracks: artist
             .top_tracks
             .into_iter()
             .map(|t| {
@@ -1319,15 +1377,15 @@ fn parse_artist_page(value: artist_page::ArtistPage) -> qobuz_player_models::Art
                     image: Some(album_image_url),
                     image_thumbnail: Some(album_image_url_small),
                     duration_seconds: t.duration,
-                    artist_name: Some(value.name.display.clone()),
-                    artist_id: Some(value.id),
+                    artist_name: Some(artist.name.display.clone()),
+                    artist_id: Some(artist.id),
                     album_title: Some(t.album.title),
                     album_id: Some(t.album.id),
                     playlist_track_id: None,
                 }
             })
             .collect(),
-        description: sanitize_html(value.biography.map(|bio| bio.content)),
+        description: sanitize_html(artist.biography.map(|bio| bio.content)),
     }
 }
 

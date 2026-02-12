@@ -66,6 +66,7 @@
     @if (tab == "tracks") {
       @defer (
         list-tracks.html;
+        now_playing_id=playing_info.now_playing_id;
         click="/api/track/play/";
         api_by_id=true;
         tracks=favorites.tracks;

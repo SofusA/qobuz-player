@@ -53,16 +53,41 @@
       </a>
     </div>
 
-    <div class="flex flex-col gap-2">
-      <h3 class="px-4 text-lg">Albums</h3>
-      @defer (list-albums-vertical.html; albums=albums) {}
-    </div>
-    @if (similar_artists) {
+    @if (artist.albums) {
       <div class="flex flex-col gap-2">
-        <h3 class="px-4 text-lg">Similar artists</h3>
-        @defer (list-artists-vertical.html; artists=similar_artists) {}
+        <h3 class="px-4 text-lg">Albums</h3>
+        @defer (list-albums-vertical.html; albums=artist.albums) {}
       </div>
     }
+
+    @if (artist.singles) {
+      <div class="flex flex-col gap-2">
+        <h3 class="px-4 text-lg">EPs and singles</h3>
+        @defer (list-albums-vertical.html; albums=artist.singles) {}
+      </div>
+    }
+
+    @if (artist.live) {
+      <div class="flex flex-col gap-2">
+        <h3 class="px-4 text-lg">Live</h3>
+        @defer (list-albums-vertical.html; albums=artist.live) {}
+      </div>
+    }
+
+    @if (artist.compilations) {
+      <div class="flex flex-col gap-2">
+        <h3 class="px-4 text-lg">Compilations</h3>
+        @defer (list-albums-vertical.html; albums=artist.compilations) {}
+      </div>
+    }
+
+    @if (artist.similar_artists) {
+      <div class="flex flex-col gap-2">
+        <h3 class="px-4 text-lg">Similar artists</h3>
+        @defer (list-artists-vertical.html; artists=artist.similar_artists) {}
+      </div>
+    }
+
     @if (artist.description) {
       @defer (
         description.html;
