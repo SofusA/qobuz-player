@@ -27,7 +27,6 @@ use crate::{
     tracklist::{self, Tracklist},
 };
 
-
 const INTERVAL_MS: u64 = 500;
 
 pub struct Player {
@@ -119,7 +118,6 @@ impl Player {
     pub fn tracklist(&self) -> TracklistReceiver {
         self.tracklist_tx.subscribe()
     }
-
 
     async fn play_pause(&mut self) -> AppResult<()> {
         let target_status = *self.target_status.borrow();

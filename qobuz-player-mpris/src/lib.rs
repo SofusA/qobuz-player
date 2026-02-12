@@ -46,7 +46,7 @@ impl SleepInhibitor {
 
     async fn uninhibit(&mut self) {
         if let Some(awake) = self._awake.take() {
-            /// moving the object to a blocking thread to be dropped
+            // moving the object to a blocking thread to be dropped
             tokio::task::spawn_blocking(move || {
                 drop(awake);
             })
