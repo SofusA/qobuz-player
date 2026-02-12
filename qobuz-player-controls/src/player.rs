@@ -26,6 +26,20 @@ use crate::{
     sink::Sink,
     tracklist::{self, Tracklist},
 };
+use tokio::sync::OnceCell;
+use zbus::Connection;
+
+static CONNECTION: OnceCell<Connection> = OnceCell::const_new();
+
+async fn connection() -> &'static Connection {
+    CONNECTION
+        .get_or_init(|| async {
+            Connection::system()
+                .await
+                .expect("failed to connect to system bus")
+        })
+        .await
+}
 
 const INTERVAL_MS: u64 = 500;
 
@@ -48,6 +62,7 @@ pub struct Player {
     downloader: Downloader,
     state_change_delay: Option<Duration>,
     sample_rate_change_delay: Option<Duration>,
+    inhibitor: Option<zbus::zvariant::OwnedFd>,
 }
 
 impl Player {
@@ -96,6 +111,7 @@ impl Player {
             downloader,
             state_change_delay,
             sample_rate_change_delay,
+            inhibitor: None,
         })
     }
 
@@ -119,12 +135,61 @@ impl Player {
         self.tracklist_tx.subscribe()
     }
 
+    async fn inhibit(&mut self) {
+        if self.inhibitor.is_some() {
+            return;
+        }
+
+        let proxy = zbus::Proxy::new(
+            connection().await,
+            "org.freedesktop.login1",
+            "/org/freedesktop/login1",
+            "org.freedesktop.login1.Manager",
+        )
+        .await;
+
+        if let Ok(proxy) = proxy {
+            let what = "sleep:idle";
+            let who = "qobuz-player";
+            let why = "Playback active";
+            let mode = "block";
+
+            let result: zbus::Result<zbus::zvariant::OwnedFd> = proxy
+                .call_method("Inhibit", &(what, who, why, mode))
+                .await
+                .map(|r| r.body().deserialize())
+                .unwrap_or(Err(zbus::Error::Failure(
+                    "failed to deserialize".to_string(),
+                )));
+
+            if let Ok(fd) = result {
+                self.inhibitor = Some(fd);
+                tracing::info!("Successfully inhibited system sleep");
+            } else {
+                tracing::error!("Failed to inhibit system sleep");
+            }
+        } else {
+            tracing::error!("Failed to create zbus proxy");
+        }
+    }
+
+    fn uninhibit(&mut self) {
+        if self.inhibitor.take().is_some() {
+            tracing::info!("Successfully uninhibited system sleep");
+        }
+    }
+
     async fn play_pause(&mut self) -> AppResult<()> {
         let target_status = *self.target_status.borrow();
 
         match target_status {
-            Status::Playing | Status::Buffering => self.pause(),
-            Status::Paused => self.play().await?,
+            Status::Playing | Status::Buffering => {
+                self.uninhibit();
+                self.pause();
+            }
+            Status::Paused => {
+                self.play().await?;
+            }
         }
 
         Ok(())
@@ -132,6 +197,7 @@ impl Player {
 
     async fn play(&mut self) -> AppResult<()> {
         tracing::info!("Play");
+        self.inhibit().await;
 
         self.wait_for_state_change_delay().await;
         let track = self.tracklist_rx.borrow().current_track().cloned();
@@ -161,6 +227,7 @@ impl Player {
     }
 
     fn pause(&mut self) {
+        self.uninhibit();
         self.set_target_status(Status::Paused);
         self.sink.pause();
     }
@@ -356,6 +423,7 @@ impl Player {
     }
 
     async fn clear_queue(&mut self) -> AppResult<()> {
+        self.uninhibit();
         self.pause();
         self.sink.clear()?;
         self.next_track_is_queried = false;
@@ -624,6 +692,7 @@ impl Player {
                 }
             }
             None => {
+                self.uninhibit();
                 tracklist.reset();
                 self.set_target_status(Status::Paused);
                 self.sink.pause();
