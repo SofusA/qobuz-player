@@ -269,9 +269,8 @@ pub async fn run() -> Result<(), Error> {
                 sample_rate_change_delay,
             )?;
 
-            let app_id = client.app_id().await?.to_string();
-
             if connect {
+                let app_id = client.app_id().await?.to_string();
                 let position_receiver = player.position();
                 let tracklist_receiver = player.tracklist();
                 let volume_receiver = player.volume();

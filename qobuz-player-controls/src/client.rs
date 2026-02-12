@@ -1,8 +1,8 @@
 use moka::future::Cache;
 use qobuz_player_client::{client::AudioQuality, qobuz_models::TrackURL};
 use qobuz_player_models::{
-    Album, AlbumSimple, Artist, ArtistPage, Favorites, Genre, Playlist, PlaylistSimple,
-    SearchResults, Track,
+    Album, AlbumSimple, ArtistPage, Favorites, Genre, Playlist, PlaylistSimple, SearchResults,
+    Track,
 };
 use std::sync::OnceLock;
 use time::Duration;
@@ -28,9 +28,7 @@ pub struct Client {
     genre_playlists_cache: Cache<u32, Vec<PlaylistSimple>>,
     album_cache: Cache<String, Album>,
     artist_cache: Cache<u32, ArtistPage>,
-    artist_albums_cache: Cache<u32, Vec<AlbumSimple>>,
     playlist_cache: Cache<u32, Playlist>,
-    similar_artists_cache: Cache<u32, Vec<Artist>>,
     suggested_albums_cache: Cache<String, Vec<AlbumSimple>>,
     search_cache: Cache<String, SearchResults>,
 }
@@ -49,16 +47,8 @@ impl Client {
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
             .build();
 
-        let artist_albums_cache = moka::future::CacheBuilder::new(1000)
-            .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
-            .build();
-
         let playlist_cache = moka::future::CacheBuilder::new(1000)
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
-            .build();
-
-        let similar_artists_cache = moka::future::CacheBuilder::new(1000)
-            .time_to_live(std::time::Duration::from_secs(60 * 60 * 24 * 7))
             .build();
 
         let suggested_albums_cache = moka::future::CacheBuilder::new(1000)
@@ -91,9 +81,7 @@ impl Client {
             genre_playlists_cache,
             album_cache,
             artist_cache,
-            artist_albums_cache,
             playlist_cache,
-            similar_artists_cache,
             suggested_albums_cache,
             search_cache,
         }
@@ -174,15 +162,6 @@ impl Client {
         Ok(artist)
     }
 
-    pub async fn similar_artists(&self, id: u32) -> Result<Vec<Artist>> {
-        if let Some(cache) = self.similar_artists_cache.get(&id).await {
-            return Ok(cache);
-        }
-
-        let client = self.get_client().await?;
-        Ok(client.similar_artists(id, None).await?)
-    }
-
     pub async fn track(&self, id: u32) -> Result<Track> {
         let client = self.get_client().await?;
         Ok(client.track(id).await?)
@@ -239,19 +218,6 @@ impl Client {
 
         self.playlist_cache.insert(id, playlist.clone()).await;
         Ok(playlist)
-    }
-
-    pub async fn artist_albums(&self, id: u32) -> Result<Vec<AlbumSimple>> {
-        if let Some(cache) = self.artist_albums_cache.get(&id).await {
-            return Ok(cache);
-        }
-
-        let client = self.get_client().await?;
-        let albums = client.artist_releases(id, None).await?;
-
-        self.artist_albums_cache.insert(id, albums.clone()).await;
-
-        Ok(albums)
     }
 
     pub async fn add_favorite_track(&self, id: u32) -> Result<()> {

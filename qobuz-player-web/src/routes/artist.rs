@@ -7,7 +7,6 @@ use axum::{
     routing::{get, put},
 };
 use serde_json::json;
-use tokio::try_join;
 
 use crate::{AppState, ResponseResult, ok_or_send_error_toast};
 
@@ -63,7 +62,6 @@ async fn top_tracks_page(
         &json!({
             "click": click_string,
             "artist": artist,
-            "top_tracks": artist.top_tracks,
         }),
     ))
 }
@@ -119,14 +117,7 @@ async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl 
 }
 
 async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
-    let (artist, albums, similar_artists) = ok_or_send_error_toast(
-        &state,
-        try_join!(
-            state.client.artist_page(id),
-            state.client.artist_albums(id),
-            state.client.similar_artists(id),
-        ),
-    )?;
+    let artist = ok_or_send_error_toast(&state, state.client.artist_page(id).await)?;
 
     let favorites = ok_or_send_error_toast(&state, state.get_favorites().await)?;
     let is_favorite = favorites.artists.iter().any(|artist| artist.id == id);
@@ -137,10 +128,8 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
         "artist.html",
         &json!({
             "artist": artist,
-            "albums": albums,
             "top_tracks": top_tracks,
             "is_favorite": is_favorite,
-            "similar_artists": similar_artists,
             "click": click_string
         }),
     ))

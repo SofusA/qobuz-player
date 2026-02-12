@@ -78,6 +78,7 @@ pub enum AppState {
     Help,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum Output {
     Consumed,
     NotConsumed,
