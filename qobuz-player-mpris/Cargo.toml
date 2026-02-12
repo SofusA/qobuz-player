@@ -11,3 +11,4 @@ qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
 mpris-server = { git = "https://github.com/SeaDve/mpris-server", features = ["tokio"] }
 tokio.workspace = true
+keepawake = "0.6.0"
