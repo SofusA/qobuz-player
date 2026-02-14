@@ -6,7 +6,7 @@ use mpris_server::{
     zbus::{self, fdo},
 };
 use qobuz_player_controls::{
-    ExitSender, PositionReceiver, AppResult, Status, StatusReceiver, TracklistReceiver,
+    AppResult, ExitSender, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
     VolumeReceiver, controls::Controls, error::Error,
 };
 use qobuz_player_models::Track;
@@ -94,8 +94,19 @@ impl PlayerInterface for MprisPlayer {
     }
 
     async fn seek(&self, offset: Time) -> fdo::Result<()> {
-        let clock = Duration::from_secs(offset.as_secs() as u64);
-        self.controls.seek(clock);
+        let current_position = *self.position_receiver.borrow();
+        let offset_millis = offset.as_millis();
+
+        let new_position = match offset_millis < 0 {
+            true => {
+                current_position - Duration::from_millis(offset_millis.abs().try_into().unwrap())
+            }
+            false => {
+                current_position + Duration::from_millis(offset_millis.abs().try_into().unwrap())
+            }
+        };
+
+        self.controls.seek(new_position);
         Ok(())
     }
 
