@@ -277,7 +277,11 @@ impl Player {
             && new_position < current_position as i32
             && self.position.borrow().as_millis() > 1000
         {
-            self.seek(Duration::default())?;
+            self.position.send(Default::default())?;
+
+            if tracklist.skip_to_track(current_position as i32).is_some() {
+                self.new_queue(tracklist).await?;
+            }
             return Ok(());
         }
 
