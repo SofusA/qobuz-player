@@ -27,7 +27,8 @@ Read more [in the wiki](https://github.com/SofusA/qobuz-player/wiki/RFID-player)
 - MPRIS support (control via [playerctl](https://github.com/altdesktop/playerctl) or other D-Bus client)
 - Gap-less playback
 - Web UI 
-- Terminal UI 
+- Terminal UI
+- Experimental Qobuz Connect. Enabled with `--connect` flag
 
 ## Installation
 ### Fonts
