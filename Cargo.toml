@@ -56,3 +56,4 @@ image = "0.25"
 skabelon = "0.2.0"
 parking_lot = "0.12.5"
 qonductor = { git = "https://github.com/nickblt/qonductor" }
+keepawake = "0.6.0"

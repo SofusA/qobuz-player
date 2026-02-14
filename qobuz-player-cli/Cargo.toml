@@ -25,3 +25,4 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio_schedule.workspace = true
 time.workspace = true
+keepawake.workspace = true

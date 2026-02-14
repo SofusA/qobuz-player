@@ -20,42 +20,6 @@ struct MprisPlayer {
     exit_sender: ExitSender,
 }
 
-struct SleepInhibitor {
-    _awake: Option<keepawake::KeepAwake>,
-}
-
-impl SleepInhibitor {
-    fn new() -> Self {
-        Self { _awake: None }
-    }
-
-    async fn inhibit(&mut self) {
-        if self._awake.is_none() {
-            let mut builder = keepawake::Builder::default();
-            builder
-                .idle(true)
-                .sleep(true)
-                .reason("Audio playback")
-                .app_name("qobuz-player");
-
-            if let Ok(Ok(awake)) = tokio::task::spawn_blocking(move || builder.create()).await {
-                self._awake = Some(awake);
-            }
-        }
-    }
-
-    async fn uninhibit(&mut self) {
-        if let Some(awake) = self._awake.take() {
-            // moving the object to a blocking thread to be dropped
-            tokio::task::spawn_blocking(move || {
-                drop(awake);
-            })
-            .await
-            .ok();
-        }
-    }
-}
-
 impl RootInterface for MprisPlayer {
     async fn identity(&self) -> fdo::Result<String> {
         Ok("qobuz-player".into())
@@ -273,8 +237,6 @@ pub async fn init(
         return Err(Error::MprisInitError);
     };
 
-    let mut sleep_inhibitor = SleepInhibitor::new();
-
     loop {
         tokio::select! {
             Ok(_) = tracklist_receiver.changed() => {
@@ -318,14 +280,8 @@ pub async fn init(
                 };
 
                 let playback_status = match status {
-                    Status::Paused | Status::Buffering => {
-                        sleep_inhibitor.uninhibit().await;
-                        PlaybackStatus::Paused
-                    }
-                    Status::Playing => {
-                        sleep_inhibitor.inhibit().await;
-                        PlaybackStatus::Playing
-                    }
+                    Status::Paused | Status::Buffering => PlaybackStatus::Paused,
+                    Status::Playing => PlaybackStatus::Playing,
                 };
 
                     let Ok(_) = server
