@@ -3517,6 +3517,7 @@ name = "qobuz-player"
 version = "0.7.1"
 dependencies = [
  "clap",
+ "futures",
  "keepawake",
  "qobuz-player-connect",
  "qobuz-player-controls",

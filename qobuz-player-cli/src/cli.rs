@@ -2,12 +2,14 @@ use std::{
     io::{Write, stdin, stdout},
     path::PathBuf,
     sync::Arc,
+    thread,
     time::Duration,
 };
 
 use clap::{Parser, Subcommand};
+use futures::executor::block_on;
 use qobuz_player_controls::{
-    AudioQuality, StatusReceiver, client::Client, database::Database,
+    AudioQuality, Status, StatusReceiver, client::Client, database::Database,
     notification::NotificationBroadcast, player::Player,
 };
 use qobuz_player_rfid::RfidState;
@@ -98,7 +100,7 @@ enum Commands {
 
         #[clap(long, default_value_t = false)]
         /// Disable sleep inhibitor
-        disable_sleep: bool,
+        disable_sleep_inhibitor: bool,
     },
     /// Persist configurations
     Config {
@@ -201,7 +203,7 @@ pub async fn run() -> Result<(), Error> {
         audio_cache: Default::default(),
         audio_cache_time_to_live: Default::default(),
         disable_tui_album_cover: false,
-        disable_sleep: false,
+        disable_sleep_inhibitor: false,
     }) {
         Commands::Open {
             username,
@@ -222,7 +224,7 @@ pub async fn run() -> Result<(), Error> {
             audio_cache,
             audio_cache_time_to_live,
             disable_tui_album_cover,
-            disable_sleep,
+            disable_sleep_inhibitor,
         } => {
             let database_credentials = database.get_credentials().await?;
             let database_configuration = database.get_configuration().await?;
@@ -326,7 +328,7 @@ pub async fn run() -> Result<(), Error> {
                 });
             }
 
-            if !disable_sleep {
+            if !disable_sleep_inhibitor {
                 let status_receiver = player.status();
 
                 sleep_inhibitor(status_receiver);
@@ -476,23 +478,22 @@ fn error_exit(error: Error) {
     std::process::exit(1);
 }
 
-fn sleep_inhibitor(mut status_receiver: StatusReceiver) {
-    tokio::spawn(async move {
+pub fn sleep_inhibitor(mut status_receiver: StatusReceiver) {
+    thread::spawn(move || {
         let mut sleep_inhibitor = SleepInhibitor::new();
 
         loop {
-            if status_receiver.changed().await.is_ok() {
-                let status = *status_receiver.borrow_and_update();
-                match status {
-                    qobuz_player_controls::Status::Paused => {
-                        sleep_inhibitor.restore_sleep().await;
-                    }
-                    qobuz_player_controls::Status::Playing
-                    | qobuz_player_controls::Status::Buffering => {
-                        sleep_inhibitor.block_sleep().await;
-                    }
-                };
-            };
+            let changed = block_on(async { status_receiver.changed().await });
+            if changed.is_err() {
+                sleep_inhibitor.restore_sleep();
+                break;
+            }
+
+            let status = *status_receiver.borrow_and_update();
+            match status {
+                Status::Paused => sleep_inhibitor.restore_sleep(),
+                Status::Playing | Status::Buffering => sleep_inhibitor.block_sleep(),
+            }
         }
     });
 }
@@ -506,7 +507,7 @@ impl SleepInhibitor {
         Self { awake: None }
     }
 
-    async fn block_sleep(&mut self) {
+    fn block_sleep(&mut self) {
         if self.awake.is_none() {
             let mut builder = keepawake::Builder::default();
             builder
@@ -515,19 +516,13 @@ impl SleepInhibitor {
                 .reason("Audio playback")
                 .app_name("qobuz-player");
 
-            if let Ok(Ok(awake)) = tokio::task::spawn_blocking(move || builder.create()).await {
+            if let Ok(awake) = builder.create() {
                 self.awake = Some(awake);
             }
         }
     }
 
-    async fn restore_sleep(&mut self) {
-        if let Some(awake) = self.awake.take() {
-            tokio::task::spawn_blocking(move || {
-                drop(awake);
-            })
-            .await
-            .ok();
-        }
+    fn restore_sleep(&mut self) {
+        let _ = self.awake.take();
     }
 }
