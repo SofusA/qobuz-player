@@ -45,6 +45,10 @@ enum Commands {
         max_audio_quality: Option<AudioQuality>,
 
         #[clap(long)]
+        /// Use provided device for audio output, instead of default
+        output_device_name: Option<String>,
+
+        #[clap(long)]
         /// Delay playback when changing state from paused to playing in milliseconds
         state_change_delay_ms: Option<u64>,
 
@@ -188,6 +192,7 @@ pub async fn run() -> Result<(), Error> {
         username: Default::default(),
         password: Default::default(),
         max_audio_quality: Default::default(),
+        output_device_name: None,
         state_change_delay_ms: Default::default(),
         sample_rate_change_delay_ms: Default::default(),
         disable_tui: Default::default(),
@@ -209,6 +214,7 @@ pub async fn run() -> Result<(), Error> {
             username,
             password,
             max_audio_quality,
+            output_device_name: preferred_device_name,
             state_change_delay_ms,
             sample_rate_change_delay_ms,
             disable_tui,
@@ -275,6 +281,7 @@ pub async fn run() -> Result<(), Error> {
                 database.clone(),
                 state_change_delay,
                 sample_rate_change_delay,
+                preferred_device_name,
             )?;
 
             if connect {

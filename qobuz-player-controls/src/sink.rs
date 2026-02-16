@@ -4,14 +4,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use rodio::Source;
 use rodio::cpal::traits::HostTrait;
+use rodio::{DeviceTrait, Source};
 use rodio::{decoder::DecoderBuilder, queue::queue};
 use tokio::sync::watch::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::error::Error;
+use crate::stderr_redirect::silence_stderr;
 use crate::{AppResult, VolumeReceiver};
 
 pub struct Sink {
@@ -22,10 +23,11 @@ pub struct Sink {
     track_finished: Sender<()>,
     track_handle: Option<JoinHandle<()>>,
     duration_played: Arc<Mutex<Duration>>,
+    preferred_device_name: Option<String>,
 }
 
 impl Sink {
-    pub fn new(volume: VolumeReceiver) -> AppResult<Self> {
+    pub fn new(volume: VolumeReceiver, preferred_device_name: Option<String>) -> AppResult<Self> {
         let (track_finished, _) = watch::channel(());
         Ok(Self {
             sink: Default::default(),
@@ -35,6 +37,7 @@ impl Sink {
             track_finished,
             track_handle: Default::default(),
             duration_played: Default::default(),
+            preferred_device_name,
         })
     }
 
@@ -138,7 +141,12 @@ impl Sink {
             self.output_stream.is_none() || self.sink.is_none() || self.sender.is_none();
 
         if needs_stream {
-            let mut stream_handle = open_default_stream(sample_rate)?;
+            let mut stream_handle =
+                if let Some(preferred_device_name) = self.preferred_device_name.as_deref() {
+                    silence_stderr(|| open_preferred_stream(sample_rate, preferred_device_name))?
+                } else {
+                    open_default_stream(sample_rate)?
+                };
             stream_handle.log_on_drop(false);
 
             let (sender, receiver) = queue(true);
@@ -199,6 +207,33 @@ fn open_default_stream(sample_rate: u32) -> AppResult<rodio::OutputStream> {
                 })
                 .ok_or(original_err)?)
         })
+}
+
+fn open_preferred_stream(
+    sample_rate: u32,
+    preferred_device_name: &str,
+) -> AppResult<rodio::OutputStream> {
+    let devices = rodio::cpal::default_host().output_devices()?;
+
+    for device in devices {
+        if device.name().ok().as_deref() == Some(preferred_device_name) {
+            let Ok(stream) = rodio::OutputStreamBuilder::from_device(device)
+                .and_then(|x| x.with_sample_rate(sample_rate).open_stream())
+            else {
+                break;
+            };
+
+            return Ok(stream);
+        }
+    }
+
+    let devices = rodio::cpal::default_host().output_devices()?;
+    let available_devices: Vec<String> = devices.flat_map(|x| x.name()).collect();
+    let available_devices = available_devices.join(", ");
+
+    Err(Error::SinkDeviceError {
+        message: format!("Unable to find device. Available devices: {available_devices}"),
+    })
 }
 
 pub enum QueryTrackResult {
