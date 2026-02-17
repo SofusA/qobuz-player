@@ -19,6 +19,10 @@ pub enum Error {
     StreamError {
         message: String,
     },
+    #[snafu(display("{message}"))]
+    SinkDeviceError {
+        message: String,
+    },
     PoisonError,
     SendError,
     #[snafu(display("Unable to init mpris. Is address already taken?"))]

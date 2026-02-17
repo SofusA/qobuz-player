@@ -61,9 +61,10 @@ impl Player {
         database: Arc<Database>,
         state_change_delay: Option<Duration>,
         sample_rate_change_delay: Option<Duration>,
+        preferred_device_name: Option<String>,
     ) -> AppResult<Self> {
         let (volume, volume_receiver) = watch::channel(volume);
-        let sink = Sink::new(volume_receiver)?;
+        let sink = Sink::new(volume_receiver, preferred_device_name)?;
 
         let downloader = Downloader::new(audio_cache_dir, broadcast.clone(), database.clone());
 
