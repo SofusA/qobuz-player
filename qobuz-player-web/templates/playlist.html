@@ -1,80 +1,175 @@
-<div
-  class="p-safe-or-4 flex w-full flex-wrap items-end justify-center gap-4 *:max-w-sm"
->
-  <img src="{{ playlist.image }}" class="size-full rounded-lg object-contain" />
-
-  <div class="flex w-full grow flex-col items-center gap-4">
-    <div
-      class="flex w-full flex-col items-center justify-center gap-2 text-center"
-    >
-      <span class="text-lg sm:text-xl">{{ playlist.title }}</span>
-      <span class="text-gray-400 sm:text-lg"> {{ duration }} minutes </span>
+@defer (base.html; active_page="Search"; playing_info=playing_info) {
+<div class="relative flex flex-col gap-8 pb-24">
+  <!-- Sticky Header (appears on scroll) -->
+  <div
+    class="pt-safe-or-4 animate-sticky-header pointer-events-none fixed top-0 right-0 left-0 z-50 flex -translate-y-full items-center justify-between gap-4 border-b border-white/5 bg-black/80 p-4 opacity-0 backdrop-blur-md transition-all data-[visible=true]:pointer-events-auto"
+  >
+    <div class="flex items-center gap-4 overflow-hidden">
+      @if(playlist.image){
+      <img
+        src="{{ playlist.image }}"
+        alt=""
+        class="size-10 rounded-md shadow-sm"
+      />
+      }
+      <div class="flex flex-col overflow-hidden">
+        <span class="truncate text-sm font-bold text-white"
+          >{{ playlist.title }}</span
+        >
+        <span class="truncate text-xs text-gray-400"
+          >{{ playlist.owner.name }}</span
+        >
+      </div>
     </div>
-
-    @defer (button-group.html) {
+    <div class="pointer-events-auto flex items-center gap-2">
       <button
-        class="button button-primary"
+        class="btn btn-primary btn-icon btn-sm rounded-full"
         hx-swap="none"
         hx-put="/playlist/{{ playlist.id }}/play"
       >
-        <span class="size-6">
-          @defer (icons/play.html) {}
-        </span>
-        <span>Play</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M8 5v14l11-7z" />
+        </svg>
       </button>
+    </div>
+  </div>
 
-      <button
-        class="button button-primary"
-        hx-swap="none"
-        hx-put="{{ playlist.id }}/play/shuffle"
+  <!-- Hero Section -->
+  <div
+    class="pt-safe-or-4 animate-hero-scroll relative flex origin-top flex-col items-center gap-6 overflow-hidden bg-gray-900 pb-8 shadow-xl"
+  >
+    <!-- Background Blur -->
+    <div
+      class="absolute inset-0 -z-10 scale-125 bg-cover bg-center bg-no-repeat opacity-30 blur-3xl"
+      style="@if(playlist.image){background-image: url({{ playlist.image }});}"
+    ></div>
+
+    <div
+      class="relative z-10 flex flex-col items-center gap-6 px-4 text-center"
+    >
+      <!-- Artwork -->
+      <div
+        class="aspect-square w-48 overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-105 sm:w-64"
       >
-        <span class="size-6">
-          @defer (icons/play.html) {}
-        </span>
-        <span>Shuffle</span>
-      </button>
+        @if(playlist.image){
+        <img
+          src="{{ playlist.image }}"
+          alt="{{ playlist.title }}"
+          class="h-full w-full object-cover"
+        />
+        } @else {
+        <div
+          class="flex h-full w-full items-center justify-center bg-gray-800 text-gray-600"
+        >
+          @defer (icons/musical-note.html) {}
+        </div>
+        }
+      </div>
 
-      @if (!playlist.is_owned) {
-        @defer (
-          toggle-favorite.html;
-          id=playlist.id;
-          is_favorite=is_favorite;
-          api="/playlist"
-        ) {}
-      } @else {
+      <!-- Info -->
+      <div class="flex flex-col gap-2">
+        <h1
+          class="text-3xl font-bold tracking-tight text-white drop-shadow-md md:text-4xl"
+        >
+          {{ playlist.title }}
+        </h1>
+        <div class="flex flex-wrap justify-center gap-2 text-sm text-gray-400">
+          <span>{{ playlist.owner.name }}</span>
+          <span>•</span>
+          <span>{{ playlist.tracks_count }} tracks</span>
+          <span>•</span>
+          <span>{{ duration }} minutes</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap justify-center gap-4">
         <button
-          class="button button-danger"
+          class="btn btn-primary btn-lg rounded-full px-8 shadow-lg hover:scale-105 active:scale-95"
+          hx-swap="none"
+          hx-put="/playlist/{{ playlist.id }}/play"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <span>Play</span>
+        </button>
+
+        <button
+          class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+          hx-swap="none"
+          hx-put="/playlist/{{ playlist.id }}/play/shuffle"
+          title="Shuffle"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" x2="21" y1="20" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" x2="21" y1="15" y2="21" />
+            <line x1="4" x2="9" y1="4" y2="9" />
+          </svg>
+        </button>
+
+        @if (!playlist.is_owned) { @defer ( toggle-favorite.html;
+        id=playlist.id; is_favorite=is_favorite; api="/playlist";
+        button_class="btn btn-secondary btn-icon rounded-full size-12
+        hover:bg-white/20 border-white/10 active:scale-95 backdrop-blur-md
+        bg-white/10" ) {} } @else {
+        <button
+          class="btn btn-icon size-12 rounded-full border border-red-500/20 bg-red-500/20 text-red-500 backdrop-blur-md hover:bg-red-500/40 active:scale-95"
           hx-swap="none"
           hx-delete="{{ playlist.id }}"
+          title="Delete Playlist"
+          confirm="Are you sure you want to delete this playlist?"
         >
-          <span class="size-6">
-            @defer (icons/trash.html) {}
-          </span>
-          <span>Delete</span>
+          @defer (icons/trash.html) {}
         </button>
-      }
-      @if (rfid) {
+        } @if (rfid) {
         <button
-          class="button button-primary"
+          class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
           hx-swap="none"
           hx-put="{{ playlist.id }}/link"
+          title="Link RFID"
         >
-          <span class="size-6">
-            @defer (icons/link.html) {}
-          </span>
-          <span>Link RFID</span>
+          @defer (icons/link.html) {}
         </button>
-      }
-    }
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Tracklist -->
+  <div
+    class="animate-in fade-in slide-in-from-bottom-8 px-4 delay-150 duration-700"
+  >
+    <div
+      class="overflow-hidden rounded-xl bg-gray-900/50 ring-1 ring-white/5 backdrop-blur-sm sm:p-4"
+    >
+      @defer ( playlist-tracks.html; playing_info=playing_info;
+      playlist=playlist; click=click ) {}
+    </div>
   </div>
 </div>
-<div class="flex w-full flex-col gap-4">
-  <div class="sm:p-4">
-    @defer (
-      playlist-tracks.html;
-      playing_info=playing_info;
-      playlist=playlist
-    click=click
-    ) {}
-  </div>
-</div>
+}

@@ -1,19 +1,38 @@
-@defer (list.html) {
+<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 p-4">
   @for (playlist in playlists) {
-    @defer (list-item.html) {
-      <a
-        class="flex w-full items-center gap-4 text-left text-lg"
-        href="/playlist/{{ playlist.id }}"
-      >
-        <div
-          class="aspect-square size-12 rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat"
-          @if(playlist.image)
-          {
-          style="background-image: url({{ playlist.image }});"
-          }
-        ></div>
-        <p class="w-full truncate text-lg">{{ playlist.title }}</p>
-      </a>
-    }
+    <a
+      href="/playlist/{{ playlist.id }}"
+      class="group flex flex-col gap-2 rounded-lg p-2 transition-colors hover:bg-gray-800/50 active:scale-95"
+      preload="mousedown"
+      preload-images="true"
+      hx-boost="true"
+    >
+      <div class="aspect-square w-full overflow-hidden rounded-lg shadow-md bg-gray-800 relative">
+        @if (playlist.image) {
+          <img
+            src="{{ playlist.image }}"
+            alt="{{ playlist.title }}"
+            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        } @else {
+          <div class="flex h-full w-full items-center justify-center text-gray-600">
+             @defer (icons/musical-note.html) {}
+          </div>
+        }
+        
+        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100">
+           <div class="absolute bottom-2 right-2 rounded-full bg-blue-500 p-2 text-white shadow-lg translate-y-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+           </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-0.5">
+        <h3 class="truncate font-medium text-gray-100 group-hover:text-white">{{ playlist.title }}</h3>
+        <p class="truncate text-sm text-gray-400 group-hover:text-gray-300">{{ playlist.owner.name }}</p>
+         <p class="truncate text-xs text-gray-500">{{ playlist.tracks_count }} tracks</p>
+      </div>
+    </a>
   }
-}
+</div>

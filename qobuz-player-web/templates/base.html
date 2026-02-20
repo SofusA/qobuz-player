@@ -1,5 +1,9 @@
 @if (partial) {
   {{ content }}
+  @if (!active_page || active_page != "NowPlaying") {
+    @defer (controls.html; playing_info=playing_info) {}
+  }
+  @defer (navigation.html; active_page=active_page) {}
 } @else {
   <!doctype html>
   <html lang="en" class="dark">
@@ -7,6 +11,8 @@
     <body
       class="touch-pan-y bg-black text-gray-50"
       hx-ext="preload, remove-me, morph"
+      hx-boost="true"
+      hx-swap="morph:innerHTML transition:true"
       hx-indicator="#loading-spinner"
     >
       <div
@@ -19,6 +25,7 @@
 
       <div
         id="toast-container"
+        hx-preserve
         class="fixed top-8 right-8 z-20 flex flex-col gap-4"
       ></div>
 

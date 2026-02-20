@@ -10,18 +10,21 @@
     data-sse="tracklist"
     hx-target="this"
     hx-swap="outerHTML"
+    class="flex flex-col gap-6 p-4 pb-24"
   >
-    <div class="flex flex-col gap-4 p-4">
-      <div class="pt-safe sticky top-0 z-10 bg-black/20 pb-2 backdrop-blur">
-        <a
-          hx-target="unset"
-          href="{{ playing_info.entity_link }}"
-          class="text-2xl"
-        >
-          {{ playing_info.entity_title }}
-        </a>
-      </div>
+    <div
+      class="pt-safe-or-4 sticky top-0 z-10 flex flex-col gap-4 bg-black/80 pb-4 backdrop-blur-md"
+    >
+      <a
+        hx-target="unset"
+        href="{{ playing_info.entity_link }}"
+        class="text-3xl font-bold tracking-tight hover:text-blue-500 transition-colors"
+      >
+        {{ playing_info.entity_title }}
+      </a>
+    </div>
 
+    <div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
       @defer (
         queue-list.html;
         tracks=tracks;

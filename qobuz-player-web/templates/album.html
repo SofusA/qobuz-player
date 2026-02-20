@@ -1,84 +1,204 @@
-<div
-  class="p-safe-or-4 flex w-full flex-wrap items-end justify-center gap-4 *:max-w-sm"
->
-  <img
-    src="{{ album.image }}"
-    alt="{{ album.title }}"
-    class="size-full rounded-lg object-contain"
-  />
-
-  <div class="flex w-full grow flex-col items-center gap-4">
-    <div
-      class="flex w-full flex-col items-center justify-center gap-2 text-center"
-    >
-      <a
-        href="/artist/{{ album.artist.id }}"
-        class="rounded text-gray-400 sm:text-lg"
-      >
-        {{ album.artist.name }}
-      </a>
-      <span class="text-lg sm:text-xl">{{ album.title }}</span>
-      <span class="flex gap-2 text-gray-400 sm:text-lg">
-        <span>{{ album.release_year }}</span>
-        <span>•︎</span>
-        <span>{{ duration }} minutes</span>
-      </span>
+@defer (base.html; active_page="Search"; playing_info=playing_info) {
+<div class="relative flex flex-col gap-8 pb-24">
+  <!-- Sticky Header (appears on scroll) -->
+  <div
+    class="pt-safe-or-4 animate-sticky-header pointer-events-none fixed top-0 right-0 left-0 z-50 flex -translate-y-full items-center justify-between gap-4 border-b border-white/5 bg-black/80 p-4 opacity-0 backdrop-blur-md transition-all data-[visible=true]:pointer-events-auto"
+  >
+    <div class="flex items-center gap-4 overflow-hidden">
+      <img
+        src="{{ album.image }}"
+        alt=""
+        class="size-10 rounded-md shadow-sm"
+      />
+      <div class="flex flex-col overflow-hidden">
+        <span class="truncate text-sm font-bold text-white"
+          >{{ album.title }}</span
+        >
+        <span class="truncate text-xs text-gray-400"
+          >{{ album.artist.name }}</span
+        >
+      </div>
     </div>
-
-    @defer (button-group.html) {
+    <div class="pointer-events-auto flex items-center gap-2">
       <button
-        class="button button-primary"
+        class="btn btn-primary btn-icon btn-sm rounded-full"
         hx-swap="none"
         hx-put="/album/{{ album.id }}/play"
       >
-        <span class="size-6">
-          @defer (icons/play.html) {}
-        </span>
-        <span>Play</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M8 5v14l11-7z" />
+        </svg>
       </button>
+    </div>
+  </div>
 
-      @defer (
-        toggle-favorite.html;
-        id=album.id;
-        is_favorite=is_favorite;
-        api="/album"
-      ) {}
-      @if (rfid) {
+  <!-- Hero Section -->
+  <div
+    class="pt-safe-or-4 animate-hero-scroll relative flex origin-top flex-col items-center gap-6 overflow-hidden bg-gray-900 pb-8 shadow-xl"
+  >
+    <!-- Background Blur -->
+    <div
+      class="absolute inset-0 -z-10 scale-125 bg-cover bg-center bg-no-repeat opacity-30 blur-3xl"
+      style="@if(album.image){background-image: url({{ album.image }});}"
+    ></div>
+
+    <div
+      class="relative z-10 flex flex-col items-center gap-6 px-4 text-center"
+    >
+      <!-- Artwork -->
+      <div
+        class="aspect-square w-48 overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-105 sm:w-64"
+      >
+        <img
+          src="{{ album.image }}"
+          alt="{{ album.title }}"
+          class="h-full w-full object-cover"
+        />
+      </div>
+
+      <!-- Info -->
+      <div class="flex flex-col gap-2">
+        <h1
+          class="text-3xl font-bold tracking-tight text-white drop-shadow-md md:text-4xl"
+        >
+          {{ album.title }}
+        </h1>
+        <a
+          href="/artist/{{ album.artist.id }}"
+          class="text-xl font-medium text-gray-200 transition-colors hover:text-white hover:underline"
+        >
+          {{ album.artist.name }}
+        </a>
+        <div class="flex flex-wrap justify-center gap-2 text-sm text-gray-400">
+          <span>{{ album.release_year }}</span>
+          <span>•</span>
+          <span>{{ duration }} minutes</span>
+          @if (album.hires) {
+          <span
+            class="ml-2 rounded bg-yellow-500/20 px-1.5 py-0.5 text-xs font-bold text-yellow-500 ring-1 ring-yellow-500/50 ring-inset"
+            >Hi-Res</span
+          >
+          }
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap justify-center gap-4">
         <button
-          class="button button-primary"
+          class="btn btn-primary btn-lg rounded-full px-8 shadow-lg hover:scale-105 active:scale-95"
+          hx-swap="none"
+          hx-put="/album/{{ album.id }}/play"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <span>Play</span>
+        </button>
+
+        @defer ( toggle-favorite.html; id=album.id; is_favorite=is_favorite;
+        api="/album"; button_class="btn btn-secondary btn-icon rounded-full
+        size-12 hover:bg-white/20 border-white/10 active:scale-95
+        backdrop-blur-md bg-white/10" ) {}
+
+        <button
+          class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+          hx-swap="none"
+          hx-put="/album/{{ album.id }}/play-shuffle"
+          title="Shuffle"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" x2="21" y1="20" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" x2="21" y1="15" y2="21" />
+            <line x1="4" x2="9" y1="4" y2="9" />
+          </svg>
+        </button>
+
+        <a
+          href="/playlist/add-tracks?type=album&id={{ album.id }}"
+          class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+          title="Add to Playlist"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </a>
+
+        @if (rfid) {
+        <button
+          class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
           hx-swap="none"
           hx-put="{{ album.id }}/link"
+          title="Link RFID"
         >
-          <span class="size-6">
-            @defer (icons/link.html) {}
-          </span>
-          <span>Link RFID</span>
+          @defer (icons/link.html) {}
         </button>
-      }
-    }
+        }
+      </div>
+    </div>
   </div>
-</div>
-<div class="flex w-full flex-col gap-4">
-  <div class="sm:p-4">
-    @defer (
-      album-tracks.html;
-      album=album;
-      playing_info=playing_info;
-      click=click
-    ) {}
+
+  <!-- Tracklist -->
+  <div
+    class="animate-in fade-in slide-in-from-bottom-8 px-4 delay-150 duration-700"
+  >
+    <div
+      class="overflow-hidden rounded-xl bg-gray-900/50 ring-1 ring-white/5 backdrop-blur-sm sm:p-4"
+    >
+      @defer ( album-tracks.html; album=album; playing_info=playing_info;
+      click=click ) {}
+    </div>
   </div>
 
   @if (suggested_albums) {
-    <div class="flex w-full flex-col gap-2">
-      <h3 class="px-4 text-lg">Album suggestions</h3>
-      @defer (list-albums-vertical.html; albums=suggested_albums) {}
-    </div>
-  }
-  @if (album.description) {
-    @defer (
-      description.html;
-      description=album.description;
-      title=album.title
+  <div class="flex flex-col gap-4 px-4 pb-4">
+    <h3 class="text-xl font-bold text-white">Album suggestions</h3>
+    @defer (list-albums-vertical.html; albums=suggested_albums;
+    card_size="w-40") {}
+  </div>
+  } @if (album.description) {
+  <div class="px-4">
+    @defer ( description.html; description=album.description; title=album.title
     ) {}
+  </div>
   }
+
+  <div class="px-4 pb-4 text-center text-xs text-gray-600">
+    {{ album.copyright }}
+  </div>
 </div>
+}

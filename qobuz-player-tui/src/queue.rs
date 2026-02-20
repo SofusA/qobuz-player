@@ -121,7 +121,7 @@ impl QueueState {
                         let index = self.state.selected();
 
                         if let Some(index) = index {
-                            controls.skip_to_position(index, false);
+                            controls.skip_to_position(index, true);
                         }
                         Output::Consumed
                     }

@@ -1,12 +1,27 @@
 @import "tailwindcss";
-@plugin "tailwindcss-safe-area";
+@import "tailwindcss-safe-area";
+@import "tailwindcss-animate";
+
+@theme {
+  --color-brand-primary: #3b82f6;
+  --color-brand-secondary: #1f2937;
+  --color-brand-accent: #f59e0b;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
 
 html {
   min-height: calc(100% + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
+  scroll-behavior: smooth;
+  timeline-scope: --page-scroll;
 }
 
+body {
+  scroll-timeline: --page-scroll block;
+}
+
+/* HTMX Indicators */
 .my-indicator {
   opacity: 0;
   transition: opacity 150ms ease-in;
@@ -16,16 +31,115 @@ html {
   opacity: 1;
 }
 
-.button {
-  @apply flex gap-2 justify-center items-center p-2 rounded cursor-pointer whitespace-nowrap;
+/* Button Component */
+@layer components {
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:shadow-md active:bg-blue-800;
+  }
+
+  .btn-secondary {
+    @apply border border-gray-700 bg-gray-800 text-gray-200 hover:border-gray-600 hover:bg-gray-700 active:bg-gray-900;
+  }
+
+  .btn-ghost {
+    @apply text-gray-400 hover:bg-gray-800/50 hover:text-white active:bg-gray-800;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800;
+  }
+
+  .btn-icon {
+    @apply aspect-square rounded-full p-2;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
 }
 
-.button-primary {
-  @apply bg-blue-500 active:bg-blue-700;
+/* Scroll Driven Animations Utilities */
+@keyframes fade-out-hero {
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
 }
 
-.button-danger {
-  @apply bg-red-700 active:bg-red-500;
+.animate-hero-scroll {
+  animation: fade-out-hero linear both;
+  animation-timeline: --page-scroll;
+  animation-range: 0 300px;
 }
 
-@source inline("bg-red-500 bg-yellow-500 bg-blue-500 bg-teal-500 bg-green-700 bg-blue-800 opacity-40");
+@keyframes sticky-header-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-sticky-header {
+  animation: sticky-header-appear linear both;
+  animation-timeline: --page-scroll;
+  animation-range: 150px 300px;
+}
+
+/* Utilities */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thumb-gray-700::-webkit-scrollbar-thumb {
+    background-color: #374151;
+    border-radius: 9999px;
+  }
+  .scrollbar-thumb-gray-700:hover::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+  }
+
+  .pt-safe-or-4 {
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-group(root) {
+  animation-duration: 0.4s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.4s;
+}

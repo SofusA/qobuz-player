@@ -1,17 +1,19 @@
-<div class="flex w-full gap-4 overflow-scroll p-2">
+<div class="flex w-full gap-4 overflow-x-auto p-2 pb-4 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700">
   @for (playlist in playlists) {
     <a
       href="/playlist/{{ playlist.id }}"
-      class="h-full shrink-0"
+      class="snap-start @if (card_size) { {{ card_size }} } @else { w-32 } h-full shrink-0 transition-transform active:scale-95"
       preload="mousedown"
       preload-images="true"
+      hx-boost="true"
     >
       <img
-        class="h-32 rounded-lg"
+        class="aspect-square w-full rounded-lg object-cover shadow-md transition-shadow hover:shadow-lg"
         alt="{{ playlist.title }}"
         src="{{ playlist.image }}"
+        loading="lazy"
       />
-      <p class="truncate text-sm">{{ playlist.title }}</p>
+      <p class="truncate text-sm font-medium mt-2">{{ playlist.title }}</p>
     </a>
   }
 </div>

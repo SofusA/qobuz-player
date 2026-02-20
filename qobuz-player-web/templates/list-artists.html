@@ -1,29 +1,28 @@
-@defer (list.html) {
+<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 p-4">
   @for (artist in artists) {
-    @defer (list-item.html) {
-      <a
-        class="flex items-center gap-4"
-        hx-push-url="true"
-        href="/artist/{{ artist.id }}"
-        preload="mousedown"
-        preload-images="true"
-      >
+    <a
+      href="/artist/{{ artist.id }}"
+      class="group flex flex-col items-center gap-3 rounded-xl p-4 transition-all hover:bg-gray-800/50 active:scale-95"
+      preload="mousedown"
+      preload-images="true"
+      hx-boost="true"
+    >
+      <div class="aspect-square w-full overflow-hidden rounded-full shadow-lg bg-gray-800 ring-2 ring-transparent transition-all group-hover:ring-white/10">
         @if (artist.image) {
-          <div
-            class="aspect-square size-12 rounded-full bg-gray-800 bg-cover bg-center bg-no-repeat"
-            style="background-image: url({{ artist.image }});"
-          ></div>
+          <img
+            src="{{ artist.image }}"
+            alt="{{ artist.name }}"
+            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+            loading="lazy"
+          />
         } @else {
-          <div
-            class="flex aspect-square size-12 items-center justify-center rounded-full bg-gray-500"
-          >
-            <div class="w-8">
-              @defer (icons/user.html) {}
-            </div>
+          <div class="flex h-full w-full items-center justify-center text-gray-600">
+             @defer (icons/user.html) {}
           </div>
         }
-        <p class="w-full truncate text-lg">{{ artist.name }}</p>
-      </a>
-    }
+      </div>
+
+      <h3 class="w-full truncate text-center font-medium text-gray-200 group-hover:text-white">{{ artist.name }}</h3>
+    </a>
   }
-}
+</div>

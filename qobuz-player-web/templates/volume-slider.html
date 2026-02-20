@@ -1,13 +1,66 @@
-<input
-  id="volume-slider"
-  class="w-full accent-blue-500"
-  autocomplete="off"
-  hx-post="/api/volume"
-  hx-trigger="input delay:100ms"
-  hx-swap="none"
-  value="{{ current_volume }}"
-  type="range"
-  name="value"
-  min="0"
-  max="100"
-/>
+<style>
+  .volume-range {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+  }
+  .volume-range:focus {
+    outline: none;
+  }
+  /* Webkit */
+  .volume-range::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: #374151; /* gray-700 */
+    border-radius: 9999px;
+  }
+  .volume-range::-webkit-slider-thumb {
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: #3b82f6; /* blue-500 */
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -4px; /* (track-height / 2) - (thumb-height / 2) */
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  /* Firefox */
+  .volume-range::-moz-range-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: #374151;
+    border-radius: 9999px;
+  }
+  .volume-range::-moz-range-thumb {
+    height: 12px;
+    width: 12px;
+    border: none;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+</style>
+<div class="flex items-center gap-4 text-gray-400">
+  <div class="size-6 shrink-0">
+    @defer (icons/speaker-wave.html) {}
+  </div>
+  <input
+    id="volume-slider"
+    class="volume-range h-1 w-full grow appearance-none rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-black"
+    autocomplete="off"
+    hx-post="/api/volume"
+    hx-trigger="input delay:100ms"
+    hx-swap="none"
+    value="{{ current_volume }}"
+    type="range"
+    name="value"
+    min="0"
+    max="100"
+    oninput="document.getElementById('volume-percentage').textContent = this.value + '%'"
+  />
+  <span id="volume-percentage" class="w-10 text-right text-sm font-medium tabular-nums">{{ current_volume }}%</span>
+</div>

@@ -60,13 +60,18 @@
             }
           </button>
 
-          <div class="flex items-center">
-            <button class="button" hx-put="/api/remove-queue-item/{{ index }}">
+          <div class="flex items-center gap-2">
+            <button
+              class="btn btn-icon btn-ghost size-10 text-gray-500 hover:text-red-500 transition-colors"
+              hx-put="/api/remove-queue-item/{{ index }}"
+              hx-swap="none"
+              title="Remove from queue"
+            >
               @defer (icons/x-circle.html) {}
             </button>
 
             <input type="hidden" name="new_order" value="{{ index }}" />
-            <span class="handle button">
+            <span class="handle btn btn-icon btn-ghost cursor-grab active:cursor-grabbing text-gray-500 hover:text-white">
               @defer (icons/bars-2.html) {}
             </span>
           </div>

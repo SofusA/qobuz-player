@@ -1,88 +1,64 @@
 let evtSource;
 
 function initSse() {
+  if (evtSource) {
+    evtSource.close();
+  }
   evtSource = new EventSource("/sse");
 
-  evtSource.addEventListener("reload", (_event) => {
+  evtSource.addEventListener("reload", () => {
     console.warn("Reload event");
     location.reload();
   });
 
-  evtSource.addEventListener("status", (_event) => {
-    const elements = document.querySelectorAll("[data-sse=status]");
-
-    for (const element of elements) {
-      htmx.trigger(element, "status");
+  evtSource.addEventListener("status", () => {
+    for (const el of document.querySelectorAll("[data-sse=status]")) {
+      htmx.trigger(el, "status");
     }
   });
 
-  evtSource.addEventListener("tracklist", (_event) => {
-    const elements = document.querySelectorAll("[data-sse=tracklist]");
-
-    for (const element of elements) {
-      htmx.trigger(element, "tracklist");
+  evtSource.addEventListener("tracklist", () => {
+    for (const el of document.querySelectorAll("[data-sse=tracklist]")) {
+      htmx.trigger(el, "tracklist");
     }
   });
 
   evtSource.addEventListener("volume", (event) => {
     const slider = document.getElementById("volume-slider");
-    if (slider === null) {
-      return;
+    if (slider) {
+      slider.value = event.data;
     }
-    slider.value = event.data;
   });
 
-  evtSource.addEventListener("error", (event) => {
-    htmx.swap("#toast-container", event.data, { swapStyle: "afterbegin" });
-  });
-
-  evtSource.addEventListener("warn", (event) => {
-    htmx.swap("#toast-container", event.data, { swapStyle: "afterbegin" });
-  });
-
-  evtSource.addEventListener("success", (event) => {
-    htmx.swap("#toast-container", event.data, { swapStyle: "afterbegin" });
-  });
-
-  evtSource.addEventListener("info", (event) => {
-    htmx.swap("#toast-container", event.data, { swapStyle: "afterbegin" });
-  });
+  for (const level of ["error", "warn", "success", "info"]) {
+    evtSource.addEventListener(level, (event) => {
+      htmx.swap("#toast-container", event.data, { swapStyle: "afterbegin" });
+    });
+  }
 
   evtSource.addEventListener("position", (event) => {
     const slider = document.getElementById("progress-slider");
-    if (slider === null) {
-      return;
-    }
+    if (!slider) return;
     slider.value = event.data;
 
     const positionElement = document.getElementById("position");
+    if (!positionElement) return;
 
-    const seconds = event.data / 1000;
-
-    const minutesString = Math.floor(seconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const secondsString = Math.floor(seconds % 60)
-      .toString()
-      .padStart(2, "0");
-
-    positionElement.innerText = `${minutesString}:${secondsString}`;
+    const totalSeconds = Math.floor(event.data / 1000);
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+    const seconds = String(totalSeconds % 60).padStart(2, "0");
+    positionElement.textContent = `${minutes}:${seconds}`;
   });
 }
 
 initSse();
 
 function refreshSse() {
-  const elements = document.querySelectorAll("[hx-trigger='tracklist'");
-
-  for (const element of elements) {
-    htmx.trigger(element, "tracklist");
+  for (const el of document.querySelectorAll("[hx-trigger='tracklist']")) {
+    htmx.trigger(el, "tracklist");
   }
-
-  const statusElements = document.querySelectorAll("[hx-trigger='status'");
-
-  for (const element of statusElements) {
-    htmx.trigger(element, "status");
+  for (const el of document.querySelectorAll("[hx-trigger='status']")) {
+    htmx.trigger(el, "status");
   }
 }
 
@@ -94,15 +70,11 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function focusSearchInput() {
-  document.getElementById("query").focus();
+  const input = document.getElementById("query");
+  if (input) input.focus();
 }
 
-function loadSearchInput() {
-  let value = sessionStorage.getItem("search-query");
-  document.getElementById("query").value = value;
-}
-
-function setSearchQuery(value) {
+function updateSearchState(value) {
   sessionStorage.setItem("search-query", value);
 
   const url = new URL(window.location.href);
@@ -111,20 +83,37 @@ function setSearchQuery(value) {
   } else {
     url.searchParams.delete("query");
   }
-
   history.replaceState(null, "", url.toString());
 
-  document.getElementById("albums-tab").href = "albums?query=" + value;
-  document.getElementById("artists-tab").href = "artists?query=" + value;
-  document.getElementById("playlists-tab").href = "playlists?query=" + value;
-  document.getElementById("tracks-tab").href = "tracks?query=" + value;
+  const encoded = encodeURIComponent(value);
+  for (const id of ["albums-tab", "artists-tab", "playlists-tab", "tracks-tab"]) {
+    const tab = document.getElementById(id);
+    if (tab) {
+      const section = id.replace("-tab", "");
+      tab.href = `${section}?query=${encoded}`;
+    }
+  }
+}
+
+function loadSearchInput() {
+  const value = sessionStorage.getItem("search-query");
+  if (value) {
+    const input = document.getElementById("query");
+    if (input) input.value = value;
+    updateSearchState(value);
+  }
+}
+
+let searchTimeout;
+
+function setSearchQuery(value) {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => updateSearchState(value), 500);
 }
 
 htmx.onLoad(function (content) {
-  var sortables = content.querySelectorAll(".sortable");
-  for (var i = 0; i < sortables.length; i++) {
-    var sortable = sortables[i];
-    var sortableInstance = new Sortable(sortable, {
+  for (const sortable of content.querySelectorAll(".sortable")) {
+    new Sortable(sortable, {
       animation: 150,
       handle: ".handle",
     });

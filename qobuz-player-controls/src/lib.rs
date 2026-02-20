@@ -8,12 +8,13 @@ pub use qobuz_player_client::client::AudioQuality;
 pub mod client;
 pub mod controls;
 pub mod database;
-pub mod downloader;
+mod downloader;
 pub mod error;
 pub mod notification;
 pub mod player;
-pub mod simple_cache;
-pub mod sink;
+mod simple_cache;
+mod sink;
+mod stderr_redirect;
 pub mod tracklist;
 
 pub type AppResult<T, E = Error> = std::result::Result<T, E>;
