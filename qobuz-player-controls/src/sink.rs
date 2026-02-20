@@ -218,7 +218,7 @@ fn open_preferred_stream(
     for device in devices {
         if device.name().ok().as_deref() == Some(preferred_device_name) {
             let Ok(stream) = rodio::OutputStreamBuilder::from_device(device)
-                .and_then(|x| x.with_sample_rate(sample_rate).open_stream())
+                .and_then(|x| x.with_sample_rate(sample_rate).open_stream_or_fallback())
             else {
                 break;
             };
