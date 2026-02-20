@@ -81,8 +81,5 @@
   </form>
 }
 <script>
-  const el = document.getElementById("playing");
-  if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  document.getElementById("playing")?.scrollIntoView({ behavior: "smooth", block: "start" });
 </script>
