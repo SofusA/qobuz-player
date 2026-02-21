@@ -1,79 +1,60 @@
 @defer (base.html; active_page="Favorites"; playing_info=playing_info) {
-  <div
-    class="flex flex-col px-4"
-    data-sse="tracklist"
-    hx-trigger="tracklist"
-    hx-get=""
-    hx-target="this"
-    hx-swap="outerHTML"
-  >
+  <div class="flex flex-col gap-6 px-4">
     <div
-      class="pt-safe-or-4 sticky top-0 z-10 flex max-h-full grow flex-col gap-4 bg-black/80 pb-2 backdrop-blur"
+      class="pt-safe-or-4 sticky top-0 z-10 flex flex-col gap-4 bg-black/80 pb-4 backdrop-blur-md"
     >
-      <h1 class="text-2xl">Favorites</h1>
-      <div
-        class="group flex justify-between *:rounded-full *:px-2 *:py-1 *:transition-colors"
-      >
+      <h1 class="text-3xl font-bold tracking-tight">Favorites</h1>
+
+      <div class="flex w-full overflow-x-auto rounded-lg bg-gray-900 p-1 no-scrollbar">
         <a
           href="albums"
-          class="@if (tab=='albums') {bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
+          class="flex-1 min-w-20 rounded-md py-1.5 px-2 text-center text-sm font-medium transition-all @if (tab == 'albums') {bg-gray-800 text-white shadow-sm} @else {text-gray-400 hover:text-gray-200}"
+          hx-boost="true"
         >
           Albums
         </a>
         <a
+          href="tracks"
+          class="flex-1 min-w-20 rounded-md py-1.5 px-2 text-center text-sm font-medium transition-all @if (tab == 'tracks') {bg-gray-800 text-white shadow-sm} @else {text-gray-400 hover:text-gray-200}"
+          hx-boost="true"
+        >
+          Tracks
+        </a>
+        <a
           href="artists"
-          class="@if (tab=='artists') {bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
+          class="flex-1 min-w-20 rounded-md py-1.5 px-2 text-center text-sm font-medium transition-all @if (tab == 'artists') {bg-gray-800 text-white shadow-sm} @else {text-gray-400 hover:text-gray-200}"
+          hx-boost="true"
         >
           Artists
         </a>
         <a
           href="playlists"
-          class="@if (tab=='playlists') {bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
+          class="flex-1 min-w-20 rounded-md py-1.5 px-2 text-center text-sm font-medium transition-all @if (tab == 'playlists') {bg-gray-800 text-white shadow-sm} @else {text-gray-400 hover:text-gray-200}"
+          hx-boost="true"
         >
           Playlists
-        </a>
-        <a
-          href="tracks"
-          class="@if (tab=='tracks') {bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
-        >
-          Tracks
         </a>
       </div>
     </div>
 
-    @if (tab == "albums") {
-      @defer (list-albums.html; albums=favorites.albums) {}
-    }
-    @if (tab == "artists") {
-      @defer (list-artists.html; artists=favorites.artists) {}
-    }
-    @if (tab == "playlists") {
-      <a class="button button-primary w-fit" href="/playlist/create">
-        @defer (icons/plus.html) {}
-        Create playlist
-      </a>
+    <div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      @if (tab == "albums") {
+        @defer (list-albums.html; albums=favorites.albums) {}
+      }
+      @if (tab == "artists") {
+        @defer (list-artists.html; artists=favorites.artists) {}
+      }
+      @if (tab == "playlists") {
+        <a class="btn btn-primary mb-4 w-full sm:w-fit" href="/playlist/create">
+          @defer (icons/plus.html) {}
+          Create playlist
+        </a>
 
-      @defer (list-playlists.html; playlists=favorites.playlists) {}
-    }
-    @if (tab == "tracks") {
-      @defer (
-        list-tracks.html;
-        now_playing_id=playing_info.now_playing_id;
-        click="/api/track/play/";
-        api_by_id=true;
-        tracks=favorites.tracks;
-        show_track_cover=true;
-        show_artist=true;
-        is_favorite=true
-      ) {}
-    }
+        @defer (list-playlists.html; playlists=favorites.playlists) {}
+      }
+      @if (tab == "tracks") {
+        @defer (favorites-tracks.html; tracks=favorites.tracks) {}
+      }
+    </div>
   </div>
 }

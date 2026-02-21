@@ -1,76 +1,82 @@
 @defer (base.html; active_page="Search"; playing_info=playing_info) {
-  <div class="flex flex-col">
-    <div
-      class="pt-safe-or-4 sticky top-0 flex max-h-full grow flex-col gap-4 bg-black/80 pb-2 backdrop-blur"
-    >
-      <div class="flex flex-row items-center gap-4">
+<div class="flex flex-col gap-6 px-4">
+  <div
+    class="pt-safe-or-4 sticky top-0 z-10 flex flex-col gap-4 bg-black/80 pb-4 backdrop-blur-md"
+  >
+    <div class="flex flex-col gap-2">
+      <h1 class="text-3xl font-bold tracking-tight">Search</h1>
+      <div class="relative w-full">
         <input
           id="query"
+          type="search"
+          class="w-full rounded-xl bg-gray-900 px-4 py-3 pl-11 text-white placeholder-gray-500 ring-1 ring-gray-800 transition-all focus:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
           name="query"
-          class="w-full rounded bg-white p-2 text-black"
+          placeholder="Search Qobuz..."
+          value=""
+          oninput="setSearchQuery(this.value)"
           autocapitalize="off"
           autocomplete="off"
           autocorrect="off"
-          placeholder="Search"
           spellcheck="false"
-          type="search"
-          oninput="setSearchQuery(this.value)"
           hx-preserve
           hx-post=""
           hx-trigger="input changed delay:500ms, keyup[key=='Enter']"
           hx-target="#search-content"
           hx-swap="outerHTML"
         />
-        <span class="size-8">
-          @defer (icons/magnifying-glass.html) {}
-        </span>
-        <script>
-          loadSearchInput();
-        </script>
-      </div>
-
-      <div
-        class="flex justify-between *:rounded-full *:px-2 *:py-1 *:transition-colors"
-      >
-        <a
-          id="albums-tab"
-          href="albums?query={{ search_results.query }}"
-          class="@if(tab == 'albums'){bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
+        <div
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"
         >
-          Albums
-        </a>
-        <a
-          id="artists-tab"
-          href="artists?query={{ search_results.query }}"
-          class="@if(tab == 'artists'){bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
-        >
-          Artists
-        </a>
-        <a
-          id="playlists-tab"
-          href="playlists?query={{ search_results.query }}"
-          class="@if(tab == 'playlists'){bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
-        >
-          Playlists
-        </a>
-        <a
-          id="tracks-tab"
-          href="tracks?query={{ search_results.query }}"
-          class="@if(tab == 'tracks'){bg-blue-800}"
-          preload="mouseover"
-          preload-images="true"
-        >
-          Tracks
-        </a>
+          <span class="size-5">
+            @defer (icons/magnifying-glass.html) {}
+          </span>
+        </div>
       </div>
     </div>
+    <script>
+      loadSearchInput();
+    </script>
 
+    <div
+      class="no-scrollbar flex w-full overflow-x-auto rounded-lg bg-gray-900 p-1"
+    >
+      <a
+        id="albums-tab"
+        href="albums?query={{ search_results.query }}"
+        class="@if (tab == 'albums') {bg-gray-800 shadow-sm} @else {text-gray-400 hover:text-gray-200} min-w-20 flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium text-white transition-all"
+        hx-boost="true"
+      >
+        Albums
+      </a>
+      <a
+        id="artists-tab"
+        href="artists?query={{ search_results.query }}"
+        class="@if (tab == 'artists') {bg-gray-800 shadow-sm} @else {text-gray-400 hover:text-gray-200} min-w-20 flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium text-white transition-all"
+        hx-boost="true"
+      >
+        Artists
+      </a>
+      <a
+        id="playlists-tab"
+        href="playlists?query={{ search_results.query }}"
+        class="@if (tab == 'playlists') {bg-gray-800 shadow-sm} @else {text-gray-400 hover:text-gray-200} min-w-20 flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium text-white transition-all"
+        hx-boost="true"
+      >
+        Playlists
+      </a>
+      <a
+        id="tracks-tab"
+        href="tracks?query={{ search_results.query }}"
+        class="@if (tab == 'tracks') {bg-gray-800 shadow-sm} @else {text-gray-400 hover:text-gray-200} min-w-20 flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium text-white transition-all"
+        hx-boost="true"
+      >
+        Tracks
+      </a>
+    </div>
+  </div>
+
+  <div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
     @defer (search-content.html; tab=tab; search_results=search_results) {}
   </div>
+</div>
 }

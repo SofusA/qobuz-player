@@ -1,32 +1,8 @@
-@defer (
-  base.html;
-  partial=partial;
-  active_page="Queue";
-  playing_info=playing_info
-) {
-  <div
-    hx-get="/queue/partial"
-    hx-trigger="tracklist"
-    data-sse="tracklist"
-    hx-target="this"
-    hx-swap="outerHTML"
-  >
-    <div class="flex flex-col gap-4 p-4">
-      <div class="pt-safe sticky top-0 z-10 bg-black/20 pb-2 backdrop-blur">
-        <a
-          hx-target="unset"
-          href="{{ playing_info.entity_link }}"
-          class="text-2xl"
-        >
-          {{ playing_info.entity_title }}
-        </a>
-      </div>
-
-      @defer (
-        queue-list.html;
-        tracks=tracks;
-        currently_playing_position=currently_playing_position
-      ) {}
-    </div>
-  </div>
+@defer (base.html; active_page="Queue"; playing_info=playing_info) {
+  @defer (
+    queue-content.html;
+    playing_info=playing_info;
+    tracks=tracks;
+    currently_playing_position=currently_playing_position
+  ) {}
 }

@@ -1,13 +1,14 @@
-<div class="flex w-full gap-4 overflow-scroll p-2">
+<div class="flex w-full gap-4 overflow-x-auto p-2 pb-4 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700">
   @for (album in albums) {
     <a
       href="/album/{{ album.id }}"
-      class="size-32 h-full shrink-0"
+      class="snap-start @if (card_size) { {{ card_size }} } @else { size-32 } h-full shrink-0 transition-transform active:scale-95"
       preload="mousedown"
       preload-images="true"
+      hx-boost="true"
     >
-      <img class="rounded-lg" alt="{{ album.title }}" src="{{ album.image }}" />
-      <p class="truncate text-sm">{{ album.title }}</p>
+      <img class="rounded-lg aspect-square object-cover shadow-md transition-shadow hover:shadow-lg" alt="{{ album.title }}" src="{{ album.image }}" loading="lazy" />
+      <p class="truncate text-sm font-medium mt-2">{{ album.title }}</p>
       <p class="truncate text-sm text-gray-500">{{ album.artist.name }}</p>
     </a>
   }

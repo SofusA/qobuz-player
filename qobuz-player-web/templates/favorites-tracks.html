@@ -1,18 +1,18 @@
 <div
-  class="w-full"
-  hx-trigger="tracklist"
-  hx-target="this"
   data-sse="tracklist"
+  hx-trigger="tracklist"
+  hx-get="/favorites/tracks/partial"
+  hx-target="this"
   hx-swap="morph:outerHTML"
-  hx-get="/playlist/{{ playlist.id }}/tracks"
-  id="tracks"
 >
   @defer (
     list-tracks.html;
     now_playing_id=playing_info.now_playing_id;
-    tracks=playlist.tracks;
-    show_artist=true;
+    click="/api/track/play/";
+    api_by_id=true;
+    tracks=tracks;
     show_track_cover=true;
-    click=click
+    show_artist=true;
+    is_favorite=true
   ) {}
 </div>

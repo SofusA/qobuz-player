@@ -7,7 +7,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::{AppState, ResponseResult, ok_or_error_page};
+use crate::{AppState, ResponseResult, ok_or_error_page, ok_or_send_error_toast};
 
 #[derive(Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -19,7 +19,9 @@ enum Tab {
 }
 
 pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
-    Router::new().route("/favorites/{tab}", get(index))
+    Router::new()
+        .route("/favorites/{tab}", get(index))
+        .route("/favorites/tracks/partial", get(tracks_partial))
 }
 
 async fn index(State(state): State<Arc<AppState>>, Path(tab): Path<Tab>) -> ResponseResult {
@@ -28,5 +30,14 @@ async fn index(State(state): State<Arc<AppState>>, Path(tab): Path<Tab>) -> Resp
     Ok(state.render(
         "favorites.html",
         &json!({"favorites": favorites, "tab": tab}),
+    ))
+}
+
+async fn tracks_partial(State(state): State<Arc<AppState>>) -> ResponseResult {
+    let favorites = ok_or_send_error_toast(&state, state.get_favorites().await)?;
+
+    Ok(state.render(
+        "favorites-tracks.html",
+        &json!({"tracks": favorites.tracks}),
     ))
 }

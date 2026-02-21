@@ -1,31 +1,38 @@
 <div
   hx-get="/controls"
+  hx-swap="morph:outerHTML"
   hx-trigger="tracklist"
   data-sse="tracklist"
   hx-target="this"
 >
-  <div class="h-16"></div>
+  <div class="h-12"></div>
   <div class="px-safe-offset-2 py-safe fixed right-0 bottom-14 left-0">
     <div
-      class="flex items-center justify-between gap-2 rounded-md bg-gray-900/70 p-2 backdrop-blur"
+      class="relative flex items-center justify-between gap-2 rounded-md bg-gray-900/70 p-2 backdrop-blur-md"
     >
       <a
-        class="flex w-full items-center gap-2 overflow-hidden"
-        hx-target="unset"
-        href="{{ playing_info.entity_link }}"
-      >
+        href="/now-playing"
+        hx-target="body"
+        class="absolute inset-0 z-0 rounded-md"
+      ></a>
+
+      <div class="pointer-events-none relative z-10 flex w-full items-center gap-2 overflow-hidden">
         <div
           class="aspect-square size-10 rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat shadow"
           style="@if(playing_info.cover_image){background-image: url({{
             playing_info.cover_image
           }});}"
         ></div>
-        <div class="flex flex-wrap gap-2 overflow-hidden leading-none">
+        <a
+          href="{{ playing_info.entity_link }}"
+          hx-target="body"
+          class="pointer-events-auto flex flex-wrap gap-2 overflow-hidden leading-none hover:underline"
+        >
           <span class="truncate">{{ playing_info.entity_title }}</span>
           <span class="truncate text-gray-500">{{ playing_info.title }}</span>
-        </div>
-      </a>
-      <div class="flex items-center gap-4">
+        </a>
+      </div>
+      <div class="relative z-20 flex items-center gap-4">
         <span class="hidden w-8 sm:flex">
           @defer (previous.html) {}
         </span>

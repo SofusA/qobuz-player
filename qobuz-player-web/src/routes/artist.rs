@@ -98,7 +98,7 @@ async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -
 
     Ok(state.render(
         "toggle-favorite.html",
-        &json!({"api": "/artist", "id": id, "is_favorite": true}),
+        &json!({"api": "/artist", "id": id, "is_favorite": true, "variant": "hero-lg"}),
     ))
 }
 
@@ -107,7 +107,7 @@ async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>)
 
     Ok(state.render(
         "toggle-favorite.html",
-        &json!({"api": "/artist", "id": id, "is_favorite": false}),
+        &json!({"api": "/artist", "id": id, "is_favorite": false, "variant": "hero-lg"}),
     ))
 }
 

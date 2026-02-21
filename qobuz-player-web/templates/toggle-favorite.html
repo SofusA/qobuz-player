@@ -1,17 +1,19 @@
 <button
-  class="button button-primary"
+  class="@if(variant == 'hero-icon'){ btn btn-secondary btn-icon rounded-full size-12 hover:bg-white/20 border-white/10 active:scale-95 backdrop-blur-md bg-white/10 } @else { @if(variant == 'hero-lg'){ btn btn-secondary btn-lg rounded-full px-8 hover:bg-white/20 border-white/10 active:scale-95 backdrop-blur-md bg-white/10 } @else { btn btn-secondary } }"
   hx-swap="outerHTML"
   hx-target="this"
   hx-put="{{ api }}/{{
     id
   }}/@if(is_favorite){unset-favorite}@else{set-favorite}"
+  @if(is_favorite){ title="Remove from favorites" } @else { title="Add to favorites" }
 >
-  <span class="size-6">
-    @if (is_favorite) {
+  @if (is_favorite) {
+    <span class="size-6 text-yellow-500">
       @defer (icons/star-solid.html) {}
-    } @else {
+    </span>
+  } @else {
+    <span class="size-6">
       @defer (icons/star.html) {}
-    }
-  </span>
-  <span>Favorite</span>
+    </span>
+  }
 </button>

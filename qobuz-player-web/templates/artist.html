@@ -1,98 +1,138 @@
-<div class="flex flex-col">
-  <div class="max-w-md self-center p-4">
-    <img
-      src="{{ artist.image }}"
-      alt="{{ artist.name }}"
-      class="size-full rounded-lg object-contain"
-    />
-  </div>
-
-  <div class="flex w-full grow flex-col items-center gap-4 p-4">
-    <h1 class="text-2xl">{{ artist.name }}</h1>
-    @defer (button-group.html) {
-      <button
-        class="button button-primary"
-        hx-swap="none"
-        hx-put="{{ artist.id }}/play-top-track/0"
-      >
-        <span class="size-6">
-          @defer (icons/play.html) {}
-        </span>
-        <span>Play</span>
-      </button>
-
-      @defer (
-        toggle-favorite.html;
-        id=artist.id;
-        is_favorite=is_favorite;
-        api="/artist"
-      ) {}
-    }
-  </div>
-
-  <div class="flex flex-col gap-4">
-    <div
-      data-sse="tracklist"
-      hx-trigger="tracklist"
-      hx-target="#top-tracks"
-      hx-get="{{ artist.id }}/top-tracks"
-    >
-      <h3 class="px-4 text-lg">Top tracks</h3>
-      <div id="top-tracks">
-        @defer (
-          list-tracks.html;
-          now_playing_id=playing_info.now_playing_id;
-          tracks=top_tracks;
-          show_artist=false;
-          show_track_cover=true;
-          click=click
-        ) {}
-      </div>
-      <a href="/artist/{{ artist.id }}/top-tracks/page" class="button">
-        Show more
-      </a>
+@defer (base.html; active_page="Search"; playing_info=playing_info) {
+  <div class="flex flex-col gap-8 relative">
+    
+    <!-- Sticky Header (appears on scroll) -->
+    <div class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between gap-4 bg-black/80 p-4 pt-safe-or-4 backdrop-blur-md border-b border-white/5 opacity-0 -translate-y-full transition-all animate-sticky-header pointer-events-none data-[visible=true]:pointer-events-auto">
+        <div class="flex items-center gap-4 overflow-hidden">
+             @if(artist.image){
+                <img src="{{ artist.image }}" alt="" class="size-10 rounded-full shadow-sm" />
+             }
+            <span class="truncate text-base font-bold text-white">{{ artist.name }}</span>
+        </div>
+        <div class="flex items-center gap-2 pointer-events-auto">
+             <button
+                class="btn btn-primary btn-icon btn-sm rounded-full"
+                hx-swap="none"
+                hx-put="{{ artist.id }}/play-top-track/0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+        </div>
     </div>
 
-    @if (artist.albums) {
-      <div class="flex flex-col gap-2">
-        <h3 class="px-4 text-lg">Albums</h3>
-        @defer (list-albums-vertical.html; albums=artist.albums) {}
-      </div>
-    }
+    <!-- Hero Section -->
+    <div class="relative flex flex-col items-center gap-6 overflow-hidden bg-gray-900 pt-safe-or-4 pb-8 shadow-xl animate-hero-scroll origin-top">
+        <!-- Background Blur -->
+        <div
+            class="absolute inset-0 -z-10 scale-125 bg-cover bg-center bg-no-repeat opacity-30 blur-3xl"
+            style="@if(artist.image){background-image: url({{ artist.image }});}"
+        ></div>
+        
+        <div class="relative z-10 flex flex-col items-center gap-4 px-4 text-center">
+            <div class="size-48 overflow-hidden rounded-full shadow-2xl ring-4 ring-white/10 transition-transform hover:scale-105 duration-500">
+                <img
+                    src="{{ artist.image }}"
+                    alt="{{ artist.name }}"
+                    class="h-full w-full object-cover"
+                />
+            </div>
+            
+            <h1 class="text-4xl font-bold tracking-tight text-white drop-shadow-md">{{ artist.name }}</h1>
+            
+            <div class="flex flex-wrap justify-center gap-4">
+                 <button
+                    class="btn btn-primary btn-lg rounded-full px-8 shadow-lg hover:scale-105 active:scale-95"
+                    hx-swap="none"
+                    hx-put="{{ artist.id }}/play-top-track/0"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    <span>Play</span>
+                </button>
+                
+                @defer (
+                    toggle-favorite.html;
+                    id=artist.id;
+                    is_favorite=is_favorite;
+                    api="/artist";
+                    variant="hero-lg"
+                ) {}
+            </div>
+        </div>
+    </div>
 
-    @if (artist.singles) {
-      <div class="flex flex-col gap-2">
-        <h3 class="px-4 text-lg">EPs and singles</h3>
-        @defer (list-albums-vertical.html; albums=artist.singles) {}
-      </div>
-    }
+    <!-- Content Sections -->
+    <div class="flex flex-col gap-8 px-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        
+        <!-- Top Tracks -->
+        <div
+        class="flex flex-col gap-4"
+        data-sse="tracklist"
+        hx-trigger="tracklist"
+        hx-target="#top-tracks"
+        hx-get="{{ artist.id }}/top-tracks"
+        >
+        <div class="flex items-center justify-between">
+            <h3 class="text-xl font-bold text-white">Top Tracks</h3>
+        </div>
+        <div id="top-tracks" class="rounded-xl bg-gray-900/50 p-2 backdrop-blur-sm ring-1 ring-white/5">
+             @defer (
+            list-tracks.html;
+            now_playing_id=playing_info.now_playing_id;
+            tracks=top_tracks;
+            show_artist=false;
+            show_track_cover=true;
+            click=click
+            ) {}
+        </div>
+        <a hx-boost="false" href="/artist/{{ artist.id }}/top-tracks/page" class="btn btn-secondary self-center rounded-full px-6 transition-colors">
+            Show more tracks
+        </a>
+        </div>
 
-    @if (artist.live) {
-      <div class="flex flex-col gap-2">
-        <h3 class="px-4 text-lg">Live</h3>
-        @defer (list-albums-vertical.html; albums=artist.live) {}
-      </div>
-    }
+        @if (artist.albums) {
+        <div class="flex flex-col gap-3">
+             <h3 class="text-xl font-bold text-white">Albums</h3>
+            @defer (list-albums-vertical.html; albums=artist.albums; card_size="w-40") {}
+        </div>
+        }
 
-    @if (artist.compilations) {
-      <div class="flex flex-col gap-2">
-        <h3 class="px-4 text-lg">Compilations</h3>
-        @defer (list-albums-vertical.html; albums=artist.compilations) {}
-      </div>
-    }
+        @if (artist.singles) {
+        <div class="flex flex-col gap-3">
+             <h3 class="text-xl font-bold text-white">EPs & Singles</h3>
+            @defer (list-albums-vertical.html; albums=artist.singles; card_size="w-40") {}
+        </div>
+        }
 
-    @if (artist.similar_artists) {
-      <div class="flex flex-col gap-2">
-        <h3 class="px-4 text-lg">Similar artists</h3>
-        @defer (list-artists-vertical.html; artists=artist.similar_artists) {}
-      </div>
-    }
+        @if (artist.live) {
+        <div class="flex flex-col gap-3">
+             <h3 class="text-xl font-bold text-white">Live</h3>
+            @defer (list-albums-vertical.html; albums=artist.live; card_size="w-40") {}
+        </div>
+        }
 
-    @if (artist.description) {
-      @defer (
-        description.html;
-        description=artist.description title=artist.name
-      ) {}
-    }
+        @if (artist.compilations) {
+        <div class="flex flex-col gap-3">
+            <h3 class="text-xl font-bold text-white">Compilations</h3>
+            @defer (list-albums-vertical.html; albums=artist.compilations; card_size="w-40") {}
+        </div>
+        }
+
+        @if (artist.similar_artists) {
+        <div class="flex flex-col gap-3">
+            <h3 class="text-xl font-bold text-white">Similar Artists</h3>
+            @defer (list-artists-vertical.html; artists=artist.similar_artists) {}
+        </div>
+        }
+
+        @if (artist.description) {
+        <div class="rounded-xl bg-gray-900/50 p-6 backdrop-blur-sm ring-1 ring-white/5">
+             @defer (
+                description.html;
+                description=artist.description;
+                title="About " + artist.name
+            ) {}
+        </div>
+        }
+    </div>
   </div>
-</div>
+}

@@ -37,7 +37,7 @@ async fn set_favorite(
 
     Ok(state.render(
         "toggle-favorite.html",
-        &json!({"api": "/album", "id": id, "is_favorite": true}),
+        &json!({"api": "/album", "id": id, "is_favorite": true, "variant": "hero-icon"}),
     ))
 }
 
@@ -49,7 +49,7 @@ async fn unset_favorite(
 
     Ok(state.render(
         "toggle-favorite.html",
-        &json!({"api": "/album", "id": id, "is_favorite": false}),
+        &json!({"api": "/album", "id": id, "is_favorite": false, "variant": "hero-icon"}),
     ))
 }
 

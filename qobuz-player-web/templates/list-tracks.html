@@ -1,98 +1,88 @@
 @defer (list.html) {
   @for (track in tracks) {
     @defer (list-item.html) {
-      <div class="flex gap-4">
+      <div class="group flex items-center justify-between gap-4 rounded-lg p-2 transition-colors hover:bg-white/5 active:bg-white/10">
         <button
           hx-swap="none"
           hx-put="@if(api_by_id){{{click}}{{ track.id }}} @else {{{ click }}{{
             index
           }}}"
-          class="flex w-full min-w-0 cursor-pointer items-center justify-between text-left disabled:cursor-default disabled:text-gray-500"
+          class="flex grow items-center gap-4 min-w-0 cursor-pointer text-left disabled:cursor-default disabled:opacity-50"
           @if(!track.available){disabled}
         >
-          <div class="flex w-full items-center gap-4 overflow-hidden">
-            <div
-              class="@if(show_track_cover) {size-12 aspect-square} flex items-center justify-center"
-            >
-              @if (show_track_cover) {
-                <div
-                  class="flex aspect-square size-12 items-center justify-center"
-                >
-                  <div
-                    class="relative aspect-square size-12 overflow-hidden rounded-md"
-                  >
-                    <div
-                      class="@if(track.id == now_playing_id) {opacity-40} h-full w-full rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat"
+          <!-- Number / Play Icon / Cover -->
+          <div class="flex shrink-0 items-center justify-center @if(show_track_cover) {size-12} @else {w-8}">
+             @if (show_track_cover) {
+                <div class="relative size-12 overflow-hidden rounded-md shadow-sm">
+                   <div
+                      class="@if(track.id == now_playing_id) {opacity-40} h-full w-full bg-gray-800 bg-cover bg-center"
                       style="background-image: url({{ track.image }});"
                     ></div>
-
-                    @if (track.id == now_playing_id) {
-                      <div
-                        class="absolute inset-0 grid place-items-center text-blue-500"
-                      >
-                        <span class="size-6">
-                          @defer (icons/play.html) {}
-                        </span>
+                     @if (track.id == now_playing_id) {
+                      <div class="absolute inset-0 grid place-items-center text-blue-500">
+                         @defer (icons/play.html) {}
                       </div>
                     }
-                  </div>
                 </div>
-              } @else {
-                @if (track.id == now_playing_id) {
+             } @else {
+                 @if (track.id == now_playing_id) {
                   <div class="size-5 text-blue-500">
                     @defer (icons/play.html) {}
                   </div>
                 } @else {
-                  <span class="w-5 text-center text-gray-400">
+                  <span class="text-sm font-medium text-gray-500 group-hover:text-white transition-colors">
                     {{ track.number }}
                   </span>
                 }
-              }
-            </div>
-            @if (show_artist && track.artist_name) {
-              <div class="flex flex-col overflow-hidden">
-                <h2 class="truncate">{{ track.title }}</h2>
-                <h3 class="truncate text-sm text-gray-400">
-                  {{ track.artist_name }}
-                </h3>
-              </div>
-            } @else {
-              <h2 class="w-full truncate">{{ track.title }}</h2>
-            }
+             }
           </div>
-          @defer (
+
+          <!-- Text Info -->
+          <div class="flex flex-col min-w-0 overflow-hidden">
+             <h3 class="truncate text-base font-medium @if(track.id == now_playing_id) {text-blue-500} @else {text-gray-200 group-hover:text-white}">
+                {{ track.title }}
+             </h3>
+             @if (show_artist && track.artist_name) {
+                <p class="truncate text-sm text-gray-500 group-hover:text-gray-400">
+                  {{ track.artist_name }}
+                </p>
+             }
+          </div>
+        </button>
+        
+        <!-- Metadata & Actions -->
+        <div class="flex items-center gap-3 shrink-0">
+             @defer (
             info.html;
             hires_available=track.hires_available;
             explicit=track.explicit
           ) {}
-        </button>
-
-        <div class="action-group relative w-12 overflow-hidden">
-          <span
-            class="pointer-events-none absolute inset-y-0 left-0 flex w-full items-center justify-center text-white"
-          >
-            @defer (icons/bars-4.html) {}
-          </span>
-          <input type="hidden" name="track_id" value="{{ track.id }}" />
-          <select
-            name="action"
-            class="size-full cursor-pointer appearance-none text-transparent"
-            hx-trigger="change"
-            hx-put="/api/track/action"
-            hx-swap="none"
-            hx-include="closest .action-group"
-            hx-on::after-request="this.value=''"
-          >
-            <option value="" disabled hidden selected>Choose action</option>
-            @if (is_favorite) {
-              <option value="remove_favorite">Remove from favorite</option>
-            } @else {
-              <option value="add_favorite">Add to favorite</option>
-            }
-            <option value="add_to_playlist">Add to playlist</option>
-            <option value="add_to_queue">Add to queue</option>
-            <option value="play_next">Play next</option>
-          </select>
+          
+          <div class="action-group relative size-8 overflow-hidden rounded-full transition-colors hover:bg-white/10">
+            <span class="pointer-events-none absolute inset-0 flex items-center justify-center text-gray-400 group-hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </span>
+            <input type="hidden" name="track_id" value="{{ track.id }}" />
+            <select
+                name="action"
+                class="size-full cursor-pointer appearance-none opacity-0"
+                hx-trigger="change"
+                hx-put="/api/track/action"
+                hx-swap="none"
+                hx-include="closest .action-group"
+                hx-on::after-request="this.value=''"
+            >
+                <option value="" disabled hidden selected>Choose action</option>
+                @if (is_favorite) {
+                <option value="remove_favorite">Remove from favorites</option>
+                } @else {
+                <option value="add_favorite">Add to favorites</option>
+                }
+                <option value="add_to_playlist">Add to playlist</option>
+                <option value="add_to_queue">Add to queue</option>
+                <option value="play_next">Play next</option>
+            </select>
+          </div>
         </div>
       </div>
     }

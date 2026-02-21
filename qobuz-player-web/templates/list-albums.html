@@ -1,36 +1,31 @@
-@defer (list.html) {
+<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 p-4">
   @for (album in albums) {
-    @defer (list-item.html) {
-      <a
-        class="flex w-full items-center gap-4"
-        hx-push-url="true"
-        href="/album/{{ album.id }}"
-        preload="mousedown"
-        preload-images="true"
-      >
+    <a
+      href="/album/{{ album.id }}"
+      class="group flex flex-col gap-2 rounded-lg p-2 transition-colors hover:bg-gray-800/50"
+      preload="mousedown"
+      preload-images="true"
+      hx-boost="true"
+    >
+      <div class="aspect-square w-full overflow-hidden rounded-lg shadow-md bg-gray-800">
         <img
-          class="inline aspect-square size-12 rounded-md bg-gray-800 text-sm text-gray-500"
-          alt="{{ album.title }}"
           src="{{ album.image }}"
+          alt="{{ album.title }}"
+          class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
         />
+      </div>
 
-        <div class="w-full overflow-hidden">
-          <div class="flex justify-between">
-            <h3 class="truncate text-lg">{{ album.title }}</h3>
-            @defer (
-              info.html;
-              hires_available=album.hires_available;
-              explicit=album.explicit
-            ) {}
-          </div>
-
-          <h4 class="flex gap-2 text-left text-gray-400">
-            <span class="truncate">{{ album.artist.name }}</span>
-            <span>•</span>
-            <span>{{ album.release_year }}</span>
-          </h4>
+      <div class="flex flex-col gap-0.5">
+        <h3 class="truncate font-medium text-gray-100 group-hover:text-white">{{ album.title }}</h3>
+        <p class="truncate text-sm text-gray-400 group-hover:text-gray-300">{{ album.artist.name }}</p>
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+          <span>{{ album.release_year }}</span>
+          @if (album.hires_available) {
+             <span class="rounded bg-yellow-500/10 px-1 py-0.5 text-[10px] font-bold text-yellow-500">Hi-Res</span>
+          }
         </div>
-      </a>
-    }
+      </div>
+    </a>
   }
-}
+</div>

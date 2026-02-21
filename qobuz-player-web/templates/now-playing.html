@@ -1,76 +1,13 @@
-@defer (
-  base.html;
-  partial=partial;
-  active_page="NowPlaying";
-  playing_info=playing_info
-) {
-  <div
-    class="mx-auto flex touch-none flex-col gap-4 p-4"
-    style="
-      max-width: calc(600px + 2rem);
-      height: calc(100% - 4rem - env(safe-area-inset-bottom));
-    "
-    hx-get="/now-playing"
-    hx-trigger="tracklist"
-    data-sse="tracklist"
-    hx-swap="outerHTML"
-  >
-    <div
-      class="flex aspect-square size-full max-h-fit justify-center overflow-hidden"
-    >
-      @if (playing_info.cover_image) {
-        <img
-          src="{{ playing_info.cover_image }}"
-          alt="{{ title }}"
-          class="rounded-lg"
-        />
-      } @else {
-        <div class="aspect-square h-full rounded-lg bg-gray-900"></div>
-      }
-    </div>
-
-    <div class="flex w-full grow flex-col justify-center">
-      <div class="flex items-center justify-between gap-2">
-        <a class="text truncate" href="{{ playing_info.entity_link }}">
-          {{ playing_info.entity_title }}
-        </a>
-        <div class="whitespace-nowrap text-gray-500">
-          {{ current_position }} of {{ number_of_tracks }}
-        </div>
-      </div>
-
-      <a
-        href="{{ playing_info.artist_link }}"
-        class="w-fit truncate text-gray-400"
-      >
-        {{ playing_info.artist_name }}
-      </a>
-
-      <div class="flex w-full flex-col gap-y-4">
-        <div class="flex items-center justify-between gap-2">
-          <span class="truncate text-lg">{{ playing_info.title }}</span>
-          @defer (
-            info.html;
-            hires_available=playing_info.hires_available;
-            explicit=playing_info.explicit
-          ) {}
-        </div>
-        @defer (
-          progress.html;
-          position_mseconds=position_mseconds;
-          duration_mseconds=duration_mseconds;
-          position_string=position_string;
-          duration_string=duration_string
-        ) {}
-      </div>
-      <div class="flex flex-col gap-4">
-        <div class="flex h-10 flex-row justify-center gap-2">
-          @defer (previous.html) {}
-          @defer (player-state.html; playing_info=playing_info) {}
-          @defer (next.html) {}
-        </div>
-        @defer (volume-slider.html; current_volume=current_volume) {}
-      </div>
-    </div>
-  </div>
+@defer (base.html; active_page="NowPlaying"; playing_info=playing_info) {
+  @defer (
+    now-playing-content.html;
+    playing_info=playing_info;
+    current_volume=current_volume;
+    position_mseconds=position_mseconds;
+    duration_mseconds=duration_mseconds;
+    position_string=position_string;
+    duration_string=duration_string;
+    current_position=current_position;
+    number_of_tracks=number_of_tracks
+  ) {}
 }
