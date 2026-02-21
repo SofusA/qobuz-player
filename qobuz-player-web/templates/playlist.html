@@ -144,6 +144,14 @@
         >
           @defer (icons/trash.html) {}
         </button>
+        <button
+          class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+          hx-get="/playlist/{{ playlist.id }}/tracks/edit"
+          hx-target="#tracks"
+          title="Edit Playlist"
+        >
+          @defer (icons/pencil-square.html) {}
+        </button>
         } @if (rfid) {
         <button
           class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"

@@ -7,18 +7,6 @@
   hx-get="/playlist/{{ playlist.id }}/tracks"
   id="tracks"
 >
-  <div class="flex w-full justify-end mb-4">
-    <button
-      class="btn btn-primary btn-sm flex items-center gap-2"
-      hx-get="/playlist/{{ playlist.id }}/tracks/edit"
-      hx-target="#tracks"
-    >
-      <span class="size-4">
-         @defer (icons/pencil-square.html) {}
-      </span>
-      Edit
-    </button>
-  </div>
   @defer (
     list-tracks.html;
     now_playing_id=playing_info.now_playing_id;
