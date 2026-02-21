@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tailwindcss-safe-area";
-@import "tailwindcss-animate";
+@plugin "tailwindcss-animate";
 
 @theme {
   --color-brand-primary: #3b82f6;
@@ -19,6 +19,7 @@ html {
 
 body {
   scroll-timeline: --page-scroll block;
+  overflow-anchor: none;
 }
 
 /* HTMX Indicators */

@@ -15,10 +15,11 @@ pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
         .route("/", get(index))
         .route("/status", get(status_partial))
         .route("/now-playing", get(now_playing_partial))
+        .route("/now-playing/content", get(now_playing_content))
 }
 
 async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    now_playing(&state, false)
+    now_playing(&state)
 }
 
 async fn status_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -26,10 +27,15 @@ async fn status_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse
 }
 
 async fn now_playing_partial(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    now_playing(&state, true)
+    now_playing(&state)
 }
 
-fn now_playing(state: &AppState, partial: bool) -> Response {
+async fn now_playing_content(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let context = now_playing_context(&state);
+    state.render("now-playing-content.html", &context)
+}
+
+fn now_playing_context(state: &AppState) -> serde_json::Value {
     let tracklist = state.tracklist_receiver.borrow().clone();
     let current_track = tracklist.current_track().cloned();
 
@@ -57,21 +63,22 @@ fn now_playing(state: &AppState, partial: bool) -> Response {
     let position_string = mseconds_to_mm_ss(position_mseconds);
     let duration_string = mseconds_to_mm_ss(duration_mseconds);
 
-    state.render(
-        "now-playing.html",
-        &json! ({
-            "partial": partial,
-            "number_of_tracks": number_of_tracks,
-            "current_volume": current_volume,
-            "duration_mseconds": duration_mseconds,
-            "position_mseconds": position_mseconds,
-            "position_string": position_string,
-            "duration_string": duration_string,
-            "current_position": current_position,
-            "explicit": explicit,
-            "hires_available": hires_available,
-        }),
-    )
+    json!({
+        "number_of_tracks": number_of_tracks,
+        "current_volume": current_volume,
+        "duration_mseconds": duration_mseconds,
+        "position_mseconds": position_mseconds,
+        "position_string": position_string,
+        "duration_string": duration_string,
+        "current_position": current_position,
+        "explicit": explicit,
+        "hires_available": hires_available,
+    })
+}
+
+fn now_playing(state: &AppState) -> Response {
+    let context = now_playing_context(state);
+    state.render("now-playing.html", &context)
 }
 
 fn mseconds_to_mm_ss<T: Into<u128>>(mseconds: T) -> String {

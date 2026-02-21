@@ -1,0 +1,26 @@
+<div
+  hx-get="/queue/partial"
+  hx-trigger="tracklist"
+  data-sse="tracklist"
+  hx-target="this"
+  hx-swap="morph:outerHTML"
+  class="flex flex-col gap-6 p-4 pb-24"
+>
+  <div
+    class="pt-safe-or-4 sticky top-0 z-10 flex flex-col gap-4 bg-black/80 pb-4 backdrop-blur-md"
+  >
+    <a
+      hx-target="unset"
+      href="{{ playing_info.entity_link }}"
+      class="text-3xl font-bold tracking-tight hover:text-blue-500 transition-colors"
+    >
+      {{ playing_info.entity_title }}
+    </a>
+  </div>
+
+  @defer (
+    queue-list.html;
+    tracks=tracks;
+    currently_playing_position=currently_playing_position
+  ) {}
+</div>

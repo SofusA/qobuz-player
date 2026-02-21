@@ -1,0 +1,18 @@
+<div
+  data-sse="tracklist"
+  hx-trigger="tracklist"
+  hx-get="/favorites/tracks/partial"
+  hx-target="this"
+  hx-swap="morph:outerHTML"
+>
+  @defer (
+    list-tracks.html;
+    now_playing_id=playing_info.now_playing_id;
+    click="/api/track/play/";
+    api_by_id=true;
+    tracks=tracks;
+    show_track_cover=true;
+    show_artist=true;
+    is_favorite=true
+  ) {}
+</div>
