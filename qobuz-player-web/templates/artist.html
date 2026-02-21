@@ -49,12 +49,12 @@
                     <span>Play</span>
                 </button>
                 
-                 @defer (
+                @defer (
                     toggle-favorite.html;
                     id=artist.id;
                     is_favorite=is_favorite;
                     api="/artist";
-                    button_class="btn btn-secondary btn-lg rounded-full px-8 hover:bg-white/20 border-white/10 active:scale-95 backdrop-blur-md bg-white/10"
+                    variant="hero-lg"
                 ) {}
             </div>
         </div>

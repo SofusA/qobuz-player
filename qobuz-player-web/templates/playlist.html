@@ -134,9 +134,7 @@
 
         @if (!playlist.is_owned) { @defer ( toggle-favorite.html;
         id=playlist.id; is_favorite=is_favorite; api="/playlist";
-        button_class="btn btn-secondary btn-icon rounded-full size-12
-        hover:bg-white/20 border-white/10 active:scale-95 backdrop-blur-md
-        bg-white/10" ) {} } @else {
+        variant="hero-icon" ) {} } @else {
         <button
           class="btn btn-icon size-12 rounded-full border border-red-500/20 bg-red-500/20 text-red-500 backdrop-blur-md hover:bg-red-500/40 active:scale-95"
           hx-swap="none"

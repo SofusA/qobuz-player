@@ -1,5 +1,5 @@
 <button
-  class="@if(button_class){ {{ button_class }} } @else { btn btn-secondary }"
+  class="@if(variant == 'hero-icon'){ btn btn-secondary btn-icon rounded-full size-12 hover:bg-white/20 border-white/10 active:scale-95 backdrop-blur-md bg-white/10 } @else { @if(variant == 'hero-lg'){ btn btn-secondary btn-lg rounded-full px-8 hover:bg-white/20 border-white/10 active:scale-95 backdrop-blur-md bg-white/10 } @else { btn btn-secondary } }"
   hx-swap="outerHTML"
   hx-target="this"
   hx-put="{{ api }}/{{
