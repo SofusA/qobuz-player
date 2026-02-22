@@ -1,17 +1,10 @@
 @if (explicit || hires_available) {
   <div class="flex items-center gap-2">
     @if (explicit) {
-      <div class="size-6 whitespace-nowrap text-gray-400">
-        <svg height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M21 3H3v18h18V3zm-6 6h-4v2h4v2h-4v2h4v2H9V7h6v2z"
-            fill="currentColor"
-          />
-        </svg>
-      </div>
+        <span class="inline-flex size-5 items-center justify-center rounded bg-gray-500/10 text-[10px] font-bold text-white">E</span>
     }
     @if (hires_available) {
-      <span class="rounded bg-yellow-500/10 px-1 py-0.5 text-[10px] font-bold text-yellow-500">Hi-Res</span>
+        <span class="inline-flex h-5 items-center justify-center rounded bg-yellow-500/10 px-1.5 text-[10px] font-bold text-yellow-500 whitespace-nowrap">Hi-Res</span>
     }
   </div>
 }
