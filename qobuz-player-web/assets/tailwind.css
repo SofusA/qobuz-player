@@ -14,11 +14,9 @@ html {
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
   scroll-behavior: smooth;
-  timeline-scope: --page-scroll;
 }
 
 body {
-  scroll-timeline: --page-scroll block;
   overflow-anchor: none;
 }
 
@@ -75,12 +73,6 @@ body {
   }
 }
 
-.animate-hero-scroll {
-  animation: fade-out-hero linear both;
-  animation-timeline: --page-scroll;
-  animation-range: 0 300px;
-}
-
 @keyframes sticky-header-appear {
   from {
     opacity: 0;
@@ -92,10 +84,21 @@ body {
   }
 }
 
-.animate-sticky-header {
-  animation: sticky-header-appear linear both;
-  animation-timeline: --page-scroll;
-  animation-range: 150px 300px;
+/* Use scroll() to find the viewport scroll container automatically.
+   Wrapped in @supports so unsupported browsers show the hero normally
+   instead of jumping to opacity:0. */
+@supports (animation-timeline: scroll()) {
+  .animate-hero-scroll {
+    animation: fade-out-hero linear both;
+    animation-timeline: scroll();
+    animation-range: 0 300px;
+  }
+
+  .animate-sticky-header {
+    animation: sticky-header-appear linear both;
+    animation-timeline: scroll();
+    animation-range: 150px 300px;
+  }
 }
 
 /* Utilities */
@@ -136,11 +139,11 @@ body {
 }
 
 ::view-transition-group(root) {
-  animation-duration: 0.4s;
+  animation-duration: 0.2s;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.4s;
+  animation-duration: 0.2s;
 }
