@@ -45,7 +45,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3" }
 url = "2"
 moka = { version = "0.12", features = ["future"]}
-rodio = { version = "0.21", default-features = false, features = ["flac", "playback"] }
+rodio = { version = "0.22", default-features = false, features = ["flac", "playback"] }
 ratatui = "0.30"
 crossterm = { version = "0.29", features = ["event-stream"] }
 tokio_schedule = "0.3"
