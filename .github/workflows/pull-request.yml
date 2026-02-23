@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - "**.rs"
+      - "**.html"
       - "**/Cargo.lock"
       - "**/Cargo.toml"
   push:
@@ -12,10 +13,34 @@ on:
       - main
     paths:
       - "**.rs"
+      - "**.html"
       - "**/Cargo.lock"
       - "**/Cargo.toml"
 
 jobs:
+  format-check:
+    name: Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'latest'
+          cache: npm
+          cache-dependency-path: qobuz-player-web/package-lock.json
+
+      - name: Install dependencies 
+        working-directory: qobuz-player-web
+        run: npm i
+
+      - name: Run format check
+        working-directory: qobuz-player-web
+        run: npm run format:check
+
   pre-merge:
     name: Pre-merge checks
     strategy:
