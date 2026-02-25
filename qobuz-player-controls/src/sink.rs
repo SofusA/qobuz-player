@@ -44,19 +44,7 @@ impl Read for StreamingFile {
 
 impl Seek for StreamingFile {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        match pos {
-            // translate SeekFrom::End using the known total file sizze since the file may not be fully written yet
-            SeekFrom::End(offset) => {
-                let total = self.state.total_size.load(Ordering::Acquire);
-                if total == u64::MAX {
-                    // no content-length available, delegate to the file
-                    return self.file.seek(pos);
-                }
-                let target = total as i64 + offset;
-                self.file.seek(SeekFrom::Start(target.max(0) as u64))
-            }
-            other => self.file.seek(other),
-        }
+        self.file.seek(pos)
     }
 }
 
@@ -178,8 +166,15 @@ impl Sink {
             })
         });
 
+        let byte_len = state.total_size.load(Ordering::Acquire);
         let streaming = StreamingFile { file, state };
-        let source = Decoder::try_from(BufReader::new(streaming))?;
+        let mut builder = Decoder::builder()
+            .with_data(BufReader::new(streaming))
+            .with_seekable(true);
+        if byte_len > 0 && byte_len != u64::MAX {
+            builder = builder.with_byte_len(byte_len);
+        }
+        let source = builder.build()?;
 
         let sample_rate = source.sample_rate();
         let same_sample_rate = self
