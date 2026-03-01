@@ -15,6 +15,7 @@ use qobuz_player_controls::{
     AppResult, client::Client, database::ReferenceType, notification::Notification,
 };
 use qobuz_player_models::{AlbumSimple, Artist, Playlist, Track};
+use qobuz_player_rfid::handle_play_scan;
 use serde::Deserialize;
 
 use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
@@ -42,7 +43,15 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/api/favorites/artists", get(favorite_artists))
         .route("/api/favorites/playlists", get(favorite_playlists))
         .route("/api/favorites/tracks", get(favorite_tracks))
-        .route("/api/rfid/reference/{reference}", get(rfid_reference))
+        .route(
+            "/api/rfid/reference/{reference}",
+            get(rfid_reference).put(play_rfid_reference),
+        )
+        .route("/api/rfid/reference/album", post(link_album_rfid_reference))
+        .route(
+            "/api/rfid/reference/playlist",
+            post(link_playlist_rfid_reference),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -253,4 +262,65 @@ async fn rfid_reference(
     reference: String,
 ) -> Json<Option<ReferenceType>> {
     Json(state.database.get_reference(&reference).await)
+}
+
+async fn play_rfid_reference(State(state): State<Arc<AppState>>, reference: String) {
+    let client = reqwest::Client::new();
+
+    handle_play_scan(
+        &client,
+        &state.database,
+        &state.controls,
+        &state.broadcast,
+        &reference,
+        &state.tracklist_receiver,
+        None,
+        None,
+    )
+    .await;
+}
+#[derive(serde::Deserialize)]
+pub struct LinkAlbumRfid {
+    rfid_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct LinkPlaylistRfid {
+    rfid_id: String,
+    id: u32,
+}
+
+async fn link_album_rfid_reference(
+    State(state): State<Arc<AppState>>,
+    Json(link): Json<LinkAlbumRfid>,
+) -> ResponseResult {
+    let reference = ReferenceType::Album(link.id);
+
+    ok_or_send_error_toast(
+        &state,
+        state
+            .database
+            .add_rfid_reference(link.rfid_id, reference)
+            .await,
+    )?;
+
+    Ok(state.send_toast(Notification::Success("Link complete".into())))
+}
+
+async fn link_playlist_rfid_reference(
+    State(state): State<Arc<AppState>>,
+    Json(link): Json<LinkPlaylistRfid>,
+) -> ResponseResult {
+    let reference = ReferenceType::Playlist(link.id);
+
+    ok_or_send_error_toast(
+        &state,
+        state
+            .database
+            .add_rfid_reference(link.rfid_id, reference)
+            .await,
+    )?;
+
+    Ok(state.send_toast(Notification::Success("Link complete".into())))
 }

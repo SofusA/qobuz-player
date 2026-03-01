@@ -3620,6 +3620,7 @@ version = "0.7.2"
 dependencies = [
  "qobuz-player-controls",
  "reqwest",
+ "serde",
  "tokio",
  "tracing",
 ]
@@ -3653,6 +3654,7 @@ dependencies = [
  "qobuz-player-controls",
  "qobuz-player-models",
  "qobuz-player-rfid",
+ "reqwest",
  "rust-embed",
  "serde",
  "serde_json",

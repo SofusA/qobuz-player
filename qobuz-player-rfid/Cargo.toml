@@ -11,3 +11,4 @@ qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
 tokio.workspace = true
 tracing.workspace = true
 reqwest.workspace = true
+serde.workspace = true

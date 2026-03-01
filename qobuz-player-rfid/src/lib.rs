@@ -87,7 +87,7 @@ pub async fn init(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn handle_play_scan(
+pub async fn handle_play_scan(
     client: &reqwest::Client,
     database: &Database,
     controls: &Controls,
