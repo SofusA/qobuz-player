@@ -15,7 +15,7 @@ use qobuz_player_controls::{
     AppResult, client::Client, database::ReferenceType, notification::Notification,
 };
 use qobuz_player_models::{AlbumSimple, Artist, Playlist, Track};
-use qobuz_player_rfid::handle_play_scan;
+use qobuz_player_rfid::{LinkAlbumRfid, LinkPlaylistRfid, handle_play_scan};
 use serde::Deserialize;
 
 use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
@@ -265,10 +265,7 @@ async fn rfid_reference(
 }
 
 async fn play_rfid_reference(State(state): State<Arc<AppState>>, reference: String) {
-    let client = reqwest::Client::new();
-
     handle_play_scan(
-        &client,
         &state.database,
         &state.controls,
         &state.broadcast,
@@ -278,17 +275,6 @@ async fn play_rfid_reference(State(state): State<Arc<AppState>>, reference: Stri
         None,
     )
     .await;
-}
-#[derive(serde::Deserialize)]
-pub struct LinkAlbumRfid {
-    rfid_id: String,
-    id: String,
-}
-
-#[derive(serde::Deserialize)]
-pub struct LinkPlaylistRfid {
-    rfid_id: String,
-    id: u32,
 }
 
 async fn link_album_rfid_reference(
