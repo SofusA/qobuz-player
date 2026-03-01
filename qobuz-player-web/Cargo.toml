@@ -24,7 +24,6 @@ serde.workspace = true
 tokio-stream.workspace = true
 tracing.workspace = true
 skabelon.workspace = true
-reqwest.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 filesentry = "0.2.1"
