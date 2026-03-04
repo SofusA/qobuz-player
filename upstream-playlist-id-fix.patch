@@ -1,0 +1,480 @@
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-client/src/client.rs fork-mod/qobuz-player-client/src/client.rs
+--- fork-orig/qobuz-player-client/src/client.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-client/src/client.rs	2026-03-04 08:41:36.785233316 +0000
+@@ -345,7 +345,7 @@
+             .collect())
+     }
+ 
+-    pub async fn playlist(&self, playlist_id: u32) -> Result<qobuz_player_models::Playlist> {
++    pub async fn playlist(&self, playlist_id: i64) -> Result<qobuz_player_models::Playlist> {
+         let endpoint = format!("{}{}", self.base_url, Endpoint::Playlist);
+         let id_string = playlist_id.to_string();
+         let params = vec![
+@@ -397,7 +397,7 @@
+         ))
+     }
+ 
+-    pub async fn delete_playlist(&self, playlist_id: u32) -> Result<SuccessfulResponse> {
++    pub async fn delete_playlist(&self, playlist_id: i64) -> Result<SuccessfulResponse> {
+         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDelete);
+ 
+         let mut form_data = HashMap::new();
+@@ -409,7 +409,7 @@
+ 
+     pub async fn playlist_add_track(
+         &self,
+-        playlist_id: u32,
++        playlist_id: i64,
+         playlist_track_ids: &[u32],
+     ) -> Result<qobuz_player_models::Playlist> {
+         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistAddTracks);
+@@ -437,7 +437,7 @@
+ 
+     pub async fn playlist_delete_track(
+         &self,
+-        playlist_id: u32,
++        playlist_id: i64,
+         playlist_track_ids: &[u64],
+     ) -> Result<qobuz_player_models::Playlist> {
+         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDeleteTracks);
+@@ -464,7 +464,7 @@
+     pub async fn update_playlist_track_position(
+         &self,
+         index: usize,
+-        playlist_id: u32,
++        playlist_id: i64,
+         playlist_track_id: u64,
+     ) -> Result<qobuz_player_models::Playlist> {
+         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
+@@ -590,7 +590,7 @@
+         self.post(&endpoint, form_data).await
+     }
+ 
+-    pub async fn add_favorite_playlist(&self, id: u32) -> Result<SuccessfulResponse> {
++    pub async fn add_favorite_playlist(&self, id: i64) -> Result<SuccessfulResponse> {
+         let id = id.to_string();
+         let endpoint = format!("{}{}", self.base_url, Endpoint::FavoritePlaylistAdd);
+         let mut form_data = HashMap::new();
+@@ -599,7 +599,7 @@
+         self.post(&endpoint, form_data).await
+     }
+ 
+-    pub async fn remove_favorite_playlist(&self, id: u32) -> Result<SuccessfulResponse> {
++    pub async fn remove_favorite_playlist(&self, id: i64) -> Result<SuccessfulResponse> {
+         let id = id.to_string();
+         let endpoint = format!("{}{}", self.base_url, Endpoint::FavoritePlaylistRemove);
+         let mut form_data = HashMap::new();
+@@ -901,12 +901,15 @@
+ }
+ 
+ async fn handle_response(response: Response) -> Result<String> {
+-    if response.status() == StatusCode::OK {
++    let url = response.url().to_string();
++    let status = response.status();
++    if status == StatusCode::OK {
+         let res = response.text().await.unwrap_or_default();
+         Ok(res)
+     } else {
++        tracing::error!("API error {status} for URL: {url}");
+         Err(Error::Api {
+-            message: response.status().to_string(),
++            message: status.to_string(),
+         })
+     }
+ }
+@@ -1426,7 +1429,7 @@
+     };
+ 
+     qobuz_player_models::Playlist {
+-        id: playlist.id as u32,
++        id: playlist.id,
+         is_owned: user_id == playlist.owner.id,
+         title: playlist.name,
+         duration_seconds: playlist.duration as u32,
+@@ -1440,7 +1443,7 @@
+     user_id: i64,
+ ) -> qobuz_player_models::PlaylistSimple {
+     qobuz_player_models::PlaylistSimple {
+-        id: playlist.id as u32,
++        id: playlist.id,
+         is_owned: user_id == playlist.owner.id,
+         title: playlist.name,
+         duration_seconds: playlist.duration as u32,
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-controls/src/client.rs fork-mod/qobuz-player-controls/src/client.rs
+--- fork-orig/qobuz-player-controls/src/client.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-controls/src/client.rs	2026-03-04 08:41:58.641226543 +0000
+@@ -28,7 +28,7 @@
+     genre_playlists_cache: Cache<u32, Vec<PlaylistSimple>>,
+     album_cache: Cache<String, Album>,
+     artist_cache: Cache<u32, ArtistPage>,
+-    playlist_cache: Cache<u32, Playlist>,
++    playlist_cache: Cache<i64, Playlist>,
+     suggested_albums_cache: Cache<String, Vec<AlbumSimple>>,
+     search_cache: Cache<String, SearchResults>,
+ }
+@@ -208,7 +208,7 @@
+         Ok(featured)
+     }
+ 
+-    pub async fn playlist(&self, id: u32) -> Result<Playlist> {
++    pub async fn playlist(&self, id: i64) -> Result<Playlist> {
+         if let Some(cache) = self.playlist_cache.get(&id).await {
+             return Ok(cache);
+         }
+@@ -262,14 +262,14 @@
+         Ok(())
+     }
+ 
+-    pub async fn add_favorite_playlist(&self, id: u32) -> Result<()> {
++    pub async fn add_favorite_playlist(&self, id: i64) -> Result<()> {
+         let client = self.get_client().await?;
+         client.add_favorite_playlist(id).await?;
+         self.favorites_cache.clear().await;
+         Ok(())
+     }
+ 
+-    pub async fn remove_favorite_playlist(&self, id: u32) -> Result<()> {
++    pub async fn remove_favorite_playlist(&self, id: i64) -> Result<()> {
+         let client = self.get_client().await?;
+         client.remove_favorite_playlist(id).await?;
+         self.favorites_cache.clear().await;
+@@ -311,7 +311,7 @@
+         Ok(playlist)
+     }
+ 
+-    pub async fn delete_playlist(&self, playlist_id: u32) -> Result<()> {
++    pub async fn delete_playlist(&self, playlist_id: i64) -> Result<()> {
+         let client = self.get_client().await?;
+         client.delete_playlist(playlist_id).await?;
+         let cache = self.favorites_cache.get().await;
+@@ -329,7 +329,7 @@
+ 
+     pub async fn playlist_add_track(
+         &self,
+-        playlist_id: u32,
++        playlist_id: i64,
+         track_ids: &[u32],
+     ) -> Result<Playlist> {
+         let client = self.get_client().await?;
+@@ -340,7 +340,7 @@
+ 
+     pub async fn playlist_delete_track(
+         &self,
+-        playlist_id: u32,
++        playlist_id: i64,
+         playlist_track_ids: &[u64],
+     ) -> Result<Playlist> {
+         let client = self.get_client().await?;
+@@ -354,7 +354,7 @@
+     pub async fn update_playlist_track_position(
+         &self,
+         index: usize,
+-        playlist_id: u32,
++        playlist_id: i64,
+         playlist_track_id: u64,
+     ) -> Result<Playlist> {
+         let client = self.get_client().await?;
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-controls/src/controls.rs fork-mod/qobuz-player-controls/src/controls.rs
+--- fork-orig/qobuz-player-controls/src/controls.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-controls/src/controls.rs	2026-03-04 08:41:36.812233308 +0000
+@@ -7,7 +7,7 @@
+         index: usize,
+     },
+     Playlist {
+-        id: u32,
++        id: i64,
+         index: usize,
+         shuffle: bool,
+     },
+@@ -93,7 +93,7 @@
+             .expect("infallible");
+     }
+ 
+-    pub fn play_playlist(&self, id: u32, index: usize, shuffle: bool) {
++    pub fn play_playlist(&self, id: i64, index: usize, shuffle: bool) {
+         self.tx
+             .send(ControlCommand::Playlist { id, index, shuffle })
+             .expect("infallible");
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-controls/src/database.rs fork-mod/qobuz-player-controls/src/database.rs
+--- fork-orig/qobuz-player-controls/src/database.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-controls/src/database.rs	2026-03-04 08:41:58.702226524 +0000
+@@ -203,7 +203,7 @@
+                     rfid_id,
+                     1,
+                     id,
+-                    None::<u32>,
++                    None::<i64>,
+                 ).fetch_one(&self.pool).await?;
+             }
+             ReferenceType::Playlist(id) => {
+@@ -237,7 +237,7 @@
+         match db_reference.reference_type {
+             ReferenceTypeDatabase::Album => Some(ReferenceType::Album(db_reference.album_id?)),
+             ReferenceTypeDatabase::Playlist => {
+-                Some(ReferenceType::Playlist(db_reference.playlist_id? as u32))
++                Some(ReferenceType::Playlist(db_reference.playlist_id?))
+             }
+         }
+     }
+@@ -300,7 +300,7 @@
+ #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+ pub enum ReferenceType {
+     Album(String),
+-    Playlist(u32),
++    Playlist(i64),
+ }
+ 
+ #[derive(sqlx::FromRow)]
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-controls/src/player.rs fork-mod/qobuz-player-controls/src/player.rs
+--- fork-orig/qobuz-player-controls/src/player.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-controls/src/player.rs	2026-03-04 08:41:36.867233291 +0000
+@@ -172,9 +172,10 @@
+ 
+     async fn query_track(&mut self, track: &Track, next_track: bool) -> AppResult<()> {
+         tracing::info!(
+-            "Querying {} track: {}",
++            "Querying {} track: {} (id={})",
+             if next_track { "next" } else { "current" },
+-            &track.title
++            &track.title,
++            track.id
+         );
+ 
+         if next_track {
+@@ -427,11 +428,17 @@
+ 
+     async fn play_playlist(
+         &mut self,
+-        playlist_id: u32,
++        playlist_id: i64,
+         index: usize,
+         shuffle: bool,
+     ) -> AppResult<()> {
++        tracing::info!("play_playlist: fetching playlist id={}", playlist_id);
+         let playlist = self.client.playlist(playlist_id).await?;
++        tracing::info!(
++            "play_playlist: got playlist '{}'  with {} tracks",
++            playlist.title,
++            playlist.tracks.len()
++        );
+ 
+         let unstreamable_tracks_to_index = playlist
+             .tracks
+@@ -450,6 +457,14 @@
+             tracks.shuffle(&mut rand::rng());
+         }
+ 
++        if let Some(first) = tracks.first() {
++            tracing::info!(
++                "play_playlist: first track to play: id={}, title='{}'",
++                first.id,
++                first.title
++            );
++        }
++
+         let mut tracklist = Tracklist::new(
+             TracklistType::Playlist(tracklist::PlaylistTracklist {
+                 title: playlist.title,
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-controls/src/tracklist.rs fork-mod/qobuz-player-controls/src/tracklist.rs
+--- fork-orig/qobuz-player-controls/src/tracklist.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-controls/src/tracklist.rs	2026-03-04 08:41:58.669226534 +0000
+@@ -12,7 +12,7 @@
+ #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+ pub struct PlaylistTracklist {
+     pub title: String,
+-    pub id: u32,
++    pub id: i64,
+     pub image: Option<String>,
+ }
+ 
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-models/src/lib.rs fork-mod/qobuz-player-models/src/lib.rs
+--- fork-orig/qobuz-player-models/src/lib.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-models/src/lib.rs	2026-03-04 08:41:36.756233325 +0000
+@@ -116,7 +116,7 @@
+     pub title: String,
+     pub duration_seconds: u32,
+     pub tracks_count: u32,
+-    pub id: u32,
++    pub id: i64,
+     pub image: Option<String>,
+     pub tracks: Vec<Track>,
+ }
+@@ -153,7 +153,7 @@
+     pub title: String,
+     pub duration_seconds: u32,
+     pub tracks_count: u32,
+-    pub id: u32,
++    pub id: i64,
+     pub image: Option<String>,
+ }
+ 
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-rfid/src/lib.rs fork-mod/qobuz-player-rfid/src/lib.rs
+--- fork-orig/qobuz-player-rfid/src/lib.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-rfid/src/lib.rs	2026-03-04 08:41:58.791226496 +0000
+@@ -220,7 +220,7 @@
+     database: Arc<Database>,
+     broadcast: Arc<NotificationBroadcast>,
+     rfid_id: &str,
+-    id: u32,
++    id: i64,
+     rfid_server_base_address: Option<&str>,
+     rfid_server_secret: Option<&str>,
+ ) {
+@@ -339,5 +339,5 @@
+ #[derive(serde::Serialize, serde::Deserialize)]
+ pub struct LinkPlaylistRfid {
+     pub rfid_id: String,
+-    pub id: u32,
++    pub id: i64,
+ }
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-tui/src/app.rs fork-mod/qobuz-player-tui/src/app.rs
+--- fork-orig/qobuz-player-tui/src/app.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-tui/src/app.rs	2026-03-04 08:41:58.877226470 +0000
+@@ -86,7 +86,7 @@
+     Popup(Popup),
+     PopPopupUpdateFavorites,
+     AddTrackToPlaylistPopup(Track),
+-    AddTrackToPlaylistAndPopPopup((u32, u32)), // TODO: Add a type
++    AddTrackToPlaylistAndPopPopup((u32, i64)), // TODO: Add a type
+ }
+ 
+ #[derive(Default, PartialEq)]
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-tui/src/popup.rs fork-mod/qobuz-player-tui/src/popup.rs
+--- fork-orig/qobuz-player-tui/src/popup.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-tui/src/popup.rs	2026-03-04 08:41:58.818226488 +0000
+@@ -209,7 +209,7 @@
+     shuffle: bool,
+     tracks: TrackList,
+     title: String,
+-    id: u32,
++    id: i64,
+ }
+ 
+ impl PlaylistPopupState {
+@@ -231,7 +231,7 @@
+ 
+ pub struct DeletePlaylistPopupstate {
+     title: String,
+-    id: u32,
++    id: i64,
+     confirm: bool,
+ }
+ 
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-tui/src/widgets/track_list.rs fork-mod/qobuz-player-tui/src/widgets/track_list.rs
+--- fork-orig/qobuz-player-tui/src/widgets/track_list.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-tui/src/widgets/track_list.rs	2026-03-04 08:41:58.905226461 +0000
+@@ -24,7 +24,7 @@
+ pub enum TrackListEvent {
+     Track,
+     Album(String),
+-    Playlist(u32, bool),
++    Playlist(i64, bool),
+     Artist(u32),
+ }
+ 
+diff -ru '--exclude=.git' '--exclude=Cargo.lock' '--exclude=assets' '--exclude=target' '--exclude=upstream-playlist-fix.patch' fork-orig/qobuz-player-web/src/routes/playlist.rs fork-mod/qobuz-player-web/src/routes/playlist.rs
+--- fork-orig/qobuz-player-web/src/routes/playlist.rs	2026-03-04 08:34:07.000000000 +0000
++++ fork-mod/qobuz-player-web/src/routes/playlist.rs	2026-03-04 08:41:58.730226515 +0000
+@@ -38,7 +38,7 @@
+ #[derive(Deserialize)]
+ struct ModifyTrackParameters {
+     track_id: u64,
+-    playlist_id: u32,
++    playlist_id: i64,
+ }
+ 
+ async fn add_track_to_playlist_action(
+@@ -70,7 +70,7 @@
+ #[derive(Deserialize)]
+ struct ReorderPlaylistParameters {
+     new_order: Vec<usize>,
+-    playlist_id: u32,
++    playlist_id: i64,
+ }
+ 
+ async fn reorder_tracks(
+@@ -157,7 +157,7 @@
+     Ok(hx_redirect(&format!("/playlist/{}", res.id)))
+ }
+ 
+-async fn delete(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
++async fn delete(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
+     let res = state.client.delete_playlist(id).await;
+     ok_or_send_error_toast(&state, res)?;
+ 
+@@ -166,16 +166,16 @@
+ 
+ async fn play_track(
+     State(state): State<Arc<AppState>>,
+-    Path((id, track_position)): Path<(u32, usize)>,
++    Path((id, track_position)): Path<(i64, usize)>,
+ ) -> impl IntoResponse {
+     state.controls.play_playlist(id, track_position, false);
+ }
+ 
+-async fn play(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
++async fn play(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
+     state.controls.play_playlist(id, 0, false);
+ }
+ 
+-async fn link(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
++async fn link(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
+     let Some(rfid_state) = state.rfid_state.clone() else {
+         return;
+     };
+@@ -187,11 +187,11 @@
+     .await;
+ }
+ 
+-async fn shuffle(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
++async fn shuffle(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
+     state.controls.play_playlist(id, 0, true);
+ }
+ 
+-async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
++async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
+     ok_or_send_error_toast(&state, state.client.add_favorite_playlist(id).await)?;
+ 
+     Ok(state.render(
+@@ -200,7 +200,7 @@
+     ))
+ }
+ 
+-async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
++async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
+     ok_or_send_error_toast(&state, state.client.remove_favorite_playlist(id).await)?;
+ 
+     Ok(state.render(
+@@ -209,12 +209,12 @@
+     ))
+ }
+ 
+-async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
++async fn index(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
+     let url = format!("/playlist/{id}/content");
+     state.render("lazy-load-component.html", &json!({"url": url}))
+ }
+ 
+-async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
++async fn content(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
+     let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
+     let favorites = ok_or_send_error_toast(&state, state.get_favorites().await)?;
+     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
+@@ -233,7 +233,7 @@
+     ))
+ }
+ 
+-async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
++async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
+     let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
+     let click_string = format!("/playlist/{}/play/", playlist.id);
+ 
+@@ -248,7 +248,7 @@
+ 
+ async fn edit_tracks_partial(
+     State(state): State<Arc<AppState>>,
+-    Path(id): Path<u32>,
++    Path(id): Path<i64>,
+ ) -> ResponseResult {
+     let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
+ 

@@ -209,7 +209,7 @@ pub struct PlaylistPopupState {
     shuffle: bool,
     tracks: TrackList,
     title: String,
-    id: u32,
+    id: i64,
 }
 
 impl PlaylistPopupState {
@@ -231,7 +231,7 @@ impl PlaylistPopupState {
 
 pub struct DeletePlaylistPopupstate {
     title: String,
-    id: u32,
+    id: i64,
     confirm: bool,
 }
 

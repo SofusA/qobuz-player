@@ -28,7 +28,7 @@ pub struct Client {
     genre_playlists_cache: Cache<u32, Vec<PlaylistSimple>>,
     album_cache: Cache<String, Album>,
     artist_cache: Cache<u32, ArtistPage>,
-    playlist_cache: Cache<u32, Playlist>,
+    playlist_cache: Cache<i64, Playlist>,
     suggested_albums_cache: Cache<String, Vec<AlbumSimple>>,
     search_cache: Cache<String, SearchResults>,
 }
@@ -208,7 +208,7 @@ impl Client {
         Ok(featured)
     }
 
-    pub async fn playlist(&self, id: u32) -> Result<Playlist> {
+    pub async fn playlist(&self, id: i64) -> Result<Playlist> {
         if let Some(cache) = self.playlist_cache.get(&id).await {
             return Ok(cache);
         }
@@ -262,14 +262,14 @@ impl Client {
         Ok(())
     }
 
-    pub async fn add_favorite_playlist(&self, id: u32) -> Result<()> {
+    pub async fn add_favorite_playlist(&self, id: i64) -> Result<()> {
         let client = self.get_client().await?;
         client.add_favorite_playlist(id).await?;
         self.favorites_cache.clear().await;
         Ok(())
     }
 
-    pub async fn remove_favorite_playlist(&self, id: u32) -> Result<()> {
+    pub async fn remove_favorite_playlist(&self, id: i64) -> Result<()> {
         let client = self.get_client().await?;
         client.remove_favorite_playlist(id).await?;
         self.favorites_cache.clear().await;
@@ -311,7 +311,7 @@ impl Client {
         Ok(playlist)
     }
 
-    pub async fn delete_playlist(&self, playlist_id: u32) -> Result<()> {
+    pub async fn delete_playlist(&self, playlist_id: i64) -> Result<()> {
         let client = self.get_client().await?;
         client.delete_playlist(playlist_id).await?;
         let cache = self.favorites_cache.get().await;
@@ -329,7 +329,7 @@ impl Client {
 
     pub async fn playlist_add_track(
         &self,
-        playlist_id: u32,
+        playlist_id: i64,
         track_ids: &[u32],
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
@@ -340,7 +340,7 @@ impl Client {
 
     pub async fn playlist_delete_track(
         &self,
-        playlist_id: u32,
+        playlist_id: i64,
         playlist_track_ids: &[u64],
     ) -> Result<Playlist> {
         let client = self.get_client().await?;
@@ -354,7 +354,7 @@ impl Client {
     pub async fn update_playlist_track_position(
         &self,
         index: usize,
-        playlist_id: u32,
+        playlist_id: i64,
         playlist_track_id: u64,
     ) -> Result<Playlist> {
         let client = self.get_client().await?;

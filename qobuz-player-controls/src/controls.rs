@@ -7,7 +7,7 @@ pub enum ControlCommand {
         index: usize,
     },
     Playlist {
-        id: u32,
+        id: i64,
         index: usize,
         shuffle: bool,
     },
@@ -93,7 +93,7 @@ impl Controls {
             .expect("infallible");
     }
 
-    pub fn play_playlist(&self, id: u32, index: usize, shuffle: bool) {
+    pub fn play_playlist(&self, id: i64, index: usize, shuffle: bool) {
         self.tx
             .send(ControlCommand::Playlist { id, index, shuffle })
             .expect("infallible");

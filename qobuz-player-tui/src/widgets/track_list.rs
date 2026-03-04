@@ -24,7 +24,7 @@ pub struct TrackList {
 pub enum TrackListEvent {
     Track,
     Album(String),
-    Playlist(u32, bool),
+    Playlist(i64, bool),
     Artist(u32),
 }
 

@@ -220,7 +220,7 @@ async fn submit_link_playlist(
     database: Arc<Database>,
     broadcast: Arc<NotificationBroadcast>,
     rfid_id: &str,
-    id: u32,
+    id: i64,
     rfid_server_base_address: Option<&str>,
     rfid_server_secret: Option<&str>,
 ) {
@@ -339,5 +339,5 @@ pub struct LinkAlbumRfid {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct LinkPlaylistRfid {
     pub rfid_id: String,
-    pub id: u32,
+    pub id: i64,
 }
