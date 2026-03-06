@@ -57,7 +57,8 @@
           </a>
           <span>•</span>
           <span class="shrink-0">
-            {{ current_position }} of {{ number_of_tracks }}
+            {{ playing_info.current_position }} of
+            {{ playing_info.number_of_tracks }}
           </span>
           @defer (
             info.html;
@@ -69,8 +70,8 @@
 
       @defer (
         progress.html;
-        position_mseconds=position_mseconds;
-        duration_mseconds=duration_mseconds;
+        position_ms=playing_info.position_ms;
+        duration_ms=playing_info.duration_ms;
         position_string=position_string;
         duration_string=duration_string
       ) {}
@@ -89,7 +90,7 @@
       </div>
 
       <!-- Volume -->
-      @defer (volume-slider.html; current_volume=current_volume) {}
+      @defer (volume-slider.html; current_volume=playing_info.current_volume) {}
     </div>
   </div>
 </div>

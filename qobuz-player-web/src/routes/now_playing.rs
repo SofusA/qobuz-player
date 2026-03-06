@@ -37,42 +37,20 @@ async fn now_playing_content(State(state): State<Arc<AppState>>) -> impl IntoRes
 
 fn now_playing_context(state: &AppState) -> serde_json::Value {
     let tracklist = state.tracklist_receiver.borrow().clone();
-    let current_track = tracklist.current_track().cloned();
-
     let position_mseconds = state.position_receiver.borrow().as_millis();
-    let current_volume = state.volume_receiver.borrow();
-    let current_volume = (*current_volume * 100.0) as u32;
 
-    let current_position = tracklist.current_position() + 1;
-
-    let (duration_mseconds, explicit, hires_available) =
-        current_track
-            .as_ref()
-            .map_or((None, false, false), |track| {
-                (
-                    Some(track.duration_seconds * 1000),
-                    track.explicit,
-                    track.hires_available,
-                )
-            });
-
-    let duration_mseconds = duration_mseconds.unwrap_or_default();
-
-    let number_of_tracks = tracklist.total();
+    let current_track = tracklist.current_track().cloned();
+    let duration_mseconds = current_track
+        .as_ref()
+        .map(|track| track.duration_seconds * 1000)
+        .unwrap_or_default();
 
     let position_string = mseconds_to_mm_ss(position_mseconds);
     let duration_string = mseconds_to_mm_ss(duration_mseconds);
 
     json!({
-        "number_of_tracks": number_of_tracks,
-        "current_volume": current_volume,
-        "duration_mseconds": duration_mseconds,
-        "position_mseconds": position_mseconds,
         "position_string": position_string,
         "duration_string": duration_string,
-        "current_position": current_position,
-        "explicit": explicit,
-        "hires_available": hires_available,
     })
 }
 

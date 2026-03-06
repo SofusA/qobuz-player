@@ -22,6 +22,7 @@ use crate::{AppState, ResponseResult, hx_redirect, ok_or_send_error_toast};
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/api/play-info", get(playing_info))
         .route("/api/play", put(play))
         .route("/api/play-pause", put(play_pause))
         .route("/api/pause", put(pause))
@@ -52,6 +53,11 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/api/rfid/reference/playlist",
             post(link_playlist_rfid_reference),
         )
+}
+
+async fn playing_info(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let playing_info = state.playing_info();
+    Json(playing_info)
 }
 
 #[derive(Debug, Deserialize)]
