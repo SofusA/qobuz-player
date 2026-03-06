@@ -38,7 +38,7 @@ pub fn routes() -> Router<std::sync::Arc<crate::AppState>> {
 #[derive(Deserialize)]
 struct ModifyTrackParameters {
     track_id: u64,
-    playlist_id: u32,
+    playlist_id: i64,
 }
 
 async fn add_track_to_playlist_action(
@@ -70,7 +70,7 @@ async fn remove_track_from_playlist_action(
 #[derive(Deserialize)]
 struct ReorderPlaylistParameters {
     new_order: Vec<usize>,
-    playlist_id: u32,
+    playlist_id: i64,
 }
 
 async fn reorder_tracks(
@@ -157,7 +157,7 @@ async fn create_form(
     Ok(hx_redirect(&format!("/playlist/{}", res.id)))
 }
 
-async fn delete(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
+async fn delete(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
     let res = state.client.delete_playlist(id).await;
     ok_or_send_error_toast(&state, res)?;
 
@@ -166,16 +166,16 @@ async fn delete(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Resp
 
 async fn play_track(
     State(state): State<Arc<AppState>>,
-    Path((id, track_position)): Path<(u32, usize)>,
+    Path((id, track_position)): Path<(i64, usize)>,
 ) -> impl IntoResponse {
     state.controls.play_playlist(id, track_position, false);
 }
 
-async fn play(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
+async fn play(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
     state.controls.play_playlist(id, 0, false);
 }
 
-async fn link(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
+async fn link(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
     let Some(rfid_state) = state.rfid_state.clone() else {
         return;
     };
@@ -187,11 +187,11 @@ async fn link(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl I
     .await;
 }
 
-async fn shuffle(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
+async fn shuffle(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
     state.controls.play_playlist(id, 0, true);
 }
 
-async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
+async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
     ok_or_send_error_toast(&state, state.client.add_favorite_playlist(id).await)?;
 
     Ok(state.render(
@@ -200,7 +200,7 @@ async fn set_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -
     ))
 }
 
-async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
+async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
     ok_or_send_error_toast(&state, state.client.remove_favorite_playlist(id).await)?;
 
     Ok(state.render(
@@ -209,12 +209,12 @@ async fn unset_favorite(State(state): State<Arc<AppState>>, Path(id): Path<u32>)
     ))
 }
 
-async fn index(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> impl IntoResponse {
+async fn index(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> impl IntoResponse {
     let url = format!("/playlist/{id}/content");
     state.render("lazy-load-component.html", &json!({"url": url}))
 }
 
-async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
+async fn content(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
     let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
     let favorites = ok_or_send_error_toast(&state, state.get_favorites().await)?;
     let is_favorite = favorites.playlists.iter().any(|playlist| playlist.id == id);
@@ -233,7 +233,7 @@ async fn content(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> Res
     ))
 }
 
-async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>) -> ResponseResult {
+async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<i64>) -> ResponseResult {
     let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
     let click_string = format!("/playlist/{}/play/", playlist.id);
 
@@ -248,7 +248,7 @@ async fn tracks_partial(State(state): State<Arc<AppState>>, Path(id): Path<u32>)
 
 async fn edit_tracks_partial(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<u32>,
+    Path(id): Path<i64>,
 ) -> ResponseResult {
     let playlist = ok_or_send_error_toast(&state, state.client.playlist(id).await)?;
 

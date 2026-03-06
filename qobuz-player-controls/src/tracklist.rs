@@ -12,7 +12,7 @@ pub struct AlbumTracklist {
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct PlaylistTracklist {
     pub title: String,
-    pub id: u32,
+    pub id: i64,
     pub image: Option<String>,
 }
 

@@ -345,7 +345,7 @@ impl Client {
             .collect())
     }
 
-    pub async fn playlist(&self, playlist_id: u32) -> Result<qobuz_player_models::Playlist> {
+    pub async fn playlist(&self, playlist_id: i64) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::Playlist);
         let id_string = playlist_id.to_string();
         let params = vec![
@@ -397,7 +397,7 @@ impl Client {
         ))
     }
 
-    pub async fn delete_playlist(&self, playlist_id: u32) -> Result<SuccessfulResponse> {
+    pub async fn delete_playlist(&self, playlist_id: i64) -> Result<SuccessfulResponse> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDelete);
 
         let mut form_data = HashMap::new();
@@ -409,7 +409,7 @@ impl Client {
 
     pub async fn playlist_add_track(
         &self,
-        playlist_id: u32,
+        playlist_id: i64,
         playlist_track_ids: &[u32],
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistAddTracks);
@@ -437,7 +437,7 @@ impl Client {
 
     pub async fn playlist_delete_track(
         &self,
-        playlist_id: u32,
+        playlist_id: i64,
         playlist_track_ids: &[u64],
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDeleteTracks);
@@ -464,7 +464,7 @@ impl Client {
     pub async fn update_playlist_track_position(
         &self,
         index: usize,
-        playlist_id: u32,
+        playlist_id: i64,
         playlist_track_id: u64,
     ) -> Result<qobuz_player_models::Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
@@ -590,7 +590,7 @@ impl Client {
         self.post(&endpoint, form_data).await
     }
 
-    pub async fn add_favorite_playlist(&self, id: u32) -> Result<SuccessfulResponse> {
+    pub async fn add_favorite_playlist(&self, id: i64) -> Result<SuccessfulResponse> {
         let id = id.to_string();
         let endpoint = format!("{}{}", self.base_url, Endpoint::FavoritePlaylistAdd);
         let mut form_data = HashMap::new();
@@ -599,7 +599,7 @@ impl Client {
         self.post(&endpoint, form_data).await
     }
 
-    pub async fn remove_favorite_playlist(&self, id: u32) -> Result<SuccessfulResponse> {
+    pub async fn remove_favorite_playlist(&self, id: i64) -> Result<SuccessfulResponse> {
         let id = id.to_string();
         let endpoint = format!("{}{}", self.base_url, Endpoint::FavoritePlaylistRemove);
         let mut form_data = HashMap::new();
@@ -901,12 +901,15 @@ async fn track_url(
 }
 
 async fn handle_response(response: Response) -> Result<String> {
-    if response.status() == StatusCode::OK {
+    let url = response.url().to_string();
+    let status = response.status();
+    if status == StatusCode::OK {
         let res = response.text().await.unwrap_or_default();
         Ok(res)
     } else {
+        tracing::error!("API error {status} for URL: {url}");
         Err(Error::Api {
-            message: response.status().to_string(),
+            message: status.to_string(),
         })
     }
 }
@@ -1426,7 +1429,7 @@ fn parse_playlist(
     };
 
     qobuz_player_models::Playlist {
-        id: playlist.id as u32,
+        id: playlist.id,
         is_owned: user_id == playlist.owner.id,
         title: playlist.name,
         duration_seconds: playlist.duration as u32,
@@ -1440,7 +1443,7 @@ fn parse_playlist_simple(
     user_id: i64,
 ) -> qobuz_player_models::PlaylistSimple {
     qobuz_player_models::PlaylistSimple {
-        id: playlist.id as u32,
+        id: playlist.id,
         is_owned: user_id == playlist.owner.id,
         title: playlist.name,
         duration_seconds: playlist.duration as u32,

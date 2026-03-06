@@ -116,7 +116,7 @@ pub struct Playlist {
     pub title: String,
     pub duration_seconds: u32,
     pub tracks_count: u32,
-    pub id: u32,
+    pub id: i64,
     pub image: Option<String>,
     pub tracks: Vec<Track>,
 }
@@ -153,7 +153,7 @@ pub struct PlaylistSimple {
     pub title: String,
     pub duration_seconds: u32,
     pub tracks_count: u32,
-    pub id: u32,
+    pub id: i64,
     pub image: Option<String>,
 }
 

@@ -172,9 +172,10 @@ impl Player {
 
     async fn query_track(&mut self, track: &Track, next_track: bool) -> AppResult<()> {
         tracing::info!(
-            "Querying {} track: {}",
+            "Querying {} track: {} (id={})",
             if next_track { "next" } else { "current" },
-            &track.title
+            &track.title,
+            track.id
         );
 
         if next_track {
@@ -427,11 +428,17 @@ impl Player {
 
     async fn play_playlist(
         &mut self,
-        playlist_id: u32,
+        playlist_id: i64,
         index: usize,
         shuffle: bool,
     ) -> AppResult<()> {
+        tracing::info!("play_playlist: fetching playlist id={}", playlist_id);
         let playlist = self.client.playlist(playlist_id).await?;
+        tracing::info!(
+            "play_playlist: got playlist '{}'  with {} tracks",
+            playlist.title,
+            playlist.tracks.len()
+        );
 
         let unstreamable_tracks_to_index = playlist
             .tracks
@@ -448,6 +455,14 @@ impl Player {
 
         if shuffle {
             tracks.shuffle(&mut rand::rng());
+        }
+
+        if let Some(first) = tracks.first() {
+            tracing::info!(
+                "play_playlist: first track to play: id={}, title='{}'",
+                first.id,
+                first.title
+            );
         }
 
         let mut tracklist = Tracklist::new(

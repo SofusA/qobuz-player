@@ -203,7 +203,7 @@ impl Database {
                     rfid_id,
                     1,
                     id,
-                    None::<u32>,
+                    None::<i64>,
                 ).fetch_one(&self.pool).await?;
             }
             ReferenceType::Playlist(id) => {
@@ -237,7 +237,7 @@ impl Database {
         match db_reference.reference_type {
             ReferenceTypeDatabase::Album => Some(ReferenceType::Album(db_reference.album_id?)),
             ReferenceTypeDatabase::Playlist => {
-                Some(ReferenceType::Playlist(db_reference.playlist_id? as u32))
+                Some(ReferenceType::Playlist(db_reference.playlist_id?))
             }
         }
     }
@@ -300,7 +300,7 @@ impl Database {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum ReferenceType {
     Album(String),
-    Playlist(u32),
+    Playlist(i64),
 }
 
 #[derive(sqlx::FromRow)]
