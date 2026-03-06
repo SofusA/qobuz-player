@@ -1,5 +1,7 @@
 use std::fs;
+use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,9 +13,40 @@ use tokio::sync::watch::{self, Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
+use crate::downloader::StreamState;
 use crate::error::Error;
 use crate::stderr_redirect::silence_stderr;
 use crate::{AppResult, VolumeReceiver};
+
+/// just a file wrapper that blocks on EOF while download is still in progress
+/// allows the decoder to read from a file that is being written to concurrently by the download task
+struct StreamingFile {
+    file: fs::File,
+    state: Arc<StreamState>,
+}
+
+impl Read for StreamingFile {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        loop {
+            let n = self.file.read(buf)?;
+            if n > 0 {
+                return Ok(n);
+            }
+            // got 0, if the download is complete, this is real EOF.
+            if self.state.download_complete.load(Ordering::Acquire) {
+                return Ok(0);
+            }
+            // if download still in progress just wait and retry
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+
+impl Seek for StreamingFile {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.file.seek(pos)
+    }
+}
 
 pub struct Sink {
     sink: Option<rodio::Sink>,
@@ -113,14 +146,35 @@ impl Sink {
         self.sink.is_none()
     }
 
-    pub fn query_track(&mut self, track_path: &Path) -> AppResult<QueryTrackResult> {
+    pub fn query_track(
+        &mut self,
+        track_path: &Path,
+        stream_state: Option<Arc<StreamState>>,
+    ) -> AppResult<QueryTrackResult> {
         tracing::info!("Sink query track: {}", track_path.to_string_lossy());
 
         let file = fs::File::open(track_path).map_err(|err| Error::StreamError {
             message: format!("Failed to read file: {track_path:?}: {err}"),
         })?;
 
-        let source = Decoder::try_from(file)?;
+        let state = stream_state.unwrap_or_else(|| {
+            let metadata = file.metadata().ok();
+            let size = metadata.map(|m| m.len()).unwrap_or(0);
+            Arc::new(StreamState {
+                download_complete: AtomicBool::new(true),
+                total_size: AtomicU64::new(size),
+            })
+        });
+
+        let byte_len = state.total_size.load(Ordering::Acquire);
+        let streaming = StreamingFile { file, state };
+        let mut builder = Decoder::builder()
+            .with_data(BufReader::new(streaming))
+            .with_seekable(true);
+        if byte_len > 0 && byte_len != u64::MAX {
+            builder = builder.with_byte_len(byte_len);
+        }
+        let source = builder.build()?;
 
         let sample_rate = source.sample_rate();
         let same_sample_rate = self

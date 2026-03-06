@@ -14,7 +14,7 @@ use crate::{
     VolumeReceiver,
     controls::{ControlCommand, Controls, NewQueueItem},
     database::Database,
-    downloader::Downloader,
+    downloader::{BufferReady, Downloader},
     notification::{Notification, NotificationBroadcast},
     sink::QueryTrackResult,
     tracklist::{QueueItem, TracklistType},
@@ -39,7 +39,7 @@ pub struct Player {
     volume: Sender<f32>,
     position: Sender<Duration>,
     track_finished: Receiver<()>,
-    done_buffering: Receiver<PathBuf>,
+    done_buffering: Receiver<BufferReady>,
     controls_rx: mpsc::UnboundedReceiver<ControlCommand>,
     controls: Controls,
     database: Arc<Database>,
@@ -188,7 +188,7 @@ impl Player {
             .await
         {
             self.wait_for_state_change_delay().await;
-            let query_result = self.sink.query_track(&track_path)?;
+            let query_result = self.sink.query_track(&track_path, None)?;
 
             if next_track {
                 self.next_track_in_sink_queue = match query_result {
@@ -637,16 +637,17 @@ impl Player {
         Ok(())
     }
 
-    async fn done_buffering(&mut self, path: PathBuf) -> AppResult<()> {
+    async fn done_buffering(&mut self, ready: BufferReady) -> AppResult<()> {
         self.wait_for_state_change_delay().await;
         self.set_target_status(Status::Playing);
 
-        tracing::info!("Done buffering track: {}", path.to_string_lossy());
+        tracing::info!("Done buffering track: {}", ready.path.to_string_lossy());
 
-        self.next_track_in_sink_queue = match self.sink.query_track(&path)? {
-            QueryTrackResult::Queued => true,
-            QueryTrackResult::RecreateStreamRequired => false,
-        };
+        self.next_track_in_sink_queue =
+            match self.sink.query_track(&ready.path, Some(ready.state))? {
+                QueryTrackResult::Queued => true,
+                QueryTrackResult::RecreateStreamRequired => false,
+            };
         Ok(())
     }
 
@@ -674,8 +675,8 @@ impl Player {
                 }
 
                 Ok(_) = self.done_buffering.changed() => {
-                    let path = self.done_buffering.borrow_and_update().clone();
-                    if let Err(err) = self.done_buffering(path).await {
+                    let ready = self.done_buffering.borrow_and_update().clone();
+                    if let Err(err) = self.done_buffering(ready).await {
                         self.broadcast.send_error(err.to_string());
                     };
                 }
