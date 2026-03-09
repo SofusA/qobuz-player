@@ -17,20 +17,23 @@
             class="@if(show_track_cover) {size-12} @else {w-8} flex shrink-0 items-center justify-center"
           >
             @if (show_track_cover) {
-              <div
-                class="relative size-12 overflow-hidden rounded-md shadow-sm"
-              >
-                <div
-                  class="@if(track.id == now_playing_id) {opacity-40} h-full w-full bg-gray-800 bg-cover bg-center"
-                  style="background-image: url({{ track.image }});"
-                ></div>
-                @if (track.id == now_playing_id) {
+              <div class="flex size-12 items-center justify-center">
+                <div class="relative size-12 overflow-hidden rounded-md">
                   <div
-                    class="absolute inset-0 grid place-items-center text-blue-500"
-                  >
-                    @defer (icons/play.html) {}
-                  </div>
-                }
+                    class="@if(track.id == now_playing_id) {opacity-40} h-full w-full rounded-md bg-gray-800 bg-cover bg-center bg-no-repeat"
+                    style="background-image: url({{ track.image }});"
+                  ></div>
+
+                  @if (track.id == now_playing_id) {
+                    <div
+                      class="absolute inset-0 grid place-items-center text-blue-500"
+                    >
+                      <span class="size-6">
+                        @defer (icons/play.html) {}
+                      </span>
+                    </div>
+                  }
+                </div>
               </div>
             } @else {
               @if (track.id == now_playing_id) {
@@ -78,21 +81,7 @@
             <span
               class="pointer-events-none absolute inset-0 flex items-center justify-center text-gray-400 group-hover:text-white"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="1" />
-                <circle cx="19" cy="12" r="1" />
-                <circle cx="5" cy="12" r="1" />
-              </svg>
+              @defer (icons/ellipsis-horizontal.html) {}
             </span>
             <input type="hidden" name="track_id" value="{{ track.id }}" />
             <select

@@ -29,12 +29,11 @@
         </p>
         <div class="flex items-center gap-2 text-xs text-gray-500">
           <span>{{ album.release_year }}</span>
-          @if (album.hires_available) {
-            <span
-              class="rounded bg-yellow-500/10 px-1 py-0.5 text-[10px] font-bold text-yellow-500"
-              >Hi-Res</span
-            >
-          }
+          @defer (
+            info.html;
+            hires_available=album.hires_available;
+            explicit=album.explicit
+          ) {}
         </div>
       </div>
     </a>

@@ -34,11 +34,7 @@
                 {{ album_feature[0] }}
               </h3>
             </div>
-            @defer (
-              list-albums-vertical.html;
-              albums=album_feature[1];
-              card_size="w-48"
-            ) {}
+            @defer (list-albums-vertical.html; albums=album_feature[1]) {}
           </div>
         }
         @for (playlist_feature in discover.playlists) {
@@ -50,8 +46,7 @@
             </div>
             @defer (
               list-playlists-vertical.html;
-              playlists=playlist_feature[1];
-              card_size="w-48"
+              playlists=playlist_feature[1]
             ) {}
           </div>
         }

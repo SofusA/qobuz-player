@@ -1,7 +1,7 @@
 use qobuz_player_controls::{
     AppResult, TracklistReceiver,
     controls::Controls,
-    database::{Database, LinkRequest, ReferenceType},
+    database::{Database, ReferenceType},
     error::Error,
     notification::NotificationBroadcast,
     tracklist,
@@ -14,7 +14,7 @@ use tokio::{
 
 #[derive(Debug, Clone, Default)]
 pub struct RfidState {
-    link_request: Arc<Mutex<Option<LinkRequest>>>,
+    link_request: Arc<Mutex<Option<ReferenceType>>>,
 }
 
 pub async fn init(
@@ -23,6 +23,8 @@ pub async fn init(
     controls: Controls,
     database: Arc<Database>,
     broadcast: Arc<NotificationBroadcast>,
+    rfid_server_base_address: Option<String>,
+    rfid_server_secret: Option<String>,
 ) -> AppResult<()> {
     let mut reader = tokio::io::BufReader::new(tokio::io::stdin());
     let mut out = tokio::io::stdout();
@@ -52,44 +54,94 @@ pub async fn init(
         };
 
         match maybe_request {
-            Some(LinkRequest::Album(album_id)) => submit_link_album(
-                state.clone(),
-                database.clone(),
-                broadcast.clone(),
-                res,
-                &album_id,
-            ),
-            Some(LinkRequest::Playlist(playlist_id)) => submit_link_playlist(
-                state.clone(),
-                database.clone(),
-                broadcast.clone(),
-                res,
-                playlist_id,
-            ),
+            Some(ReferenceType::Album(album_id)) => {
+                submit_link_album(
+                    state.clone(),
+                    database.clone(),
+                    broadcast.clone(),
+                    res,
+                    &album_id,
+                    rfid_server_base_address.as_deref(),
+                    rfid_server_secret.as_deref(),
+                )
+                .await
+            }
+            Some(ReferenceType::Playlist(playlist_id)) => {
+                submit_link_playlist(
+                    state.clone(),
+                    database.clone(),
+                    broadcast.clone(),
+                    res,
+                    playlist_id,
+                    rfid_server_base_address.as_deref(),
+                    rfid_server_secret.as_deref(),
+                )
+                .await
+            }
             None => {
-                handle_play_scan(&database, &controls, res, &tracklist_receiver).await;
+                handle_play_scan(
+                    &database,
+                    &controls,
+                    &broadcast,
+                    res,
+                    &tracklist_receiver,
+                    rfid_server_base_address.as_deref(),
+                    rfid_server_secret.as_deref(),
+                )
+                .await;
             }
         };
     }
 }
 
-async fn handle_play_scan(
-    database: &Arc<Database>,
+#[allow(clippy::too_many_arguments)]
+pub async fn handle_play_scan(
+    database: &Database,
     controls: &Controls,
-    res: &str,
+    broadcast: &NotificationBroadcast,
+    reference_id: &str,
     tracklist_receiver: &TracklistReceiver,
+    rfid_server_base_address: Option<&str>,
+    rfid_server_secret: Option<&str>,
 ) {
-    let reference = match database.get_reference(res).await {
-        Some(reference) => reference,
-        None => {
-            return;
+    let reference = match rfid_server_base_address {
+        Some(server) => {
+            let client = reqwest::Client::new();
+            let url = format!("{}/api/rfid/reference/{}", server, reference_id);
+
+            let mut request = client.get(&url);
+            if let Some(rfid_server_secret) = rfid_server_secret {
+                request = request.header("secret", rfid_server_secret);
+            }
+
+            let response = match request.send().await {
+                Ok(res) => res,
+                Err(err) => {
+                    broadcast.send_error(err.to_string());
+                    return;
+                }
+            };
+
+            match response.json().await {
+                Ok(res) => res,
+                Err(err) => {
+                    broadcast.send_error(err.to_string());
+                    return;
+                }
+            }
         }
+        None => match database.get_reference(reference_id).await {
+            Some(reference) => reference,
+            None => {
+                return;
+            }
+        },
     };
 
     let tracklist = tracklist_receiver.borrow();
     let now_playing = tracklist.list_type();
     match reference {
-        LinkRequest::Album(id) => {
+        ReferenceType::Album(id) => {
             if let tracklist::TracklistType::Album(now_playing) = now_playing
                 && now_playing.id == id
             {
@@ -98,7 +150,7 @@ async fn handle_play_scan(
             }
             controls.play_album(&id, 0);
         }
-        LinkRequest::Playlist(id) => {
+        ReferenceType::Playlist(id) => {
             if let tracklist::TracklistType::Playlist(now_playing) = now_playing
                 && now_playing.id == id
             {
@@ -110,12 +162,12 @@ async fn handle_play_scan(
     }
 }
 
-pub async fn link(state: RfidState, request: LinkRequest, broadcast: Arc<NotificationBroadcast>) {
+pub async fn link(state: RfidState, request: ReferenceType, broadcast: Arc<NotificationBroadcast>) {
     set_state(&state, Some(request.clone())).await;
 
     let type_string = match request {
-        LinkRequest::Album(_) => "album",
-        LinkRequest::Playlist(_) => "playlist",
+        ReferenceType::Album(_) => "album",
+        ReferenceType::Playlist(_) => "playlist",
     };
 
     broadcast.send(qobuz_player_controls::notification::Notification::Info(
@@ -136,40 +188,124 @@ pub async fn link(state: RfidState, request: LinkRequest, broadcast: Arc<Notific
     });
 }
 
-async fn set_state(state: &RfidState, request: Option<LinkRequest>) {
+async fn set_state(state: &RfidState, request: Option<ReferenceType>) {
     let mut request_lock = state.link_request.lock().await;
     *request_lock = request;
 }
 
-fn submit_link_album(
+async fn submit_link_album(
     state: RfidState,
     database: Arc<Database>,
     broadcast: Arc<NotificationBroadcast>,
     rfid_id: &str,
     id: &str,
+    rfid_server_base_address: Option<&str>,
+    rfid_server_secret: Option<&str>,
 ) {
     let reference = ReferenceType::Album(id.to_owned());
-    submit_link(state, database, broadcast, rfid_id, reference);
+    submit_link(
+        state,
+        database,
+        broadcast,
+        rfid_id,
+        reference,
+        rfid_server_base_address,
+        rfid_server_secret,
+    )
+    .await;
 }
 
-fn submit_link_playlist(
+async fn submit_link_playlist(
     state: RfidState,
     database: Arc<Database>,
     broadcast: Arc<NotificationBroadcast>,
     rfid_id: &str,
     id: u32,
+    rfid_server_base_address: Option<&str>,
+    rfid_server_secret: Option<&str>,
 ) {
     let reference = ReferenceType::Playlist(id);
-    submit_link(state, database, broadcast, rfid_id, reference);
+    submit_link(
+        state,
+        database,
+        broadcast,
+        rfid_id,
+        reference,
+        rfid_server_base_address,
+        rfid_server_secret,
+    )
+    .await;
 }
 
-fn submit_link(
+async fn submit_link(
     state: RfidState,
     database: Arc<Database>,
     broadcast: Arc<NotificationBroadcast>,
     rfid_id: &str,
     reference: ReferenceType,
+    rfid_server_base_address: Option<&str>,
+    rfid_server_secret: Option<&str>,
 ) {
+    if let Some(server) = rfid_server_base_address {
+        let client = reqwest::Client::new();
+
+        let mut request = match reference {
+            ReferenceType::Album(id) => {
+                let reference_payload = LinkAlbumRfid {
+                    rfid_id: rfid_id.to_string(),
+                    id,
+                };
+
+                let reference_payload = match serde_json::to_string(&reference_payload) {
+                    Ok(res) => res,
+                    Err(err) => {
+                        broadcast.send_error(err.to_string());
+                        return;
+                    }
+                };
+
+                let url = format!("{server}/api/rfid/reference/album");
+                let request = client.post(url);
+                request.body(reference_payload)
+            }
+            ReferenceType::Playlist(id) => {
+                let reference_payload = LinkPlaylistRfid {
+                    rfid_id: rfid_id.to_string(),
+                    id,
+                };
+
+                let reference_payload = match serde_json::to_string(&reference_payload) {
+                    Ok(res) => res,
+                    Err(err) => {
+                        broadcast.send_error(err.to_string());
+                        return;
+                    }
+                };
+
+                let url = format!("{server}/api/rfid/reference/playlist");
+                let request = client.post(url);
+                request.body(reference_payload)
+            }
+        };
+
+        if let Some(rfid_server_secret) = rfid_server_secret {
+            request = request.header("secret", rfid_server_secret);
+        }
+        request = request.header("Content-Type", "application/json");
+
+        match request.send().await {
+            Ok(_) => broadcast.send(qobuz_player_controls::notification::Notification::Success(
+                "Link completed".to_string(),
+            )),
+            Err(err) => {
+                broadcast.send_error(err.to_string());
+                return;
+            }
+        };
+
+        return;
+    }
+
     let rfid_id = rfid_id.to_owned();
     tokio::spawn(async move {
         match database.add_rfid_reference(rfid_id, reference).await {
@@ -187,4 +323,16 @@ fn submit_link(
             }
         };
     });
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct LinkAlbumRfid {
+    pub rfid_id: String,
+    pub id: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct LinkPlaylistRfid {
+    pub rfid_id: String,
+    pub id: u32,
 }

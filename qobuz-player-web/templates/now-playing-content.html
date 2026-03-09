@@ -6,13 +6,7 @@
   hx-target="this"
   hx-swap="morph:outerHTML"
 >
-  <!-- Background Blur -->
-  <div
-    class="fixed inset-0 -z-10 scale-110 bg-cover bg-center bg-no-repeat opacity-30 blur-3xl transition-all duration-1000"
-    style="@if(playing_info.cover_image){background-image: url({{
-      playing_info.cover_image
-    }});}"
-  ></div>
+  @defer (background-blur.html; image=playing_info.cover_image) {}
 
   <div
     class="pt-safe-or-4 z-10 mx-auto flex w-full max-w-md grow flex-col justify-center gap-2 p-3 sm:gap-4 sm:p-6 md:max-w-4xl md:flex-row md:items-center md:gap-8 md:px-8 md:pt-0"
@@ -23,7 +17,7 @@
     >
       <!-- Album art -->
       <div
-        class="aspect-square max-h-full w-full overflow-hidden rounded-2xl shadow-2xl transition-transform duration-500 hover:scale-[1.02]"
+        class="aspect-square max-h-full w-full overflow-hidden rounded-2xl shadow-2xl"
       >
         @if (playing_info.cover_image) {
           <img
@@ -31,22 +25,6 @@
             alt="{{ playing_info.title }}"
             class="h-full w-full object-cover"
           />
-        } @else {
-          <div
-            class="flex h-full w-full items-center justify-center bg-gray-800 text-gray-600"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="64"
-              height="64"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path
-                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-              />
-            </svg>
-          </div>
         }
       </div>
     </div>
@@ -56,10 +34,17 @@
       class="flex shrink-0 flex-col gap-2 sm:gap-4 md:min-w-0 md:flex-1 md:shrink md:justify-center"
     >
       <!-- Track Info -->
-      <div class="flex flex-col gap-0.5 text-center md:text-left">
-        <h1 class="truncate text-xl font-bold text-white sm:text-2xl">
-          {{ playing_info.title }}
-        </h1>
+      <div class="flex flex-col gap-1 text-center md:text-left">
+        <div class="flex justify-center gap-0.5">
+          <h1 class="truncate text-xl font-bold text-white sm:text-2xl">
+            {{ playing_info.title }}
+          </h1>
+          @defer (
+            info.html;
+            hires_available=playing_info.hires_available;
+            explicit=playing_info.explicit
+          ) {}
+        </div>
         <a
           href="{{ playing_info.artist_link }}"
           hx-target="body"
@@ -77,28 +62,21 @@
           >
             {{ playing_info.entity_title }}
           </a>
-          <span>&bull;</span>
-          <span class="shrink-0"
-            >{{ current_position }} of {{ number_of_tracks }}</span
-          >
-          @defer (
-            info.html;
-            hires_available=playing_info.hires_available;
-            explicit=playing_info.explicit
-          ) {}
+          <span>•</span>
+          <span class="shrink-0">
+            {{ playing_info.current_position }} of
+            {{ playing_info.number_of_tracks }}
+          </span>
         </div>
       </div>
 
-      <!-- Progress -->
-      <div class="flex flex-col gap-2">
-        @defer (
-          progress.html;
-          position_mseconds=position_mseconds;
-          duration_mseconds=duration_mseconds;
-          position_string=position_string;
-          duration_string=duration_string
-        ) {}
-      </div>
+      @defer (
+        progress.html;
+        position_ms=playing_info.position_ms;
+        duration_ms=playing_info.duration_ms;
+        position_string=position_string;
+        duration_string=duration_string
+      ) {}
 
       <!-- Controls -->
       <div class="flex items-center justify-center gap-8">
@@ -114,7 +92,7 @@
       </div>
 
       <!-- Volume -->
-      @defer (volume-slider.html; current_volume=current_volume) {}
+      @defer (volume-slider.html; current_volume=playing_info.current_volume) {}
     </div>
   </div>
 </div>

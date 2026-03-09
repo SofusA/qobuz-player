@@ -1,12 +1,8 @@
-<div
-  class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700 flex w-full snap-x snap-mandatory gap-4 overflow-x-auto p-2 pb-4"
->
+<div class="flex w-full snap-x snap-mandatory gap-4 overflow-x-auto p-2 pb-4">
   @for (album in albums) {
     <a
       href="/album/{{ album.id }}"
-      class="snap-start @if (card_size) { {{
-        card_size
-      }} } @else { size-32 } h-full shrink-0 transition-transform active:scale-95"
+      class="size-42 h-full shrink-0 snap-start transition-transform hover:scale-105 active:scale-95"
       preload="mousedown"
       preload-images="true"
       hx-boost="true"

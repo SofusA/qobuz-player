@@ -17,7 +17,7 @@
       >
         <!-- Artwork -->
         <div
-          class="aspect-square w-48 overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-105 sm:w-64"
+          class="aspect-square w-48 overflow-hidden rounded-lg shadow-2xl sm:w-64"
         >
           @if (playlist.image) {
             <img
@@ -53,47 +53,25 @@
         </div>
 
         <!-- Actions -->
-        <div class="flex flex-wrap justify-center gap-4">
+        <div class="flex justify-center gap-4 *:h-12">
           <button
-            class="btn btn-primary btn-lg rounded-full px-8 shadow-lg hover:scale-105 active:scale-95"
+            class="btn btn-primary btn-play"
             hx-swap="none"
             hx-put="/playlist/{{ playlist.id }}/play"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            <span>Play</span>
+            <span class="size-6">
+              @defer (icons/play.html) {}
+            </span>
+            <span> Play </span>
           </button>
 
           <button
-            class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+            class="btn btn-secondary btn-icon"
             hx-swap="none"
             hx-put="/playlist/{{ playlist.id }}/play/shuffle"
             title="Shuffle"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="16 3 21 3 21 8" />
-              <line x1="4" x2="21" y1="20" y2="3" />
-              <polyline points="21 16 21 21 16 21" />
-              <line x1="15" x2="21" y1="15" y2="21" />
-              <line x1="4" x2="9" y1="4" y2="9" />
-            </svg>
+            @defer (icons/shuffle.html) {}
           </button>
 
           @if (!playlist.is_owned) {
@@ -105,7 +83,7 @@
             ) {}
           } @else {
             <button
-              class="btn btn-icon size-12 rounded-full border border-red-500/20 bg-red-500/20 text-red-500 backdrop-blur-md hover:bg-red-500/40 active:scale-95"
+              class="btn btn-danger btn-icon"
               hx-swap="none"
               hx-delete="{{ playlist.id }}"
               title="Delete Playlist"
@@ -114,7 +92,7 @@
               @defer (icons/trash.html) {}
             </button>
             <button
-              class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+              class="btn btn-secondary btn-icon"
               hx-get="/playlist/{{ playlist.id }}/tracks/edit"
               hx-target="#tracks"
               title="Edit Playlist"
@@ -124,7 +102,7 @@
           }
           @if (rfid) {
             <button
-              class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+              class="btn btn-secondary btn-icon"
               hx-swap="none"
               hx-put="{{ playlist.id }}/link"
               title="Link RFID"
@@ -138,9 +116,7 @@
 
     <!-- Tracklist -->
     <div class="animate-in fade-in slide-in-from-bottom-4 px-4 duration-300">
-      <div
-        class="overflow-hidden rounded-xl bg-gray-900/50 ring-1 ring-white/5 backdrop-blur-sm sm:p-4"
-      >
+      <div class="surface overflow-hidden">
         @defer (
           playlist-tracks.html;
           playing_info=playing_info;

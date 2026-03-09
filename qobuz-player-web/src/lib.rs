@@ -8,9 +8,10 @@ use axum::{
 };
 use futures::stream::Stream;
 use qobuz_player_controls::{
-    PositionReceiver, AppResult, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
+    AppResult, PositionReceiver, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
     controls::Controls,
+    database::Database,
     error::Error,
     notification::{Notification, NotificationBroadcast},
 };
@@ -52,6 +53,7 @@ pub async fn init(
     rfid_state: Option<RfidState>,
     broadcast: Arc<NotificationBroadcast>,
     client: Arc<Client>,
+    database: Arc<Database>,
 ) -> AppResult<()> {
     let interface = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&interface)
@@ -68,6 +70,7 @@ pub async fn init(
         rfid_state,
         broadcast,
         client,
+        database,
     )
     .await;
 
@@ -86,6 +89,7 @@ async fn create_router(
     rfid_state: Option<RfidState>,
     broadcast: Arc<NotificationBroadcast>,
     client: Arc<Client>,
+    database: Arc<Database>,
 ) -> Router {
     let (tx, _rx) = broadcast::channel::<ServerSentEvent>(100);
     let broadcast_subscribe = broadcast.subscribe();
@@ -142,6 +146,7 @@ async fn create_router(
         volume_receiver: volume_receiver.clone(),
         status_receiver: status_receiver.clone(),
         templates: templates_rx.clone(),
+        database,
     });
 
     tokio::spawn(background_task(

@@ -1,5 +1,5 @@
 <button
-  class="btn btn-secondary btn-icon size-12 rounded-full border-white/10 bg-white/10 backdrop-blur-md hover:bg-white/20 active:scale-95"
+  class="btn btn-secondary btn-icon"
   hx-swap="outerHTML"
   hx-target="this"
   hx-put="{{ api }}/{{
@@ -14,11 +14,11 @@
   }
 >
   @if (is_favorite) {
-    <span class="size-6 text-yellow-500">
+    <span class="text-yellow-500">
       @defer (icons/star-solid.html) {}
     </span>
   } @else {
-    <span class="size-6">
+    <span>
       @defer (icons/star.html) {}
     </span>
   }

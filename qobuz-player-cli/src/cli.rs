@@ -91,6 +91,14 @@ enum Commands {
         /// Enable rfid interface
         rfid: bool,
 
+        #[clap(long)]
+        /// Use other qobuz-player with web for rfid database
+        rfid_server_base_address: Option<String>,
+
+        #[clap(long)]
+        /// Secret for optional qobuz-player rfid server
+        rfid_server_secret: Option<String>,
+
         #[cfg(feature = "gpio")]
         #[clap(long, default_value_t = false)]
         /// Enable gpio interface for raspberry pi. Pin 16 (gpio-23) will be high when playing
@@ -207,6 +215,8 @@ pub async fn run() -> Result<(), Error> {
         web: Default::default(),
         web_secret: Default::default(),
         rfid: Default::default(),
+        rfid_server_base_address: Default::default(),
+        rfid_server_secret: Default::default(),
         port: Default::default(),
         #[cfg(feature = "gpio")]
         gpio: Default::default(),
@@ -229,6 +239,8 @@ pub async fn run() -> Result<(), Error> {
             web,
             web_secret,
             rfid,
+            rfid_server_base_address,
+            rfid_server_secret,
             port,
             #[cfg(feature = "gpio")]
             gpio,
@@ -355,6 +367,7 @@ pub async fn run() -> Result<(), Error> {
                 let rfid_state = rfid_state.clone();
                 let broadcast = broadcast.clone();
                 let client = client.clone();
+                let database = database.clone();
 
                 tokio::spawn(async move {
                     if let Err(e) = qobuz_player_web::init(
@@ -368,6 +381,7 @@ pub async fn run() -> Result<(), Error> {
                         rfid_state,
                         broadcast,
                         client,
+                        database,
                     )
                     .await
                     {
@@ -397,6 +411,8 @@ pub async fn run() -> Result<(), Error> {
                         controls,
                         database,
                         broadcast,
+                        rfid_server_base_address,
+                        rfid_server_secret,
                     )
                     .await
                     {

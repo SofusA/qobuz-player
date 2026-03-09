@@ -1,4 +1,4 @@
-use crate::{AudioQuality, Error, AppResult, Tracklist};
+use crate::{AppResult, AudioQuality, Error, Tracklist};
 use serde_json::to_string;
 use sqlx::types::Json;
 use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
@@ -221,7 +221,7 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_reference(&self, id: &str) -> Option<LinkRequest> {
+    pub async fn get_reference(&self, id: &str) -> Option<ReferenceType> {
         let db_reference = match sqlx::query_as!(
             RFIDReference,
             "SELECT * FROM rfid_references WHERE ID = $1;",
@@ -235,14 +235,17 @@ impl Database {
         };
 
         match db_reference.reference_type {
-            ReferenceTypeDatabase::Album => Some(LinkRequest::Album(db_reference.album_id?)),
+            ReferenceTypeDatabase::Album => Some(ReferenceType::Album(db_reference.album_id?)),
             ReferenceTypeDatabase::Playlist => {
-                Some(LinkRequest::Playlist(db_reference.playlist_id? as u32))
+                Some(ReferenceType::Playlist(db_reference.playlist_id? as u32))
             }
         }
     }
 
-    pub async fn clean_up_cache_entries(&self, older_than: time::Duration) -> AppResult<Vec<PathBuf>> {
+    pub async fn clean_up_cache_entries(
+        &self,
+        older_than: time::Duration,
+    ) -> AppResult<Vec<PathBuf>> {
         let cutoff = time::OffsetDateTime::now_utc() - older_than;
         let cutoff_str = cutoff
             .format(&time::format_description::well_known::Rfc3339)
@@ -294,12 +297,7 @@ impl Database {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum LinkRequest {
-    Album(String),
-    Playlist(u32),
-}
-
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum ReferenceType {
     Album(String),
     Playlist(u32),

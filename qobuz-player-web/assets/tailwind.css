@@ -20,7 +20,6 @@ body {
   overflow-anchor: none;
 }
 
-/* HTMX Indicators */
 .my-indicator {
   opacity: 0;
   transition: opacity 150ms ease-in;
@@ -30,7 +29,6 @@ body {
   opacity: 1;
 }
 
-/* Button Component */
 @layer components {
   .btn {
     @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95 disabled:pointer-events-none disabled:opacity-50;
@@ -41,7 +39,7 @@ body {
   }
 
   .btn-secondary {
-    @apply border border-gray-700 bg-gray-800 text-gray-200 hover:border-gray-600 hover:bg-gray-700 active:bg-gray-900;
+    @apply border border-gray-700 border-white/10 bg-gray-800 bg-white/10 text-gray-200 backdrop-blur-md hover:border-gray-600 hover:bg-gray-700 hover:bg-white/20 active:bg-gray-900;
   }
 
   .btn-ghost {
@@ -49,52 +47,19 @@ body {
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800;
+    @apply border-red-500/20 bg-red-500/20 text-red-500 hover:bg-red-500/40;
   }
 
   .btn-icon {
-    @apply aspect-square rounded-full p-2;
+    @apply aspect-square rounded-full p-3;
   }
 
-  .btn-lg {
-    @apply px-6 py-3 text-base;
+  .btn-play {
+    @apply rounded-full px-6 px-8 py-3 text-base shadow-lg;
   }
 
-  .btn-sm {
-    @apply px-3 py-1.5 text-xs;
-  }
-}
-
-/* Utilities */
-@layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-thin {
-    scrollbar-width: thin;
-  }
-  .scrollbar-thin::-webkit-scrollbar {
-    height: 6px;
-    width: 6px;
-  }
-  .scrollbar-track-transparent::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .scrollbar-thumb-gray-700::-webkit-scrollbar-thumb {
-    background-color: #374151;
-    border-radius: 9999px;
-  }
-  .scrollbar-thumb-gray-700:hover::-webkit-scrollbar-thumb {
-    background-color: #4b5563;
-  }
-
-  .pt-safe-or-4 {
-    padding-top: max(env(safe-area-inset-top), 1rem);
+  .surface {
+    @apply rounded-xl bg-gray-900/50 p-2 sm:p-4;
   }
 }
 

@@ -1,9 +1,10 @@
 use axum::response::{Html, IntoResponse, Response};
 use futures::try_join;
 use qobuz_player_controls::{
-    PositionReceiver, AppResult, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
+    AppResult, PositionReceiver, Status, StatusReceiver, TracklistReceiver, VolumeReceiver,
     client::Client,
     controls::Controls,
+    database::Database,
     notification::{Notification, NotificationBroadcast},
 };
 use qobuz_player_models::Favorites;
@@ -27,13 +28,14 @@ pub struct AppState {
     pub status_receiver: StatusReceiver,
     pub volume_receiver: VolumeReceiver,
     pub templates: watch::Receiver<Templates>,
+    pub database: Arc<Database>,
 }
 
 impl AppState {
-    pub fn render<T>(&self, view: &str, context: &T) -> Response
-    where
-        T: serde::Serialize,
-    {
+    pub fn playing_info(&self) -> PlayingInfo {
+        let current_volume = self.volume_receiver.borrow();
+        let current_volume = (*current_volume * 100.0) as u32;
+
         let tracklist = self.tracklist_receiver.borrow().clone();
         let current_track = tracklist.current_track().cloned();
         let status = *self.status_receiver.borrow();
@@ -42,20 +44,35 @@ impl AppState {
             .and_then(|track| track.artist_name.clone());
         let artist_id = current_track.as_ref().and_then(|track| track.artist_id);
 
-        let (title, artist_link) =
-            current_track
-                .as_ref()
-                .map_or((String::default(), None), |track| {
+        let (title, artist_link, duration_ms, explicit, hires_available) =
+            current_track.as_ref().map_or(
+                (
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                ),
+                |track| {
                     (
                         track.title.clone(),
                         artist_id.map(|id| format!("/artist/{id}")),
+                        track.duration_seconds * 1000,
+                        track.explicit,
+                        track.hires_available,
                     )
-                });
+                },
+            );
 
         let entity = tracklist.entity_playing();
         let now_playing_id = tracklist.currently_playing();
 
-        let playing_info = PlayingInfo {
+        let position_ms = self.position_receiver.borrow().as_millis() as u32;
+
+        let number_of_tracks = tracklist.total() as u32;
+        let current_position = (tracklist.current_position() + 1) as u32;
+
+        PlayingInfo {
             title,
             now_playing_id,
             artist_link,
@@ -64,9 +81,20 @@ impl AppState {
             entity_link: entity.link,
             status,
             cover_image: entity.cover_link,
-        };
-
-        let playing_info = serde_json::json!({"playing_info": playing_info});
+            number_of_tracks,
+            current_position,
+            current_volume,
+            explicit,
+            hires_available,
+            duration_ms,
+            position_ms,
+        }
+    }
+    pub fn render<T>(&self, view: &str, context: &T) -> Response
+    where
+        T: serde::Serialize,
+    {
+        let playing_info = serde_json::json!({"playing_info": self.playing_info()});
 
         let context = merge_serialized(&playing_info, context).unwrap();
         let templates = self.templates.borrow();
@@ -119,7 +147,7 @@ impl AppState {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct PlayingInfo {
+pub struct PlayingInfo {
     title: String,
     now_playing_id: Option<u32>,
     artist_link: Option<String>,
@@ -128,6 +156,13 @@ struct PlayingInfo {
     entity_link: Option<String>,
     status: Status,
     cover_image: Option<String>,
+    duration_ms: u32,
+    position_ms: u32,
+    number_of_tracks: u32,
+    current_position: u32,
+    current_volume: u32,
+    explicit: bool,
+    hires_available: bool,
 }
 
 fn merge_serialized<T: serde::Serialize, Y: serde::Serialize>(
