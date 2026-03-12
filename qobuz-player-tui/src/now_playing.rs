@@ -2,7 +2,7 @@ use crate::ui::{HIGHLIGHT_TEXT_STYLE, block};
 use qobuz_player_controls::Status;
 use qobuz_player_models::Track;
 use ratatui::{prelude::*, widgets::*};
-use ratatui_image::{StatefulImage, protocol::StatefulProtocol};
+use ratatui_image::{FilterType, Resize, StatefulImage, protocol::StatefulProtocol};
 
 #[derive(Default)]
 pub struct NowPlayingState {
@@ -52,7 +52,8 @@ pub fn render(
     if let Some(image) = &mut state.image
         && !disable_tui_album_cover
     {
-        let stateful_image = StatefulImage::default();
+        let stateful_image =
+            StatefulImage::default().resize(Resize::Fit(Some(FilterType::Triangle)));
         frame.render_stateful_widget(stateful_image, chunks[0], &mut image.0);
     }
 

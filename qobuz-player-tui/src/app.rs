@@ -20,7 +20,10 @@ use qobuz_player_controls::{
 };
 use qobuz_player_models::Track;
 use ratatui::{DefaultTerminal, widgets::*};
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
+use ratatui_image::{
+    picker::{Picker, ProtocolType},
+    protocol::StatefulProtocol,
+};
 use std::{io, sync::Arc, time::Instant};
 use tokio::time::{self, Duration};
 
@@ -502,7 +505,18 @@ async fn fetch_image(image_url: &str) -> Option<(StatefulProtocol, f32)> {
     let image = load_from_memory(&img_bytes).ok()?;
     let ratio = image.width() as f32 / image.height() as f32;
 
-    let picker = Picker::from_query_stdio().ok()?;
+    let mut picker = Picker::from_query_stdio().ok()?;
+
+    // ratatui-image 10.0.6 blacklists kitty/sixel for WezTerm and Konsole, but those
+    // terminals support kitty protocol well. Restore it when running inside them.
+    if picker.protocol_type() == ProtocolType::Halfblocks {
+        let is_wezterm = std::env::var("WEZTERM_EXECUTABLE").is_ok_and(|s| !s.is_empty());
+        let is_konsole = std::env::var("KONSOLE_VERSION").is_ok_and(|s| !s.is_empty());
+        if is_wezterm || is_konsole {
+            picker.set_protocol_type(ProtocolType::Kitty);
+        }
+    }
+
     Some((picker.new_resize_protocol(image), ratio))
 }
 
