@@ -2,16 +2,21 @@ use std::{
     io::{Write, stdin, stdout},
     path::PathBuf,
     sync::Arc,
-    thread,
     time::Duration,
 };
 
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+use std::thread;
+
 use clap::{Parser, Subcommand};
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 use futures::executor::block_on;
 use qobuz_player_controls::{
-    AudioQuality, Status, StatusReceiver, client::Client, database::Database,
+    AudioQuality, client::Client, database::Database,
     notification::NotificationBroadcast, player::Player,
 };
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+use qobuz_player_controls::{Status, StatusReceiver};
 use qobuz_player_rfid::RfidState;
 use rodio::{DeviceTrait, cpal::traits::HostTrait};
 use snafu::prelude::*;
@@ -112,6 +117,7 @@ enum Commands {
         /// Hours before audio cache is cleaned. 0 for disable
         audio_cache_time_to_live: u32,
 
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         #[clap(long, default_value_t = false)]
         /// Disable sleep inhibitor
         disable_sleep_inhibitor: bool,
@@ -223,6 +229,7 @@ pub async fn run() -> Result<(), Error> {
         audio_cache: Default::default(),
         audio_cache_time_to_live: Default::default(),
         disable_tui_album_cover: false,
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         disable_sleep_inhibitor: false,
     }) {
         Commands::Open {
@@ -247,6 +254,7 @@ pub async fn run() -> Result<(), Error> {
             audio_cache,
             audio_cache_time_to_live,
             disable_tui_album_cover,
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             disable_sleep_inhibitor,
         } => {
             let database_credentials = database.get_credentials().await?;
@@ -352,6 +360,7 @@ pub async fn run() -> Result<(), Error> {
                 });
             }
 
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             if !disable_sleep_inhibitor {
                 let status_receiver = player.status();
 
@@ -527,6 +536,7 @@ fn error_exit(error: Error) {
     std::process::exit(1);
 }
 
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 pub fn sleep_inhibitor(mut status_receiver: StatusReceiver) {
     thread::spawn(move || {
         let mut sleep_inhibitor = SleepInhibitor::new();
@@ -547,10 +557,12 @@ pub fn sleep_inhibitor(mut status_receiver: StatusReceiver) {
     });
 }
 
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 struct SleepInhibitor {
     awake: Option<keepawake::KeepAwake>,
 }
 
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 impl SleepInhibitor {
     fn new() -> Self {
         Self { awake: None }
