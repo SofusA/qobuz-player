@@ -25,6 +25,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio_schedule.workspace = true
 time.workspace = true
-keepawake.workspace = true
 futures.workspace = true
 rodio.workspace = true
+
+[target.'cfg(any(windows, target_os = "linux", target_os = "macos"))'.dependencies]
+keepawake = { workspace = true }
