@@ -75,6 +75,10 @@ enum Commands {
         /// Enable qobuz connect (experimental)
         connect: bool,
 
+        #[clap(long, default_value_t = String::from("qobuz-player"))]
+        /// Set qobuz connect device name
+        connect_name: String,
+
         #[clap(short, long, default_value_t = false)]
         /// Start web server with web api and ui
         web: bool,
@@ -212,6 +216,7 @@ pub async fn run() -> Result<(), Error> {
         #[cfg(target_os = "linux")]
         disable_mpris: Default::default(),
         connect: Default::default(),
+        connect_name: Default::default(),
         web: Default::default(),
         web_secret: Default::default(),
         rfid: Default::default(),
@@ -236,6 +241,7 @@ pub async fn run() -> Result<(), Error> {
             #[cfg(target_os = "linux")]
             disable_mpris,
             connect,
+            connect_name,
             web,
             web_secret,
             rfid,
@@ -312,6 +318,7 @@ pub async fn run() -> Result<(), Error> {
                 tokio::spawn(async move {
                     if let Err(e) = qobuz_player_connect::init(
                         &app_id,
+                        connect_name,
                         controls,
                         position_receiver,
                         tracklist_receiver,

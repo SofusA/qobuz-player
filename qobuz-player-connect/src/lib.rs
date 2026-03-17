@@ -26,6 +26,7 @@ struct ConnectState {
 
 pub async fn init(
     app_id: &str,
+    connect_name: String,
     controls: Controls,
     position_receiver: PositionReceiver,
     tracklist_receiver: TracklistReceiver,
@@ -45,7 +46,7 @@ pub async fn init(
         connected: false,
     };
 
-    connect_state.run(app_id).await?;
+    connect_state.run(app_id, connect_name).await?;
 
     Ok(())
 }
@@ -163,11 +164,11 @@ impl ConnectState {
         Ok(())
     }
 
-    async fn run(&mut self, app_id: &str) -> qonductor::Result<()> {
+    async fn run(&mut self, app_id: &str, connect_name: String) -> qonductor::Result<()> {
         let mut manager = SessionManager::start(0).await?;
 
         let mut session = manager
-            .add_device(DeviceConfig::new("qobuz-player", app_id))
+            .add_device(DeviceConfig::new(connect_name, app_id))
             .await?;
 
         tokio::spawn(async move { manager.run().await });
