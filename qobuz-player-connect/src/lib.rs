@@ -204,11 +204,14 @@ impl ConnectState {
                     let response = msg::QueueRendererState::default();
 
                     match cmd.playing_state() {
-                        PlayingState::Unknown | PlayingState::Stopped | PlayingState::Paused => {
+                        PlayingState::Stopped | PlayingState::Paused => {
                             self.controls.pause();
                         }
                         PlayingState::Playing => {
                             self.controls.play();
+                        }
+                        PlayingState::Unknown => {
+                            // don't change current playing state, used for seeking
                         }
                     };
 
@@ -302,6 +305,16 @@ impl ConnectState {
                         })
                         .collect();
                     self.controls.new_queue(queue_items, false);
+
+                    let current_position = self.tracklist_receiver.borrow().current_position();
+
+                    let tracklist_position = queue.queue_position.map(|x| x as usize);
+
+                    if let Some(tracklist_position) = tracklist_position
+                        && current_position != tracklist_position
+                    {
+                        self.controls.skip_to_position(tracklist_position, true);
+                    }
                 }
                 Notification::QueueTracksAdded(queue_tracks_added) => {
                     // Added in end of queue
