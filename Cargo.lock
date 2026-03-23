@@ -1989,7 +1989,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -4192,7 +4192,7 @@ dependencies = [
 [[package]]
 name = "rodio"
 version = "0.22.2"
-source = "git+https://github.com/RustAudio/rodio#b7c504e3ddf3c08ca653dbd58df3b67d0fb8720a"
+source = "git+https://github.com/RustAudio/rodio#76f8ba7644189639b0e616dfc98f98753a23bb6a"
 dependencies = [
  "cpal",
  "dasp_sample",
@@ -6145,7 +6145,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
