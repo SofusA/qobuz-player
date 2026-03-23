@@ -23,13 +23,16 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Display,
+};
 use time::macros::format_description;
 use tokio::try_join;
 
 #[derive(Debug)]
 pub struct Client {
-    active_secret: String,
+    session: Option<StartResponse>,
     app_id: String,
     base_url: String,
     http_client: reqwest::Client,
@@ -101,23 +104,17 @@ pub async fn new(
         .build()
         .expect("infallible");
 
-    let Secrets { secrets, app_id } = get_secrets(&http_client).await?;
+    let Secrets { app_id } = get_secrets(&http_client).await?;
 
     tracing::debug!("Got login secrets");
 
     let base_url = "https://www.qobuz.com/api.json/0.2/".to_string();
 
     let login = login(username, password, &app_id, &base_url, &http_client).await?;
-    tracing::debug!("Logged in");
-
-    let active_secret =
-        find_active_secret(secrets, &base_url, &http_client, &app_id, &login.user_token).await?;
-
-    tracing::debug!("Found active secrets");
 
     let client = Client {
         http_client,
-        active_secret,
+        session: None,
         user_token: login.user_token,
         user_id: login.user_id,
         app_id,
@@ -144,6 +141,7 @@ enum Endpoint {
     PlaylistDeleteTracks,
     PlaylistUpdatePosition,
     Search,
+    SessionStart,
     Favorites,
     FavoriteAdd,
     FavoriteRemove,
@@ -173,8 +171,9 @@ impl Display for Endpoint {
             Endpoint::PlaylistDeleteTracks => "playlist/deleteTracks",
             Endpoint::PlaylistUpdatePosition => "playlist/updateTracksPosition",
             Endpoint::Search => "catalog/search",
+            Endpoint::SessionStart => "session/start",
             Endpoint::Track => "track/get",
-            Endpoint::TrackURL => "track/getFileUrl",
+            Endpoint::TrackURL => "file/url",
             Endpoint::UserPlaylist => "playlist/getUserPlaylists",
             Endpoint::Favorites => "favorite/getUserFavorites",
             Endpoint::FavoriteAdd => "favorite/create",
@@ -486,17 +485,80 @@ impl Client {
         ))
     }
 
-    pub async fn track_url(&self, track_id: u32) -> Result<TrackURL> {
-        track_url(
-            track_id,
-            &self.active_secret,
-            &self.base_url,
-            &self.http_client,
-            &self.app_id,
-            &self.user_token,
-            &self.max_audio_quality,
-        )
-        .await
+    async fn session(&mut self) -> Result<()> {
+        tracing::info!("Renewing session");
+
+        let endpoint = format!("{}{}", &self.base_url, Endpoint::SessionStart);
+        let now = format!("{}", time::OffsetDateTime::now_utc().unix_timestamp());
+
+        let mut args = BTreeMap::<&str, String>::new();
+        args.insert("profile", "qbz-1".to_string());
+
+        let request_sig = get_request_sig("sessionstart", args, &now);
+
+        let mut form_data = HashMap::new();
+        form_data.insert("profile", "qbz-1");
+        form_data.insert("request_ts", now.as_str());
+        form_data.insert("request_sig", request_sig.as_str());
+
+        let result: StartResponse = self.post(&endpoint, form_data).await?;
+
+        tracing::info!("Session renewed: {}", result.session_id);
+
+        self.session = Some(result);
+        Ok(())
+    }
+
+    pub async fn track_url(&mut self, track_id: u32) -> Result<TrackURL> {
+        // TODO: Also when expired
+        if self.session.is_none() {
+            self.session().await?;
+        }
+
+        let endpoint = format!("{}{}", &self.base_url, Endpoint::TrackURL);
+        let now = format!("{}", time::OffsetDateTime::now_utc().unix_timestamp());
+        let quality_string = &self.max_audio_quality.to_string();
+        let track_id_str = track_id.to_string();
+
+        let mut args = BTreeMap::<&str, String>::new();
+        args.insert("format_id", quality_string.clone());
+        args.insert("intent", "stream".to_string());
+        args.insert("track_id", track_id_str.clone());
+
+        let request_sig = get_request_sig("fileurl", args, &now);
+
+        let params = vec![
+            ("request_ts", now.as_str()),
+            ("request_sig", request_sig.as_str()),
+            ("track_id", track_id_str.as_str()),
+            ("format_id", quality_string),
+            ("intent", "stream"),
+        ];
+
+        match self
+            .make_get_call(
+                &endpoint,
+                Some(&params),
+                Some(&self.session.as_ref().unwrap().session_id),
+            )
+            .await
+        {
+            Ok(response) => match serde_json::from_str::<TrackURL>(response.as_str()) {
+                Ok(item) => Ok(item),
+                Err(error) => {
+                    dbg!(error.to_string());
+                    Err(Error::DeserializeJSON {
+                        message: error.to_string(),
+                    })
+                }
+            },
+            Err(error) => {
+                dbg!(error.to_string());
+                Err(Error::Api {
+                    message: error.to_string(),
+                })
+            }
+        }
     }
 
     pub async fn favorites(&self, limit: i32) -> Result<qobuz_player_models::Favorites> {
@@ -703,7 +765,7 @@ impl Client {
         T: serde::de::DeserializeOwned,
     {
         let response = self
-            .make_get_call(endpoint, params)
+            .make_get_call(endpoint, params, None)
             .await
             .map_err(|error| Error::Api {
                 message: error.to_string(),
@@ -797,6 +859,7 @@ impl Client {
         &self,
         endpoint: &str,
         params: Option<&[(&str, &str)]>,
+        session: Option<&str>,
     ) -> Result<String> {
         make_get_call(
             endpoint,
@@ -804,6 +867,7 @@ impl Client {
             &self.http_client,
             &self.app_id,
             Some(&self.user_token),
+            session,
         )
         .await
     }
@@ -824,80 +888,24 @@ impl Client {
     }
 }
 
-// Check the retrieved secrets to see which one works.
-async fn find_active_secret(
-    secrets: HashMap<String, String>,
-    base_url: &str,
-    client: &reqwest::Client,
-    app_id: &str,
-    user_token: &str,
-) -> Result<String> {
-    tracing::debug!("testing secrets: {secrets:?}");
+fn get_request_sig(method: &str, args: BTreeMap<&str, String>, now_string: &str) -> String {
+    let rng_init = "abb21364945c0583309667d13ca3d93a";
 
-    for (timezone, secret) in secrets.into_iter() {
-        let response = track_url(
-            64868955,
-            &secret,
-            base_url,
-            client,
-            app_id,
-            user_token,
-            &AudioQuality::Mp3,
-        )
-        .await;
-
-        if response.is_ok() {
-            tracing::debug!("found good secret: {}\t{}", timezone, secret);
-            let secret_string = secret;
-
-            return Ok(secret_string);
-        }
+    let mut n = String::new();
+    for (k, v) in args.iter() {
+        n.push_str(k);
+        n.push_str(v);
     }
 
-    Err(Error::ActiveSecret)
+    let req_id = format!("{method}{n}{now_string}{rng_init}");
+
+    format!("{:x}", md5::compute(req_id.as_bytes()))
 }
 
-async fn track_url(
-    track_id: u32,
-    secret: &str,
-    base_url: &str,
-    client: &reqwest::Client,
-    app_id: &str,
-    user_token: &str,
-    max_audio_quality: &AudioQuality,
-) -> Result<TrackURL> {
-    let endpoint = format!("{}{}", base_url, Endpoint::TrackURL);
-    let now = format!("{}", time::OffsetDateTime::now_utc().unix_timestamp());
-
-    let sig = format!(
-        "trackgetFileUrlformat_id{max_audio_quality}intentstreamtrack_id{track_id}{now}{secret}"
-    );
-
-    let hashed_sig = format!("{:x}", md5::compute(sig.as_str()));
-
-    let track_id = track_id.to_string();
-
-    let quality_string = max_audio_quality.to_string();
-
-    let params = vec![
-        ("request_ts", now.as_str()),
-        ("request_sig", hashed_sig.as_str()),
-        ("track_id", track_id.as_str()),
-        ("format_id", &quality_string),
-        ("intent", "stream"),
-    ];
-
-    match make_get_call(&endpoint, Some(&params), client, app_id, Some(user_token)).await {
-        Ok(response) => match serde_json::from_str(response.as_str()) {
-            Ok(item) => Ok(item),
-            Err(error) => Err(Error::DeserializeJSON {
-                message: error.to_string(),
-            }),
-        },
-        Err(error) => Err(Error::Api {
-            message: error.to_string(),
-        }),
-    }
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct StartResponse {
+    session_id: String,
+    expires_at: u32,
 }
 
 async fn handle_response(response: Response) -> Result<String> {
@@ -906,7 +914,7 @@ async fn handle_response(response: Response) -> Result<String> {
         Ok(res)
     } else {
         Err(Error::Api {
-            message: response.status().to_string(),
+            message: response.text().await.unwrap_or_default(),
         })
     }
 }
@@ -917,8 +925,16 @@ async fn make_get_call(
     client: &reqwest::Client,
     app_id: &str,
     user_token: Option<&str>,
+    session: Option<&str>,
 ) -> Result<String> {
-    let headers = client_headers(app_id, user_token);
+    let mut headers = client_headers(app_id, user_token);
+
+    if let Some(session) = session {
+        headers.insert(
+            "X-Session-Id",
+            HeaderValue::from_str(session).expect("infallible"),
+        );
+    }
 
     tracing::debug!("calling {} endpoint, with params {params:?}", endpoint);
     let request = client.request(Method::GET, endpoint).headers(headers);
@@ -988,7 +1004,7 @@ async fn login(
         ("app_id", app_id),
     ];
 
-    match make_get_call(&endpoint, Some(&params), client, app_id, None).await {
+    match make_get_call(&endpoint, Some(&params), client, app_id, None, None).await {
         Ok(response) => {
             let json: Value = serde_json::from_str(response.as_str())
                 .or(Err(Error::DeserializeJSON { message: response }))?;
@@ -1018,7 +1034,6 @@ async fn login(
 }
 
 struct Secrets {
-    secrets: HashMap<String, String>,
     app_id: String,
 }
 
@@ -1113,7 +1128,7 @@ async fn get_secrets(client: &reqwest::Client) -> Result<Secrets> {
         }
     }
 
-    Ok(Secrets { secrets, app_id })
+    Ok(Secrets { app_id })
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

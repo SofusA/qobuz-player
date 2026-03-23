@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    fs::{self},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -63,17 +63,27 @@ impl Downloader {
 
         tracing::info!("Downloading: {}", track.title);
         let handle = tokio::spawn(async move {
-            let Ok(resp) = reqwest::get(&track_url.url).await else {
-                broadcast.send_error("Unable to get track audio file".to_string());
-                return;
-            };
+            dbg!(&track_url);
+            let template = &track_url.url_template;
+            let segments = track_url.n_segments;
 
-            let Ok(body) = resp.bytes().await else {
-                broadcast.send_error("Unable to get audio file bytes".to_string());
-                return;
-            };
+            let mut bytes: Vec<u8> = Vec::new();
 
-            let bytes = body.to_vec();
+            for i in 0..segments {
+                let seq_url = template.replace("$SEGMENT$", &i.to_string());
+
+                let Ok(resp) = reqwest::get(&seq_url).await else {
+                    broadcast.send_error(format!("Unable to get segment {i} from {seq_url}"));
+                    return;
+                };
+
+                let Ok(chunk) = resp.bytes().await else {
+                    broadcast.send_error(format!("Unable to read segment {i} bytes"));
+                    return;
+                };
+
+                bytes.extend_from_slice(&chunk);
+            }
 
             if let Some(parent) = cache_path.parent()
                 && let Err(e) = fs::create_dir_all(parent)
