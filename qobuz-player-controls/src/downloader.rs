@@ -114,7 +114,6 @@ impl Downloader {
             cache_path,
             broadcast: self.broadcast.clone(),
             segment_map: segment_map.clone(),
-            total_byte_len,
         };
 
         let reader = StreamDownload::new::<FlacSourceStream>(

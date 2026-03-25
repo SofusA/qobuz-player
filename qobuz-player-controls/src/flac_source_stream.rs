@@ -18,6 +18,7 @@ use stream_download::{
     source::{DecodeError, SourceStream, StreamOutcome},
     storage::temp::TempStorageProvider,
 };
+use tokio::task::JoinHandle;
 
 use crate::{cmaf, crypto, notification::NotificationBroadcast};
 
@@ -49,12 +50,10 @@ pub struct FlacSourceParams {
     pub cache_path: PathBuf,
     pub broadcast: Arc<NotificationBroadcast>,
     pub segment_map: Vec<SegmentByteInfo>,
-    pub total_byte_len: u64,
 }
 
 pub struct FlacSourceStream {
     rx: tokio::sync::mpsc::Receiver<io::Result<Bytes>>,
-    content_length: Option<u64>,
     flac_header_len: u64,
     shared: Arc<SharedDownloadState>,
 }
@@ -77,7 +76,6 @@ impl SourceStream for FlacSourceStream {
 
     async fn create(params: Self::Params) -> Result<Self, Self::StreamCreationError> {
         let (tx, rx) = tokio::sync::mpsc::channel::<io::Result<Bytes>>(4);
-        let content_length = Some(params.total_byte_len);
         let flac_header_len = params.flac_header.len() as u64;
         let total_segs = (params.n_segments - 1) as usize;
 
@@ -101,14 +99,16 @@ impl SourceStream for FlacSourceStream {
 
         Ok(Self {
             rx,
-            content_length,
             flac_header_len,
             shared,
         })
     }
 
+    // Return None: disables stream-download-rs gap-filling which caused 100% CPU
+    // (segment table byte_len estimates don't match actual decrypted sizes).
+    // SeekableStreamReader handles SeekFrom::End independently.
     fn content_length(&self) -> Option<u64> {
-        self.content_length
+        None
     }
 
     fn supports_seek(&self) -> bool {
@@ -116,10 +116,6 @@ impl SourceStream for FlacSourceStream {
     }
 
     async fn seek_range(&mut self, start: u64, _end: Option<u64>) -> io::Result<()> {
-        if self.shared.all_downloaded() {
-            return Ok(());
-        }
-
         let data_offset = start.saturating_sub(self.flac_header_len);
 
         let seg_idx = self
@@ -128,10 +124,6 @@ impl SourceStream for FlacSourceStream {
             .iter()
             .position(|s| data_offset < s.byte_offset + s.byte_len)
             .unwrap_or(self.shared.segment_map.len().saturating_sub(1));
-
-        if self.shared.downloaded.lock()[seg_idx].is_some() {
-            return Ok(());
-        }
 
         let target_seg = seg_idx as u8 + 1;
         let seg_byte_start = self.flac_header_len + self.shared.segment_map[seg_idx].byte_offset;
@@ -223,7 +215,8 @@ async fn run_download_initial(
         return;
     }
 
-    download_segments(&shared, &tx, 1, shared.n_segments, 0).await;
+    let n = shared.n_segments;
+    download_segments(&shared, &tx, 1, n, 0).await;
     shared.try_write_cache();
 }
 
@@ -233,25 +226,45 @@ async fn run_download_from(
     start_seg: u8,
     skip_first_bytes: usize,
 ) {
-    download_segments(&shared, &tx, start_seg, shared.n_segments, skip_first_bytes).await;
+    let n = shared.n_segments;
+    download_segments(&shared, &tx, start_seg, n, skip_first_bytes).await;
     shared.try_write_cache();
 }
 
 /// Resolution order per segment: downloaded (complete) → in_progress (partial) → network.
+/// Prefetches the next segment in parallel for faster buffering.
 async fn download_segments(
-    shared: &SharedDownloadState,
+    shared: &Arc<SharedDownloadState>,
     tx: &tokio::sync::mpsc::Sender<io::Result<Bytes>>,
     from_seg: u8,
     to_seg: u8,
     skip_first_bytes: usize,
 ) {
+    let mut prefetch: Option<JoinHandle<()>> = None;
+
     for seg in from_seg..to_seg {
         if tx.is_closed() {
+            if let Some(h) = prefetch.take() {
+                h.abort();
+            }
             return;
+        }
+
+        if let Some(h) = prefetch.take() {
+            let _ = h.await;
         }
 
         let idx = (seg - 1) as usize;
         let skip = if seg == from_seg { skip_first_bytes } else { 0 };
+
+        // Prefetch next segment in background
+        let next_seg = seg + 1;
+        if next_seg < to_seg && shared.downloaded.lock()[(next_seg - 1) as usize].is_none() {
+            let shared_clone = shared.clone();
+            prefetch = Some(tokio::spawn(async move {
+                prefetch_segment(&shared_clone, next_seg).await;
+            }));
+        }
 
         let complete = shared.downloaded.lock().get(idx).cloned().flatten();
         if let Some(frames) = complete {
@@ -261,7 +274,6 @@ async fn download_segments(
             return;
         }
 
-        // Send partial data immediately, then fall through to network fetch to complete it.
         let partial = shared
             .in_progress
             .lock()
@@ -297,6 +309,50 @@ async fn download_segments(
             tokio::task::yield_now().await;
         }
     }
+}
+
+/// Prefetch a segment into `downloaded` without sending to the channel.
+async fn prefetch_segment(shared: &SharedDownloadState, seg: u8) {
+    let idx = (seg - 1) as usize;
+    if shared.downloaded.lock()[idx].is_some() {
+        return;
+    }
+
+    let url = shared.url_template.replace("$SEGMENT$", &seg.to_string());
+    let resp = match reqwest::get(&url).await {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+    let seg_bytes = match resp.bytes().await {
+        Ok(b) => b.to_vec(),
+        Err(_) => return,
+    };
+
+    let crypto = match cmaf::parse_segment_crypto(&seg_bytes) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    let key = shared.content_key.unwrap_or([0u8; 16]);
+    let mut all_decrypted = Vec::new();
+    let mut data_pos = crypto.data_offset;
+
+    for entry in &crypto.entries {
+        let frame_end = data_pos + entry.size as usize;
+        if frame_end > seg_bytes.len() {
+            return;
+        }
+        let mut frame = seg_bytes[data_pos..frame_end].to_vec();
+        if entry.flags != 0 {
+            crypto::decrypt_frame(&key, &entry.iv, &mut frame);
+        }
+        all_decrypted.extend_from_slice(&frame);
+        data_pos = frame_end;
+    }
+
+    shared.downloaded.lock()[idx] = Some(all_decrypted);
+    shared.in_progress.lock()[idx] = None;
+    tracing::debug!("Segment {seg}/{}: prefetched", shared.n_segments - 1);
 }
 
 /// Returns true if send succeeded, false if channel closed.
@@ -364,6 +420,7 @@ async fn fetch_and_stream_segment(
     let mut data_pos = segment_crypto.data_offset;
     let mut bytes_accumulated: usize = 0;
     let mut entry_idx = 0;
+    let mut last_persisted_len: usize = 0;
     let entries = &segment_crypto.entries;
 
     while entry_idx < entries.len() {
@@ -400,15 +457,23 @@ async fn fetch_and_stream_segment(
             entry_idx += 1;
         }
 
-        {
+        // Persist to in_progress periodically (not every batch) to reduce cloning
+        if all_decrypted.len() - last_persisted_len > 512 * 1024 {
             let mut progress = shared.in_progress.lock();
             let existing_len = progress[idx].as_ref().map_or(0, |d| d.len());
             if all_decrypted.len() > existing_len {
                 progress[idx] = Some(all_decrypted.clone());
+                last_persisted_len = all_decrypted.len();
             }
         }
 
         if !batch.is_empty() && tx.send(Ok(Bytes::copy_from_slice(&batch))).await.is_err() {
+            // Persist before exit so data survives for future seeks
+            let mut progress = shared.in_progress.lock();
+            let existing_len = progress[idx].as_ref().map_or(0, |d| d.len());
+            if all_decrypted.len() > existing_len {
+                progress[idx] = Some(all_decrypted);
+            }
             return Ok(());
         }
 
@@ -425,6 +490,11 @@ async fn fetch_and_stream_segment(
             None => return Err(format!("Segment {seg}: truncated at frame")),
         }
         if tx.is_closed() {
+            let mut progress = shared.in_progress.lock();
+            let existing_len = progress[idx].as_ref().map_or(0, |d| d.len());
+            if all_decrypted.len() > existing_len {
+                progress[idx] = Some(all_decrypted);
+            }
             return Ok(());
         }
     }
@@ -442,10 +512,6 @@ async fn fetch_and_stream_segment(
 }
 
 impl SharedDownloadState {
-    fn all_downloaded(&self) -> bool {
-        self.downloaded.lock().iter().all(|f| f.is_some())
-    }
-
     fn try_write_cache(&self) {
         if self.cache_written.swap(true, Ordering::AcqRel) {
             return;
