@@ -82,7 +82,9 @@ impl Downloader {
             init_info.flac_header.len(),
         );
 
-        if n_segments < 2 {
+        // Segment table may list more audio segments than the API's n_segments-1.
+        let audio_segments = init_info.segment_table.len() as u8;
+        if audio_segments == 0 {
             return Err(Error::StreamError {
                 message: "Track has no audio segments".to_string(),
             });
@@ -100,15 +102,17 @@ impl Downloader {
         }
         let total_byte_len = flac_header_len + cumulative_offset;
 
+        let n_segments_to_download = audio_segments + 1; // +1 for init segment
+
         tracing::info!(
-            "Segment map: {} segments, total FLAC size: {} bytes",
-            segment_map.len(),
+            "Segment map: {} audio segments, total FLAC size: {} bytes",
+            audio_segments,
             total_byte_len,
         );
 
         let params = FlacSourceParams {
             url_template: track_url.url_template,
-            n_segments,
+            n_segments: n_segments_to_download,
             content_key,
             flac_header: init_info.flac_header,
             cache_path,

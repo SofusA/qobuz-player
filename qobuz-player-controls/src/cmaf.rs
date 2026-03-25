@@ -33,8 +33,11 @@ pub struct FrameEntry {
 
 /// Parsed crypto info from a segment's QBZ_SEGMENT_UUID box.
 pub struct SegmentCrypto {
-    /// Offset from the UUID box start to the audio data (usually points to mdat payload).
+    /// Offset to the start of audio frame data (usually mdat payload).
     pub data_offset: usize,
+    /// End of the mdat box content. Data between the last frame entry and this
+    /// offset is unencrypted trailing audio that must be included in output.
+    pub mdat_end: usize,
     pub entries: Vec<FrameEntry>,
 }
 
@@ -65,6 +68,9 @@ pub fn parse_init_segment(data: &[u8]) -> Result<InitInfo, Error> {
 
 /// Parse an audio segment to extract per-frame crypto info.
 pub fn parse_segment_crypto(data: &[u8]) -> Result<SegmentCrypto, Error> {
+    let mut uuid_pos = None;
+    let mut mdat_end = data.len();
+
     let mut pos = 0;
     while pos + 8 <= data.len() {
         let size = read_box_size(data, pos);
@@ -72,19 +78,25 @@ pub fn parse_segment_crypto(data: &[u8]) -> Result<SegmentCrypto, Error> {
             break;
         }
 
-        if &data[pos + 4..pos + 8] == b"uuid" && pos + 24 <= data.len() {
+        let box_type = &data[pos + 4..pos + 8];
+        if box_type == b"uuid" && pos + 24 <= data.len() {
             let uuid = &data[pos + 8..pos + 24];
             if uuid == QBZ_SEGMENT_UUID {
-                return parse_segment_uuid_payload(data, pos);
+                uuid_pos = Some(pos);
             }
+        } else if box_type == b"mdat" {
+            mdat_end = pos + size;
         }
 
         pos += size;
     }
 
-    Err(Error::StreamError {
-        message: "audio segment: QBZ_SEGMENT_UUID box not found".into(),
-    })
+    match uuid_pos {
+        Some(p) => parse_segment_uuid_payload(data, p, mdat_end),
+        None => Err(Error::StreamError {
+            message: "audio segment: QBZ_SEGMENT_UUID box not found".into(),
+        }),
+    }
 }
 
 // --- Internal helpers ---
@@ -191,7 +203,11 @@ fn parse_init_uuid_payload(payload: &[u8]) -> Result<InitInfo, Error> {
     })
 }
 
-fn parse_segment_uuid_payload(data: &[u8], uuid_box_start: usize) -> Result<SegmentCrypto, Error> {
+fn parse_segment_uuid_payload(
+    data: &[u8],
+    uuid_box_start: usize,
+    mdat_end: usize,
+) -> Result<SegmentCrypto, Error> {
     // Layout after box header (8) + UUID (16) = offset 24:
     //   [4B version/padding]
     //   [4B data_offset]    — offset from uuid_box_start to audio data
@@ -246,6 +262,7 @@ fn parse_segment_uuid_payload(data: &[u8], uuid_box_start: usize) -> Result<Segm
 
     Ok(SegmentCrypto {
         data_offset,
+        mdat_end,
         entries,
     })
 }

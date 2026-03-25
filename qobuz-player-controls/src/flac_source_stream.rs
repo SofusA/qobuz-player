@@ -350,6 +350,12 @@ async fn prefetch_segment(shared: &SharedDownloadState, seg: u8) {
         data_pos = frame_end;
     }
 
+    // Trailing mdat data after last frame entry (unencrypted)
+    let mdat_end = crypto.mdat_end.min(seg_bytes.len());
+    if data_pos < mdat_end {
+        all_decrypted.extend_from_slice(&seg_bytes[data_pos..mdat_end]);
+    }
+
     shared.downloaded.lock()[idx] = Some(all_decrypted);
     shared.in_progress.lock()[idx] = None;
     tracing::debug!("Segment {seg}/{}: prefetched", shared.n_segments - 1);
@@ -497,6 +503,27 @@ async fn fetch_and_stream_segment(
             }
             return Ok(());
         }
+    }
+
+    // Trailing mdat data after last frame entry (unencrypted)
+    let mdat_end = segment_crypto.mdat_end.min(buf.len());
+    if data_pos < mdat_end {
+        let trailing = &buf[data_pos..mdat_end];
+        all_decrypted.extend_from_slice(trailing);
+
+        if bytes_accumulated + trailing.len() > total_skip {
+            let send_start = if bytes_accumulated < total_skip {
+                total_skip - bytes_accumulated
+            } else {
+                0
+            };
+            if send_start < trailing.len() {
+                let _ = tx
+                    .send(Ok(Bytes::copy_from_slice(&trailing[send_start..])))
+                    .await;
+            }
+        }
+        bytes_accumulated += trailing.len();
     }
 
     shared.downloaded.lock()[idx] = Some(all_decrypted);
