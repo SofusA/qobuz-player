@@ -40,6 +40,7 @@ struct SharedDownloadState {
     /// Partial decrypted data from cancelled fetches, persists across task respawns.
     in_progress: Mutex<Vec<Option<Vec<u8>>>>,
     cache_written: AtomicBool,
+    gap_fill_running: AtomicBool,
 }
 
 pub struct FlacSourceParams {
@@ -90,6 +91,7 @@ impl SourceStream for FlacSourceStream {
             downloaded: Mutex::new(vec![None; total_segs]),
             in_progress: Mutex::new(vec![None; total_segs]),
             cache_written: AtomicBool::new(false),
+            gap_fill_running: AtomicBool::new(false),
         });
 
         let shared_clone = shared.clone();
@@ -217,7 +219,7 @@ async fn run_download_initial(
 
     let n = shared.n_segments;
     download_segments(&shared, &tx, 1, n, 0).await;
-    shared.try_write_cache();
+    maybe_spawn_gap_fill(shared, 1);
 }
 
 async fn run_download_from(
@@ -228,7 +230,28 @@ async fn run_download_from(
 ) {
     let n = shared.n_segments;
     download_segments(&shared, &tx, start_seg, n, skip_first_bytes).await;
-    shared.try_write_cache();
+    maybe_spawn_gap_fill(shared, start_seg);
+}
+
+/// Spawn gap-fill only if the forward pass completed (all segments from start_seg onward
+/// are downloaded) and no other gap-fill is already running.
+fn maybe_spawn_gap_fill(shared: Arc<SharedDownloadState>, start_seg: u8) {
+    let n = shared.n_segments;
+    let forward_complete = {
+        let downloaded = shared.downloaded.lock();
+        (start_seg..n).all(|seg| downloaded[(seg - 1) as usize].is_some())
+    };
+    if !forward_complete {
+        return;
+    }
+    if shared.gap_fill_running.swap(true, Ordering::AcqRel) {
+        return; // another gap-fill already in progress
+    }
+    tokio::spawn(async move {
+        fill_missing_segments(&shared).await;
+        shared.try_write_cache();
+        shared.gap_fill_running.store(false, Ordering::Release);
+    });
 }
 
 /// Resolution order per segment: downloaded (complete) → in_progress (partial) → network.
@@ -308,6 +331,26 @@ async fn download_segments(
         if seg == from_seg {
             tokio::task::yield_now().await;
         }
+    }
+}
+
+/// Download any segments not yet in `downloaded` (for cache completeness).
+/// Runs in background after the main download pass — doesn't send to channel.
+async fn fill_missing_segments(shared: &Arc<SharedDownloadState>) {
+    let total = (shared.n_segments - 1) as usize;
+    let missing: Vec<u8> = (0..total)
+        .filter(|i| shared.downloaded.lock()[*i].is_none())
+        .map(|i| i as u8 + 1)
+        .collect();
+
+    if missing.is_empty() {
+        return;
+    }
+
+    tracing::info!("Filling {} missing segments for cache", missing.len());
+    for seg in missing {
+        let shared_clone = shared.clone();
+        prefetch_segment(&shared_clone, seg).await;
     }
 }
 
