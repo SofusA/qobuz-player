@@ -1,9 +1,11 @@
 use std::fs;
+use std::io::{Read, Seek};
 use std::num::NonZero;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::flac_source_stream::SeekableStreamReader;
 use parking_lot::Mutex;
 use rodio::cpal::traits::HostTrait;
 use rodio::queue::queue;
@@ -72,11 +74,23 @@ impl Sink {
 
     pub fn seek(&self, duration: Duration) -> AppResult<()> {
         if let Some(player) = &self.sink {
-            match player.try_seek(duration) {
+            let current_volume = *self.volume.borrow();
+            player.set_volume(0.0);
+            player.pause();
+
+            let result = player.try_seek(duration);
+
+            player.play();
+            set_volume(player, &current_volume);
+
+            match result {
                 Ok(_) => {
                     *self.duration_played.lock() = Default::default();
                 }
-                Err(err) => return Err(err.into()),
+                Err(err) => {
+                    tracing::warn!("rodio seek error: {err:?}");
+                    return Err(err.into());
+                }
             };
         }
 
@@ -122,7 +136,32 @@ impl Sink {
         })?;
 
         let source = Decoder::try_from(file)?;
+        self.queue_decoder(source)
+    }
 
+    pub fn query_track_stream(
+        &mut self,
+        reader: SeekableStreamReader,
+    ) -> AppResult<QueryTrackResult> {
+        tracing::info!("Sink query track (streaming)");
+
+        let byte_len = reader.content_length();
+        let source = Decoder::builder()
+            .with_data(reader)
+            .with_byte_len(byte_len)
+            .with_seekable(true)
+            .build()
+            .map_err(|e| Error::StreamError {
+                message: format!("Failed to decode streaming FLAC: {e}"),
+            })?;
+
+        self.queue_decoder(source)
+    }
+
+    fn queue_decoder<R: Read + Seek + Send + Sync + 'static>(
+        &mut self,
+        source: Decoder<R>,
+    ) -> AppResult<QueryTrackResult> {
         let sample_rate = source.sample_rate();
         let same_sample_rate = self
             .output_stream

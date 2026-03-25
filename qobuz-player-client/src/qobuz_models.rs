@@ -30,13 +30,19 @@ pub struct Image {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrackURL {
-    pub track_id: i32,
-    pub duration: i32,
-    pub url: String,
-    pub format_id: i32,
+    pub url_template: String,
     pub mime_type: String,
-    pub sampling_rate: f64,
-    pub bit_depth: i32,
+    pub n_segments: u8,
+    #[serde(default)]
+    pub key_id: Option<String>,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub sampling_rate: Option<u32>,
+    #[serde(default)]
+    pub duration: Option<f64>,
+    #[serde(default)]
+    pub n_samples: Option<u64>,
 }
 
 pub enum UrlType {

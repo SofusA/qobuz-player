@@ -1,0 +1,491 @@
+use std::{
+    fs,
+    io::{self, Read, Seek, SeekFrom},
+    path::PathBuf,
+    pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    task::{Context, Poll},
+};
+
+use bytes::Bytes;
+use futures::Stream;
+use parking_lot::Mutex;
+use stream_download::{
+    StreamDownload,
+    source::{DecodeError, SourceStream, StreamOutcome},
+    storage::temp::TempStorageProvider,
+};
+
+use crate::{cmaf, crypto, notification::NotificationBroadcast};
+
+#[derive(Debug, Clone)]
+pub struct SegmentByteInfo {
+    pub byte_offset: u64,
+    pub byte_len: u64,
+}
+
+struct SharedDownloadState {
+    url_template: String,
+    n_segments: u8,
+    content_key: Option<[u8; 16]>,
+    flac_header: Vec<u8>,
+    cache_path: PathBuf,
+    broadcast: Arc<NotificationBroadcast>,
+    segment_map: Vec<SegmentByteInfo>,
+    downloaded: Mutex<Vec<Option<Vec<u8>>>>,
+    /// Partial decrypted data from cancelled fetches, persists across task respawns.
+    in_progress: Mutex<Vec<Option<Vec<u8>>>>,
+    cache_written: AtomicBool,
+}
+
+pub struct FlacSourceParams {
+    pub url_template: String,
+    pub n_segments: u8,
+    pub content_key: Option<[u8; 16]>,
+    pub flac_header: Vec<u8>,
+    pub cache_path: PathBuf,
+    pub broadcast: Arc<NotificationBroadcast>,
+    pub segment_map: Vec<SegmentByteInfo>,
+    pub total_byte_len: u64,
+}
+
+pub struct FlacSourceStream {
+    rx: tokio::sync::mpsc::Receiver<io::Result<Bytes>>,
+    content_length: Option<u64>,
+    flac_header_len: u64,
+    shared: Arc<SharedDownloadState>,
+}
+
+#[derive(Debug)]
+pub struct FlacStreamError(pub String);
+
+impl std::fmt::Display for FlacStreamError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for FlacStreamError {}
+impl DecodeError for FlacStreamError {}
+
+impl SourceStream for FlacSourceStream {
+    type Params = FlacSourceParams;
+    type StreamCreationError = FlacStreamError;
+
+    async fn create(params: Self::Params) -> Result<Self, Self::StreamCreationError> {
+        let (tx, rx) = tokio::sync::mpsc::channel::<io::Result<Bytes>>(4);
+        let content_length = Some(params.total_byte_len);
+        let flac_header_len = params.flac_header.len() as u64;
+        let total_segs = (params.n_segments - 1) as usize;
+
+        let shared = Arc::new(SharedDownloadState {
+            url_template: params.url_template,
+            n_segments: params.n_segments,
+            content_key: params.content_key,
+            flac_header: params.flac_header,
+            cache_path: params.cache_path,
+            broadcast: params.broadcast,
+            segment_map: params.segment_map,
+            downloaded: Mutex::new(vec![None; total_segs]),
+            in_progress: Mutex::new(vec![None; total_segs]),
+            cache_written: AtomicBool::new(false),
+        });
+
+        let shared_clone = shared.clone();
+        tokio::spawn(async move {
+            run_download_initial(shared_clone, tx).await;
+        });
+
+        Ok(Self {
+            rx,
+            content_length,
+            flac_header_len,
+            shared,
+        })
+    }
+
+    fn content_length(&self) -> Option<u64> {
+        self.content_length
+    }
+
+    fn supports_seek(&self) -> bool {
+        true
+    }
+
+    async fn seek_range(&mut self, start: u64, _end: Option<u64>) -> io::Result<()> {
+        if self.shared.all_downloaded() {
+            return Ok(());
+        }
+
+        let data_offset = start.saturating_sub(self.flac_header_len);
+
+        let seg_idx = self
+            .shared
+            .segment_map
+            .iter()
+            .position(|s| data_offset < s.byte_offset + s.byte_len)
+            .unwrap_or(self.shared.segment_map.len().saturating_sub(1));
+
+        if self.shared.downloaded.lock()[seg_idx].is_some() {
+            return Ok(());
+        }
+
+        let target_seg = seg_idx as u8 + 1;
+        let seg_byte_start = self.flac_header_len + self.shared.segment_map[seg_idx].byte_offset;
+        let skip_bytes = start.saturating_sub(seg_byte_start) as usize;
+
+        self.rx.close();
+        while self.rx.try_recv().is_ok() {}
+
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
+        self.rx = rx;
+
+        let shared = self.shared.clone();
+        tokio::spawn(async move {
+            run_download_from(shared, tx, target_seg, skip_bytes).await;
+        });
+
+        tracing::debug!("seek: respawned from segment {target_seg} (skip {skip_bytes} bytes)");
+        Ok(())
+    }
+
+    async fn reconnect(&mut self, current_position: u64) -> io::Result<()> {
+        self.seek_range(current_position, None).await
+    }
+
+    async fn on_finish(
+        &mut self,
+        result: io::Result<()>,
+        _outcome: StreamOutcome,
+    ) -> io::Result<()> {
+        result
+    }
+}
+
+impl Stream for FlacSourceStream {
+    type Item = io::Result<Bytes>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.rx.poll_recv(cx)
+    }
+}
+
+/// Wraps `StreamDownload` with `SeekFrom::End` support using known content length.
+pub struct SeekableStreamReader {
+    inner: StreamDownload<TempStorageProvider>,
+    content_length: u64,
+}
+
+impl SeekableStreamReader {
+    pub fn new(inner: StreamDownload<TempStorageProvider>, content_length: u64) -> Self {
+        Self {
+            inner,
+            content_length,
+        }
+    }
+
+    pub fn content_length(&self) -> u64 {
+        self.content_length
+    }
+}
+
+impl Read for SeekableStreamReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+
+impl Seek for SeekableStreamReader {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        match pos {
+            SeekFrom::End(offset) => {
+                let target = (self.content_length as i64 + offset).max(0) as u64;
+                self.inner.seek(SeekFrom::Start(target))
+            }
+            other => self.inner.seek(other),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Download tasks
+// ---------------------------------------------------------------------------
+
+async fn run_download_initial(
+    shared: Arc<SharedDownloadState>,
+    tx: tokio::sync::mpsc::Sender<io::Result<Bytes>>,
+) {
+    let header_bytes = Bytes::copy_from_slice(&shared.flac_header);
+    if tx.send(Ok(header_bytes)).await.is_err() {
+        return;
+    }
+
+    download_segments(&shared, &tx, 1, shared.n_segments, 0).await;
+    shared.try_write_cache();
+}
+
+async fn run_download_from(
+    shared: Arc<SharedDownloadState>,
+    tx: tokio::sync::mpsc::Sender<io::Result<Bytes>>,
+    start_seg: u8,
+    skip_first_bytes: usize,
+) {
+    download_segments(&shared, &tx, start_seg, shared.n_segments, skip_first_bytes).await;
+    shared.try_write_cache();
+}
+
+/// Resolution order per segment: downloaded (complete) → in_progress (partial) → network.
+async fn download_segments(
+    shared: &SharedDownloadState,
+    tx: &tokio::sync::mpsc::Sender<io::Result<Bytes>>,
+    from_seg: u8,
+    to_seg: u8,
+    skip_first_bytes: usize,
+) {
+    for seg in from_seg..to_seg {
+        if tx.is_closed() {
+            return;
+        }
+
+        let idx = (seg - 1) as usize;
+        let skip = if seg == from_seg { skip_first_bytes } else { 0 };
+
+        let complete = shared.downloaded.lock().get(idx).cloned().flatten();
+        if let Some(frames) = complete {
+            if send_with_skip(tx, &frames, skip, shared.n_segments, seg, "memory").await {
+                continue;
+            }
+            return;
+        }
+
+        // Send partial data immediately, then fall through to network fetch to complete it.
+        let partial = shared
+            .in_progress
+            .lock()
+            .get(idx)
+            .cloned()
+            .flatten()
+            .filter(|data| data.len() > skip);
+        let mut already_sent: usize = 0;
+        if let Some(data) = partial {
+            already_sent = if skip < data.len() {
+                data.len() - skip
+            } else {
+                0
+            };
+            if !send_with_skip(tx, &data, skip, shared.n_segments, seg, "partial").await {
+                return;
+            }
+        }
+
+        match fetch_and_stream_segment(shared, seg, skip, already_sent, tx).await {
+            Ok(()) => {}
+            Err(e) => {
+                if tx.is_closed() {
+                    return;
+                }
+                shared.broadcast.send_error(format!("Segment {seg}: {e}"));
+                let _ = tx.send(Err(io::Error::new(io::ErrorKind::Other, e))).await;
+                return;
+            }
+        }
+
+        if seg == from_seg {
+            tokio::task::yield_now().await;
+        }
+    }
+}
+
+/// Returns true if send succeeded, false if channel closed.
+async fn send_with_skip(
+    tx: &tokio::sync::mpsc::Sender<io::Result<Bytes>>,
+    frames: &[u8],
+    skip: usize,
+    n_segments: u8,
+    seg: u8,
+    source: &str,
+) -> bool {
+    let data = if skip > 0 && skip < frames.len() {
+        &frames[skip..]
+    } else {
+        frames
+    };
+    if tx.send(Ok(Bytes::copy_from_slice(data))).await.is_err() {
+        return false;
+    }
+    tracing::debug!(
+        "Segment {seg}/{}: {} bytes (from {source})",
+        n_segments - 1,
+        data.len(),
+    );
+    true
+}
+
+/// Streams a segment from the network, decrypting FLAC frames incrementally.
+/// `already_sent`: bytes already sent from partial data (not re-sent, but still decrypted).
+/// Partial progress is stored in `shared.in_progress` to survive task cancellation.
+async fn fetch_and_stream_segment(
+    shared: &SharedDownloadState,
+    seg: u8,
+    skip_bytes: usize,
+    already_sent: usize,
+    tx: &tokio::sync::mpsc::Sender<io::Result<Bytes>>,
+) -> Result<(), String> {
+    let url = shared.url_template.replace("$SEGMENT$", &seg.to_string());
+    let mut resp = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("Failed to fetch segment {seg}: {e}"))?;
+
+    let mut buf = Vec::new();
+    let segment_crypto = loop {
+        match resp
+            .chunk()
+            .await
+            .map_err(|e| format!("Segment {seg}: {e}"))?
+        {
+            Some(chunk) => {
+                buf.extend_from_slice(&chunk);
+                if let Ok(c) = cmaf::parse_segment_crypto(&buf) {
+                    break c;
+                }
+            }
+            None => return Err(format!("Segment {seg}: truncated before header")),
+        }
+    };
+
+    let key = shared.content_key.unwrap_or([0u8; 16]);
+    let idx = (seg - 1) as usize;
+    let total_skip = skip_bytes + already_sent;
+
+    let mut all_decrypted = Vec::new();
+    let mut data_pos = segment_crypto.data_offset;
+    let mut bytes_accumulated: usize = 0;
+    let mut entry_idx = 0;
+    let entries = &segment_crypto.entries;
+
+    while entry_idx < entries.len() {
+        let mut batch = Vec::new();
+
+        while entry_idx < entries.len() {
+            let entry = &entries[entry_idx];
+            let frame_end = data_pos + entry.size as usize;
+
+            if buf.len() < frame_end {
+                break;
+            }
+
+            let mut frame = buf[data_pos..frame_end].to_vec();
+            if entry.flags != 0 {
+                crypto::decrypt_frame(&key, &entry.iv, &mut frame);
+            }
+
+            all_decrypted.extend_from_slice(&frame);
+            let frame_len = frame.len();
+
+            if bytes_accumulated + frame_len <= total_skip {
+                bytes_accumulated += frame_len;
+            } else if bytes_accumulated < total_skip {
+                let offset = total_skip - bytes_accumulated;
+                bytes_accumulated += frame_len;
+                batch.extend_from_slice(&frame[offset..]);
+            } else {
+                bytes_accumulated += frame_len;
+                batch.extend_from_slice(&frame);
+            }
+
+            data_pos = frame_end;
+            entry_idx += 1;
+        }
+
+        {
+            let mut progress = shared.in_progress.lock();
+            let existing_len = progress[idx].as_ref().map_or(0, |d| d.len());
+            if all_decrypted.len() > existing_len {
+                progress[idx] = Some(all_decrypted.clone());
+            }
+        }
+
+        if !batch.is_empty() && tx.send(Ok(Bytes::copy_from_slice(&batch))).await.is_err() {
+            return Ok(());
+        }
+
+        if entry_idx >= entries.len() {
+            break;
+        }
+
+        match resp
+            .chunk()
+            .await
+            .map_err(|e| format!("Segment {seg}: {e}"))?
+        {
+            Some(chunk) => buf.extend_from_slice(&chunk),
+            None => return Err(format!("Segment {seg}: truncated at frame")),
+        }
+        if tx.is_closed() {
+            return Ok(());
+        }
+    }
+
+    shared.downloaded.lock()[idx] = Some(all_decrypted);
+    shared.in_progress.lock()[idx] = None;
+
+    let total_sent = bytes_accumulated.saturating_sub(skip_bytes);
+    tracing::debug!(
+        "Segment {seg}/{}: {total_sent} bytes streamed",
+        shared.n_segments - 1,
+    );
+
+    Ok(())
+}
+
+impl SharedDownloadState {
+    fn all_downloaded(&self) -> bool {
+        self.downloaded.lock().iter().all(|f| f.is_some())
+    }
+
+    fn try_write_cache(&self) {
+        if self.cache_written.swap(true, Ordering::AcqRel) {
+            return;
+        }
+
+        let downloaded = self.downloaded.lock();
+        if !downloaded.iter().all(|f| f.is_some()) {
+            self.cache_written.store(false, Ordering::Release);
+            return;
+        }
+
+        let mut cache_data = Vec::with_capacity(
+            self.flac_header.len()
+                + self
+                    .segment_map
+                    .iter()
+                    .map(|s| s.byte_len as usize)
+                    .sum::<usize>(),
+        );
+        cache_data.extend_from_slice(&self.flac_header);
+        for f in downloaded.iter().flatten() {
+            cache_data.extend_from_slice(f);
+        }
+        drop(downloaded);
+
+        if let Some(parent) = self.cache_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let tmp = self.cache_path.with_extension("partial");
+        if let Err(e) = fs::write(&tmp, &cache_data) {
+            tracing::warn!("Failed to write cache: {e}");
+        } else if let Err(e) = fs::rename(&tmp, &self.cache_path) {
+            let _ = fs::remove_file(&tmp);
+            tracing::warn!("Failed to finalize cache: {e}");
+        } else {
+            tracing::info!(
+                "Cached: {} ({} bytes)",
+                self.cache_path.display(),
+                cache_data.len()
+            );
+        }
+    }
+}

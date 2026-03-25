@@ -15,7 +15,6 @@ use crate::{
         track,
     },
 };
-use base64::{Engine, engine::general_purpose};
 use regex::Regex;
 use reqwest::{
     Method, Response, StatusCode,
@@ -23,13 +22,16 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Display,
+};
 use time::macros::format_description;
 use tokio::try_join;
 
 #[derive(Debug)]
 pub struct Client {
-    active_secret: String,
+    session: Option<StartResponse>,
     app_id: String,
     base_url: String,
     http_client: reqwest::Client,
@@ -101,7 +103,7 @@ pub async fn new(
         .build()
         .expect("infallible");
 
-    let Secrets { secrets, app_id } = get_secrets(&http_client).await?;
+    let Secrets { app_id } = get_secrets(&http_client).await?;
 
     tracing::debug!("Got login secrets");
 
@@ -110,14 +112,9 @@ pub async fn new(
     let login = login(username, password, &app_id, &base_url, &http_client).await?;
     tracing::debug!("Logged in");
 
-    let active_secret =
-        find_active_secret(secrets, &base_url, &http_client, &app_id, &login.user_token).await?;
-
-    tracing::debug!("Found active secrets");
-
     let client = Client {
         http_client,
-        active_secret,
+        session: None,
         user_token: login.user_token,
         user_id: login.user_id,
         app_id,
@@ -144,6 +141,7 @@ enum Endpoint {
     PlaylistDeleteTracks,
     PlaylistUpdatePosition,
     Search,
+    SessionStart,
     Favorites,
     FavoriteAdd,
     FavoriteRemove,
@@ -173,8 +171,9 @@ impl Display for Endpoint {
             Endpoint::PlaylistDeleteTracks => "playlist/deleteTracks",
             Endpoint::PlaylistUpdatePosition => "playlist/updateTracksPosition",
             Endpoint::Search => "catalog/search",
+            Endpoint::SessionStart => "session/start",
             Endpoint::Track => "track/get",
-            Endpoint::TrackURL => "track/getFileUrl",
+            Endpoint::TrackURL => "file/url",
             Endpoint::UserPlaylist => "playlist/getUserPlaylists",
             Endpoint::Favorites => "favorite/getUserFavorites",
             Endpoint::FavoriteAdd => "favorite/create",
@@ -486,17 +485,88 @@ impl Client {
         ))
     }
 
-    pub async fn track_url(&self, track_id: u32) -> Result<TrackURL> {
-        track_url(
-            track_id,
-            &self.active_secret,
-            &self.base_url,
+    async fn session(&mut self) -> Result<()> {
+        tracing::info!("Renewing session");
+
+        let endpoint = format!("{}{}", &self.base_url, Endpoint::SessionStart);
+        let now = format!("{}", time::OffsetDateTime::now_utc().unix_timestamp());
+
+        let mut args = BTreeMap::<&str, String>::new();
+        args.insert("profile", "qbz-1".to_string());
+
+        let request_sig = get_request_sig("sessionstart", args, &now);
+
+        let mut form_data = HashMap::new();
+        form_data.insert("profile", "qbz-1");
+        form_data.insert("request_ts", now.as_str());
+        form_data.insert("request_sig", request_sig.as_str());
+
+        let result: StartResponse = self.post(&endpoint, form_data).await?;
+
+        tracing::info!("Session renewed: {}", result.session_id);
+        if let Some(infos) = &result.infos {
+            tracing::debug!("Session infos: {}", infos);
+        }
+
+        self.session = Some(result);
+        Ok(())
+    }
+
+    pub fn session_infos(&self) -> Option<&str> {
+        self.session.as_ref().and_then(|s| s.infos.as_deref())
+    }
+
+    pub async fn track_url(&mut self, track_id: u32) -> Result<TrackURL> {
+        if self.session.is_none() {
+            self.session().await?;
+        }
+
+        let endpoint = format!("{}{}", &self.base_url, Endpoint::TrackURL);
+        let now = format!("{}", time::OffsetDateTime::now_utc().unix_timestamp());
+        let quality_string = self.max_audio_quality.to_string();
+        let track_id_str = track_id.to_string();
+
+        let mut args = BTreeMap::<&str, String>::new();
+        args.insert("format_id", quality_string.clone());
+        args.insert("intent", "stream".to_string());
+        args.insert("track_id", track_id_str.clone());
+
+        let request_sig = get_request_sig("fileurl", args, &now);
+
+        let params = vec![
+            ("request_ts", now.as_str()),
+            ("request_sig", request_sig.as_str()),
+            ("track_id", track_id_str.as_str()),
+            ("format_id", quality_string.as_str()),
+            ("intent", "stream"),
+        ];
+
+        let session_id = self.session.as_ref().unwrap().session_id.clone();
+
+        match make_get_call(
+            &endpoint,
+            Some(&params),
             &self.http_client,
             &self.app_id,
-            &self.user_token,
-            &self.max_audio_quality,
+            Some(&self.user_token),
+            Some(&session_id),
         )
         .await
+        {
+            Ok(response) => match serde_json::from_str::<TrackURL>(response.as_str()) {
+                Ok(item) => Ok(item),
+                Err(error) => {
+                    tracing::debug!("TrackURL deserialize error: {}", error);
+                    tracing::debug!("Response was: {}", response);
+                    Err(Error::DeserializeJSON {
+                        message: error.to_string(),
+                    })
+                }
+            },
+            Err(error) => Err(Error::Api {
+                message: error.to_string(),
+            }),
+        }
     }
 
     pub async fn favorites(&self, limit: i32) -> Result<qobuz_player_models::Favorites> {
@@ -804,6 +874,7 @@ impl Client {
             &self.http_client,
             &self.app_id,
             Some(&self.user_token),
+            None,
         )
         .await
     }
@@ -824,80 +895,25 @@ impl Client {
     }
 }
 
-// Check the retrieved secrets to see which one works.
-async fn find_active_secret(
-    secrets: HashMap<String, String>,
-    base_url: &str,
-    client: &reqwest::Client,
-    app_id: &str,
-    user_token: &str,
-) -> Result<String> {
-    tracing::debug!("testing secrets: {secrets:?}");
+fn get_request_sig(method: &str, args: BTreeMap<&str, String>, now_string: &str) -> String {
+    let rng_init = "abb21364945c0583309667d13ca3d93a";
 
-    for (timezone, secret) in secrets.into_iter() {
-        let response = track_url(
-            64868955,
-            &secret,
-            base_url,
-            client,
-            app_id,
-            user_token,
-            &AudioQuality::Mp3,
-        )
-        .await;
-
-        if response.is_ok() {
-            tracing::debug!("found good secret: {}\t{}", timezone, secret);
-            let secret_string = secret;
-
-            return Ok(secret_string);
-        }
+    let mut n = String::new();
+    for (k, v) in args.iter() {
+        n.push_str(k);
+        n.push_str(v);
     }
 
-    Err(Error::ActiveSecret)
+    let req_id = format!("{method}{n}{now_string}{rng_init}");
+    format!("{:x}", md5::compute(req_id.as_bytes()))
 }
 
-async fn track_url(
-    track_id: u32,
-    secret: &str,
-    base_url: &str,
-    client: &reqwest::Client,
-    app_id: &str,
-    user_token: &str,
-    max_audio_quality: &AudioQuality,
-) -> Result<TrackURL> {
-    let endpoint = format!("{}{}", base_url, Endpoint::TrackURL);
-    let now = format!("{}", time::OffsetDateTime::now_utc().unix_timestamp());
-
-    let sig = format!(
-        "trackgetFileUrlformat_id{max_audio_quality}intentstreamtrack_id{track_id}{now}{secret}"
-    );
-
-    let hashed_sig = format!("{:x}", md5::compute(sig.as_str()));
-
-    let track_id = track_id.to_string();
-
-    let quality_string = max_audio_quality.to_string();
-
-    let params = vec![
-        ("request_ts", now.as_str()),
-        ("request_sig", hashed_sig.as_str()),
-        ("track_id", track_id.as_str()),
-        ("format_id", &quality_string),
-        ("intent", "stream"),
-    ];
-
-    match make_get_call(&endpoint, Some(&params), client, app_id, Some(user_token)).await {
-        Ok(response) => match serde_json::from_str(response.as_str()) {
-            Ok(item) => Ok(item),
-            Err(error) => Err(Error::DeserializeJSON {
-                message: error.to_string(),
-            }),
-        },
-        Err(error) => Err(Error::Api {
-            message: error.to_string(),
-        }),
-    }
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct StartResponse {
+    session_id: String,
+    expires_at: u32,
+    #[serde(default)]
+    infos: Option<String>,
 }
 
 async fn handle_response(response: Response) -> Result<String> {
@@ -906,7 +922,7 @@ async fn handle_response(response: Response) -> Result<String> {
         Ok(res)
     } else {
         Err(Error::Api {
-            message: response.status().to_string(),
+            message: response.text().await.unwrap_or_default(),
         })
     }
 }
@@ -917,8 +933,16 @@ async fn make_get_call(
     client: &reqwest::Client,
     app_id: &str,
     user_token: Option<&str>,
+    session: Option<&str>,
 ) -> Result<String> {
-    let headers = client_headers(app_id, user_token);
+    let mut headers = client_headers(app_id, user_token);
+
+    if let Some(session_id) = session {
+        headers.insert(
+            "X-Session-Id",
+            HeaderValue::from_str(session_id).expect("infallible"),
+        );
+    }
 
     tracing::debug!("calling {} endpoint, with params {params:?}", endpoint);
     let request = client.request(Method::GET, endpoint).headers(headers);
@@ -988,7 +1012,7 @@ async fn login(
         ("app_id", app_id),
     ];
 
-    match make_get_call(&endpoint, Some(&params), client, app_id, None).await {
+    match make_get_call(&endpoint, Some(&params), client, app_id, None, None).await {
         Ok(response) => {
             let json: Value = serde_json::from_str(response.as_str())
                 .or(Err(Error::DeserializeJSON { message: response }))?;
@@ -1018,7 +1042,6 @@ async fn login(
 }
 
 struct Secrets {
-    secrets: HashMap<String, String>,
     app_id: String,
 }
 
@@ -1044,11 +1067,6 @@ async fn get_secrets(client: &reqwest::Client) -> Result<Secrets> {
     )
     .map_err(|_| Error::AppID)?;
 
-    let seed_regex = Regex::new(
-        r#"[a-z]\.initialSeed\("(?P<seed>[\w=]+)",window\.utimezone\.(?P<timezone>[a-z]+)\)"#,
-    )
-    .map_err(|_| Error::Login)?;
-
     let bundle_path = bundle_regex
         .captures(&login_html)
         .and_then(|c| c.get(1))
@@ -1071,60 +1089,12 @@ async fn get_secrets(client: &reqwest::Client) -> Result<Secrets> {
         .as_str()
         .to_owned();
 
-    let mut secrets = HashMap::new();
-
-    for seed_cap in seed_regex.captures_iter(&bundle_html) {
-        let seed = seed_cap.name("seed").ok_or(Error::Login)?.as_str();
-        let mut timezone = seed_cap
-            .name("timezone")
-            .ok_or(Error::Login)?
-            .as_str()
-            .to_owned();
-
-        capitalize(timezone.as_mut_str());
-
-        let info_re_str = format!(
-            r#"name:"\w+/(?P<timezone>{}([a-z]?))",info:"(?P<info>[\w=]+)",extras:"(?P<extras>[\w=]+)""#,
-            timezone
-        );
-        let info_re = Regex::new(&info_re_str).map_err(|_| Error::Login)?;
-
-        for c in info_re.captures_iter(&bundle_html) {
-            let tz_full = c.name("timezone").ok_or(Error::Login)?.as_str().to_owned();
-            let info = c.name("info").ok_or(Error::Login)?.as_str();
-            let extras = c.name("extras").ok_or(Error::Login)?.as_str();
-
-            let chars = format!("{seed}{info}{extras}");
-
-            if chars.len() <= 44 {
-                continue;
-            }
-
-            let encoded_secret = &chars[..chars.len() - 44];
-
-            let decoded = general_purpose::URL_SAFE
-                .decode(encoded_secret)
-                .map_err(|_| Error::Login)?;
-            let secret = std::str::from_utf8(&decoded)
-                .map_err(|_| Error::Login)?
-                .to_owned();
-
-            secrets.insert(tz_full, secret);
-        }
-    }
-
-    Ok(Secrets { secrets, app_id })
+    Ok(Secrets { app_id })
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct SuccessfulResponse {
     status: String,
-}
-
-fn capitalize(s: &mut str) {
-    if let Some(r) = s.get_mut(0..1) {
-        r.make_ascii_uppercase();
-    }
 }
 
 fn parse_featured_albums(

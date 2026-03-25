@@ -1,23 +1,31 @@
 use std::{
-    fs,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use crate::{database::Database, notification::NotificationBroadcast};
+use stream_download::{Settings, StreamDownload, storage::temp::TempStorageProvider};
+
+use crate::{
+    AppResult, cmaf, crypto,
+    database::Database,
+    error::Error,
+    flac_source_stream::{
+        FlacSourceParams, FlacSourceStream, SeekableStreamReader, SegmentByteInfo,
+    },
+    notification::NotificationBroadcast,
+};
 use qobuz_player_client::qobuz_models::TrackURL;
 use qobuz_player_models::Track;
-use tokio::{
-    sync::watch::{self, Receiver, Sender},
-    task::JoinHandle,
-};
+
+pub enum DownloadResult {
+    Cached(PathBuf),
+    Streaming(SeekableStreamReader),
+}
 
 pub struct Downloader {
     audio_cache_dir: PathBuf,
     database: Arc<Database>,
     broadcast: Arc<NotificationBroadcast>,
-    done_buffering_tx: Sender<PathBuf>,
-    download_handle: Option<JoinHandle<()>>,
 }
 
 impl Downloader {
@@ -26,75 +34,117 @@ impl Downloader {
         broadcast: Arc<NotificationBroadcast>,
         database: Arc<Database>,
     ) -> Self {
-        let (done_buffering_tx, _) = watch::channel(Default::default());
-
         Self {
             audio_cache_dir,
-            done_buffering_tx,
             database,
             broadcast,
-            download_handle: None,
         }
-    }
-
-    pub fn done_buffering(&self) -> Receiver<PathBuf> {
-        self.done_buffering_tx.subscribe()
     }
 
     pub async fn ensure_track_is_downloaded(
         &mut self,
         track_url: TrackURL,
+        session_infos: Option<&str>,
         track: &Track,
-    ) -> Option<PathBuf> {
-        if let Some(handle) = &self.download_handle {
-            handle.abort();
-            self.download_handle = None;
-        };
-
+    ) -> AppResult<DownloadResult> {
         let cache_path = cache_path(track, &track_url.mime_type, &self.audio_cache_dir);
         self.database.set_cache_entry(cache_path.as_path()).await;
 
         if cache_path.exists() {
-            return Some(cache_path);
+            tracing::info!("Playing from cache: {}", cache_path.display());
+            return Ok(DownloadResult::Cached(cache_path));
         }
 
-        let done_buffering = self.done_buffering_tx.clone();
-        let broadcast = self.broadcast.clone();
+        let n_segments = track_url.n_segments;
 
-        tracing::info!("Downloading: {}", track.title);
-        let handle = tokio::spawn(async move {
-            let Ok(resp) = reqwest::get(&track_url.url).await else {
-                broadcast.send_error("Unable to get track audio file".to_string());
-                return;
-            };
+        tracing::info!("Streaming: {} ({n_segments} segments)", track.title);
 
-            let Ok(body) = resp.bytes().await else {
-                broadcast.send_error("Unable to get audio file bytes".to_string());
-                return;
-            };
-
-            let bytes = body.to_vec();
-
-            if let Some(parent) = cache_path.parent()
-                && let Err(e) = fs::create_dir_all(parent)
-            {
-                broadcast.send_error(format!("Unable to create cache directory: {e}"));
+        let content_key = match (&track_url.key, session_infos) {
+            (Some(key_str), Some(infos)) => {
+                let session_key = crypto::derive_session_key(infos)?;
+                let content_key = crypto::unwrap_content_key(&session_key, key_str)?;
+                tracing::debug!("Derived content key for key_id: {:?}", track_url.key_id);
+                Some(content_key)
             }
-
-            let tmp = cache_path.with_extension("partial");
-            if let Err(e) = fs::write(&tmp, &bytes) {
-                broadcast.send_error(format!("Unable to write cache temp file: {e}"));
-            } else if let Err(e) = fs::rename(&tmp, &cache_path) {
-                let _ = fs::remove_file(&tmp);
-                broadcast.send_error(format!("Unable to finalize cache file: {e}"));
+            _ => {
+                tracing::warn!("No encryption key available");
+                None
             }
+        };
 
-            done_buffering.send(cache_path).expect("infallible");
-        });
+        let seg0_url = track_url.url_template.replace("$SEGMENT$", "0");
+        let init_bytes = fetch_segment(&seg0_url, 0).await?;
+        let init_info = cmaf::parse_init_segment(&init_bytes)?;
 
-        self.download_handle = Some(handle);
-        None
+        tracing::info!(
+            "Init segment: {} bytes, FLAC header: {} bytes",
+            init_bytes.len(),
+            init_info.flac_header.len(),
+        );
+
+        if n_segments < 2 {
+            return Err(Error::StreamError {
+                message: "Track has no audio segments".to_string(),
+            });
+        }
+
+        let flac_header_len = init_info.flac_header.len() as u64;
+        let mut segment_map = Vec::new();
+        let mut cumulative_offset: u64 = 0;
+        for entry in &init_info.segment_table {
+            segment_map.push(SegmentByteInfo {
+                byte_offset: cumulative_offset,
+                byte_len: entry.byte_len as u64,
+            });
+            cumulative_offset += entry.byte_len as u64;
+        }
+        let total_byte_len = flac_header_len + cumulative_offset;
+
+        tracing::info!(
+            "Segment map: {} segments, total FLAC size: {} bytes",
+            segment_map.len(),
+            total_byte_len,
+        );
+
+        let params = FlacSourceParams {
+            url_template: track_url.url_template,
+            n_segments,
+            content_key,
+            flac_header: init_info.flac_header,
+            cache_path,
+            broadcast: self.broadcast.clone(),
+            segment_map: segment_map.clone(),
+            total_byte_len,
+        };
+
+        let reader = StreamDownload::new::<FlacSourceStream>(
+            params,
+            TempStorageProvider::default(),
+            Settings::default().prefetch_bytes(4096),
+        )
+        .await
+        .map_err(|e| Error::StreamError {
+            message: format!("Failed to create stream: {e}"),
+        })?;
+
+        let seekable = SeekableStreamReader::new(reader, total_byte_len);
+
+        Ok(DownloadResult::Streaming(seekable))
     }
+}
+
+async fn fetch_segment(url: &str, index: u8) -> AppResult<Vec<u8>> {
+    let bytes = reqwest::get(url)
+        .await
+        .map_err(|e| Error::StreamError {
+            message: format!("Failed to fetch segment {index}: {e}"),
+        })?
+        .bytes()
+        .await
+        .map_err(|e| Error::StreamError {
+            message: format!("Failed to read segment {index} bytes: {e}"),
+        })?;
+    Ok(bytes.to_vec())
 }
 
 fn cache_path(track: &Track, mime: &str, audio_cache_dir: &Path) -> PathBuf {
@@ -117,7 +167,11 @@ fn cache_path(track: &Track, mime: &str, audio_cache_dir: &Path) -> PathBuf {
         sanitize_name(album_title),
         sanitize_name(album_id),
     );
-    let extension = guess_extension(mime);
+    let extension = if mime.contains("flac") || mime.contains("mp4") {
+        "flac"
+    } else {
+        &guess_extension(mime)
+    };
     let track_file = format!(
         "{}_{}.{extension}",
         track.number,
@@ -167,10 +221,9 @@ fn sanitize_name(input: &str) -> String {
 
 fn guess_extension(mime: &str) -> String {
     match mime {
-        m if m.contains("mp4") => "mp4".to_string(),
+        m if m.contains("flac") => "flac".to_string(),
         m if m.contains("mpeg") => "mp3".to_string(),
         m if m.contains("mp3") => "mp3".to_string(),
-        m if m.contains("flac") => "flac".to_string(),
         _ => "unknown".to_string(),
     }
 }

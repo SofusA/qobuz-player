@@ -5,9 +5,8 @@ use qobuz_player_models::{
     Album, AlbumSimple, ArtistPage, Favorites, Genre, Playlist, PlaylistSimple, SearchResults,
     Track,
 };
-use std::sync::OnceLock;
 use time::Duration;
-use tokio::sync::Mutex;
+use tokio::sync::{OnceCell, RwLock};
 
 use crate::{AppResult, error::Error, simple_cache::SimpleCache};
 
@@ -16,11 +15,10 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
 pub struct Client {
-    qobuz_client: OnceLock<QobuzClient>,
+    qobuz_client: OnceCell<RwLock<QobuzClient>>,
     username: String,
     password: String,
     max_audio_quality: AudioQuality,
-    client_initiated: Mutex<bool>,
     favorites_cache: SimpleCache<Favorites>,
     featured_albums_cache: SimpleCache<Vec<(String, Vec<AlbumSimple>)>>,
     featured_playlists_cache: SimpleCache<Vec<(String, Vec<Playlist>)>>,
@@ -35,10 +33,11 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn app_id(&self) -> AppResult<&str> {
+    pub async fn app_id(&self) -> AppResult<String> {
         let client = self.get_client().await?;
-        Ok(client.app_id())
+        Ok(client.app_id().to_string())
     }
+
     pub fn new(username: String, password: String, max_audio_quality: AudioQuality) -> Self {
         let album_cache = moka::future::CacheBuilder::new(1000)
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24 * 7))
@@ -73,7 +72,6 @@ impl Client {
             username,
             password,
             max_audio_quality,
-            client_initiated: Mutex::new(false),
             favorites_cache: SimpleCache::new(Duration::days(1)),
             featured_albums_cache: SimpleCache::new(Duration::days(1)),
             featured_playlists_cache: SimpleCache::new(Duration::days(1)),
@@ -99,31 +97,35 @@ impl Client {
         Ok(client)
     }
 
-    async fn get_client(&self) -> Result<&QobuzClient> {
-        if let Some(client) = self.qobuz_client.get() {
-            return Ok(client);
-        }
+    async fn get_client(&self) -> Result<tokio::sync::RwLockReadGuard<'_, QobuzClient>> {
+        let cell = self
+            .qobuz_client
+            .get_or_try_init(|| async {
+                let client = self.init_client().await?;
+                Ok::<_, Error>(RwLock::new(client))
+            })
+            .await?;
 
-        let mut initiated = self.client_initiated.lock().await;
-
-        if !*initiated {
-            let client = self.init_client().await?;
-
-            self.qobuz_client.set(client).or(Err(Error::Client {
-                message: "Unable to set client".into(),
-            }))?;
-            *initiated = true;
-            drop(initiated);
-        }
-
-        self.qobuz_client.get().ok_or_else(|| Error::Client {
-            message: "Unable to acquire client lock".to_string(),
-        })
+        Ok(cell.read().await)
     }
 
-    pub async fn track_url(&self, track_id: u32) -> Result<TrackURL> {
-        let client = self.get_client().await?;
-        Ok(client.track_url(track_id).await?)
+    async fn get_client_mut(&self) -> Result<tokio::sync::RwLockWriteGuard<'_, QobuzClient>> {
+        let cell = self
+            .qobuz_client
+            .get_or_try_init(|| async {
+                let client = self.init_client().await?;
+                Ok::<_, Error>(RwLock::new(client))
+            })
+            .await?;
+
+        Ok(cell.write().await)
+    }
+
+    pub async fn track_url(&self, track_id: u32) -> Result<(TrackURL, Option<String>)> {
+        let mut client = self.get_client_mut().await?;
+        let track_url = client.track_url(track_id).await?;
+        let infos = client.session_infos().map(|s| s.to_string());
+        Ok((track_url, infos))
     }
 
     pub async fn album(&self, id: &str) -> Result<Album> {

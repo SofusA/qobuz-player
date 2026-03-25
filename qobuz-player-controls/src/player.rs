@@ -14,12 +14,12 @@ use crate::{
     VolumeReceiver,
     controls::{ControlCommand, Controls, NewQueueItem},
     database::Database,
-    downloader::Downloader,
+    downloader::{DownloadResult, Downloader},
     notification::{Notification, NotificationBroadcast},
     sink::QueryTrackResult,
     tracklist::{QueueItem, TracklistType},
 };
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use crate::{
     client::Client,
@@ -39,7 +39,6 @@ pub struct Player {
     volume: Sender<f32>,
     position: Sender<Duration>,
     track_finished: Receiver<()>,
-    done_buffering: Receiver<PathBuf>,
     controls_rx: mpsc::UnboundedReceiver<ControlCommand>,
     controls: Controls,
     database: Arc<Database>,
@@ -57,7 +56,7 @@ impl Player {
         client: Arc<Client>,
         volume: f32,
         broadcast: Arc<NotificationBroadcast>,
-        audio_cache_dir: PathBuf,
+        audio_cache_dir: std::path::PathBuf,
         database: Arc<Database>,
         state_change_delay: Option<Duration>,
         sample_rate_change_delay: Option<Duration>,
@@ -69,7 +68,6 @@ impl Player {
         let downloader = Downloader::new(audio_cache_dir, broadcast.clone(), database.clone());
 
         let track_finished = sink.track_finished();
-        let done_buffering = downloader.done_buffering();
 
         let (position, _) = watch::channel(Default::default());
         let (target_status, _) = watch::channel(Default::default());
@@ -90,7 +88,6 @@ impl Player {
             volume,
             position,
             track_finished,
-            done_buffering,
             database,
             next_track_in_sink_queue: false,
             next_track_is_queried: false,
@@ -181,33 +178,33 @@ impl Player {
             self.next_track_is_queried = true;
         }
 
-        let track_url = self.client.track_url(track.id).await?;
-        if let Some(track_path) = self
+        let (track_url, session_infos) = self.client.track_url(track.id).await?;
+        let download_result = self
             .downloader
-            .ensure_track_is_downloaded(track_url, track)
-            .await
-        {
-            self.wait_for_state_change_delay().await;
-            let query_result = self.sink.query_track(&track_path)?;
+            .ensure_track_is_downloaded(track_url, session_infos.as_deref(), track)
+            .await?;
 
-            if next_track {
-                self.next_track_in_sink_queue = match query_result {
-                    QueryTrackResult::Queued => {
-                        tracing::info!("In queue");
-                        true
-                    }
-                    QueryTrackResult::RecreateStreamRequired => {
-                        tracing::info!("Not in queue");
-                        false
-                    }
-                };
-            }
-            self.sink.play();
-            self.set_target_status(Status::Playing);
-        } else {
-            tracing::info!("Buffering track: {}", &track.title);
-            self.set_target_status(Status::Buffering);
+        self.wait_for_state_change_delay().await;
+
+        let query_result = match download_result {
+            DownloadResult::Cached(track_path) => self.sink.query_track(&track_path)?,
+            DownloadResult::Streaming(reader) => self.sink.query_track_stream(reader)?,
+        };
+
+        if next_track {
+            self.next_track_in_sink_queue = match query_result {
+                QueryTrackResult::Queued => {
+                    tracing::info!("In queue");
+                    true
+                }
+                QueryTrackResult::RecreateStreamRequired => {
+                    tracing::info!("Not in queue");
+                    false
+                }
+            };
         }
+        self.sink.play();
+        self.set_target_status(Status::Playing);
 
         Ok(())
     }
@@ -226,8 +223,14 @@ impl Player {
     }
 
     fn seek(&mut self, duration: Duration) -> AppResult<()> {
-        self.sink.seek(duration)?;
-        self.position.send(self.sink.position())?;
+        match self.sink.seek(duration) {
+            Ok(()) => {
+                self.position.send(self.sink.position())?;
+            }
+            Err(e) => {
+                tracing::warn!("Seek to {:?} failed: {e:?}", duration);
+            }
+        }
         Ok(())
     }
 
@@ -653,19 +656,6 @@ impl Player {
         Ok(())
     }
 
-    async fn done_buffering(&mut self, path: PathBuf) -> AppResult<()> {
-        self.wait_for_state_change_delay().await;
-        self.set_target_status(Status::Playing);
-
-        tracing::info!("Done buffering track: {}", path.to_string_lossy());
-
-        self.next_track_in_sink_queue = match self.sink.query_track(&path)? {
-            QueryTrackResult::Queued => true,
-            QueryTrackResult::RecreateStreamRequired => false,
-        };
-        Ok(())
-    }
-
     pub async fn player_loop(&mut self, mut exit_receiver: ExitReceiver) -> AppResult<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(INTERVAL_MS));
 
@@ -689,12 +679,6 @@ impl Player {
                     };
                 }
 
-                Ok(_) = self.done_buffering.changed() => {
-                    let path = self.done_buffering.borrow_and_update().clone();
-                    if let Err(err) = self.done_buffering(path).await {
-                        self.broadcast.send_error(err.to_string());
-                    };
-                }
                 Ok(exit) = exit_receiver.recv() => {
                     if exit {
                         break Ok(());

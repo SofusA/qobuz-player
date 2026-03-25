@@ -204,11 +204,28 @@ pub async fn run() -> Result<(), Error> {
         _ => cli.verbosity,
     };
 
-    tracing_subscriber::fmt()
-        .with_max_level(verbosity)
-        .with_target(false)
-        .compact()
-        .init();
+    {
+        use tracing_subscriber::EnvFilter;
+
+        let level_str = match verbosity {
+            Some(tracing::Level::TRACE) => "trace",
+            Some(tracing::Level::DEBUG) => "debug",
+            Some(tracing::Level::INFO) => "info",
+            Some(tracing::Level::WARN) => "warn",
+            Some(tracing::Level::ERROR) => "error",
+            None => "info",
+        };
+
+        let filter = EnvFilter::new(format!(
+            "{level_str},stream_download=warn,hyper=warn,reqwest=warn,rustls=warn"
+        ));
+
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_target(false)
+            .compact()
+            .init();
+    }
 
     match cli.command.unwrap_or(Commands::Open {
         username: Default::default(),
@@ -315,7 +332,7 @@ pub async fn run() -> Result<(), Error> {
             )?;
 
             if connect {
-                let app_id = client.app_id().await?.to_string();
+                let app_id = client.app_id().await?;
                 let position_receiver = player.position();
                 let tracklist_receiver = player.tracklist();
                 let volume_receiver = player.volume();
