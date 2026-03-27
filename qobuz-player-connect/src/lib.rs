@@ -11,7 +11,7 @@ pub use qonductor::Error;
 use qonductor::{
     ActivationState, BufferState, Command, DeviceConfig, DeviceSession, Notification, PlayingState,
     SessionEvent, SessionManager,
-    msg::{self, Position, QueueRendererState},
+    msg::{self, Position, QueueRendererState, report::VolumeChanged},
 };
 
 struct ConnectState {
@@ -252,6 +252,20 @@ impl ConnectState {
                         max_quality: self.audio_quality,
                         playback: response,
                     });
+                }
+                Command::SetVolume { cmd, respond } => {
+                    let volume = cmd.volume;
+                    tracing::info!("Volume command received: {:?}", volume);
+
+                    let current_volume = convert_volume(*self.volume_receiver.borrow());
+
+                    if let Some(volume) = volume
+                        && volume != current_volume
+                    {
+                        self.controls.set_volume(volume as f32 / 100.0);
+                    }
+
+                    respond.send(VolumeChanged { volume: volume });
                 }
                 Command::Heartbeat { respond } => {
                     let status = self.status_receiver.borrow();
