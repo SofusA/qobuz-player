@@ -1,5 +1,8 @@
 use qobuz_player_controls::{
-    AppResult, client::Client, controls::Controls, notification::Notification,
+    AppResult,
+    client::Client,
+    controls::{Controls, NewQueueItem},
+    notification::Notification,
 };
 use qobuz_player_models::AlbumSimple;
 use ratatui::{
@@ -114,7 +117,10 @@ impl AlbumList {
                         .await?
                         .tracks
                         .into_iter()
-                        .map(|x| x.id)
+                        .map(|x| NewQueueItem {
+                            track_id: x.id,
+                            queue_id: None,
+                        })
                         .collect();
                     controls.add_tracks_to_queue(ids);
                 }

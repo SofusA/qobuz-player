@@ -12,7 +12,8 @@ use axum::{
 };
 use axum_extra::extract::Form;
 use qobuz_player_controls::{
-    AppResult, client::Client, database::ReferenceType, notification::Notification,
+    AppResult, client::Client, controls::NewQueueItem, database::ReferenceType,
+    notification::Notification,
 };
 use qobuz_player_models::{AlbumSimple, Artist, Playlist, Track};
 use qobuz_player_rfid::{LinkAlbumRfid, LinkPlaylistRfid, handle_play_scan};
@@ -93,7 +94,10 @@ async fn track_action(
             Ok(state.send_toast(Notification::Info("Track removed from favorites".into())))
         }
         TrackAction::AddToQueue => {
-            state.controls.add_tracks_to_queue(vec![req.track_id]);
+            state.controls.add_tracks_to_queue(vec![NewQueueItem {
+                track_id: req.track_id,
+                queue_id: None,
+            }]);
             state.send_sse("tracklist".into(), "Track added to queue".into());
             Ok(state.send_toast(Notification::Info("Track added to queue".into())))
         }

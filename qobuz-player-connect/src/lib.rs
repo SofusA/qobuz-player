@@ -201,8 +201,6 @@ impl ConnectState {
                 Command::SetState { cmd, respond } => {
                     tracing::info!("Set state message received");
                     tracing::info!("{:?}", cmd);
-                    let response = msg::QueueRendererState::default();
-
                     match cmd.playing_state() {
                         PlayingState::Stopped | PlayingState::Paused => {
                             self.controls.pause();
@@ -232,10 +230,15 @@ impl ConnectState {
                     if let Some(tracklist_position) = tracklist_position
                         && current_position != tracklist_position
                     {
-                        self.controls.skip_to_position(tracklist_position, true);
+                        self.controls.skip_to_queue_item(tracklist_position);
+                        self.controls.seek(Duration::from_secs(0));
                     }
 
-                    respond.send(response);
+                    respond.send(current_state(
+                        &self.status_receiver.borrow_and_update(),
+                        &self.position_receiver.borrow_and_update(),
+                        &self.tracklist_receiver.borrow_and_update(),
+                    ));
                 }
                 Command::SetActive { respond, cmd: _cmd } => {
                     tracing::info!("Device activated!");
@@ -296,7 +299,7 @@ impl ConnectState {
                         .into_iter()
                         .map(|x| NewQueueItem {
                             track_id: x.track_id(),
-                            queue_id: x.queue_item_id(),
+                            queue_id: Some(x.queue_item_id()),
                         })
                         .collect();
                     self.controls.new_queue(queue_items, false);
@@ -315,7 +318,7 @@ impl ConnectState {
                         .into_iter()
                         .map(|x| NewQueueItem {
                             track_id: x.track_id(),
-                            queue_id: x.queue_item_id(),
+                            queue_id: Some(x.queue_item_id()),
                         })
                         .collect();
                     self.controls.new_queue(queue_items, false);
@@ -333,10 +336,37 @@ impl ConnectState {
                 Notification::QueueTracksAdded(queue_tracks_added) => {
                     // Added in end of queue
                     tracing::info!("Queue tracks added: {:?}", queue_tracks_added);
+
+                    self.controls.add_tracks_to_queue(
+                        queue_tracks_added
+                            .tracks
+                            .into_iter()
+                            .map(|x| NewQueueItem {
+                                track_id: x.track_id(),
+                                queue_id: Some(x.queue_item_id()),
+                            })
+                            .collect(),
+                    );
                 }
                 Notification::QueueTracksInserted(queue_tracks_inserted) => {
                     // Next in queue
                     tracing::info!("Queue tracks inserted: {:?}", queue_tracks_inserted);
+
+                    let insert_after = queue_tracks_inserted.insert_after.map(|x| x as usize);
+
+                    let new_tracks = queue_tracks_inserted
+                        .tracks
+                        .into_iter()
+                        .map(|x| NewQueueItem {
+                            track_id: x.track_id(),
+                            queue_id: Some(x.queue_item_id()),
+                        })
+                        .collect();
+
+                    if let Some(insert_after) = insert_after {
+                        self.controls
+                            .insert_tracks_to_queue(new_tracks, insert_after);
+                    }
                 }
                 Notification::QueueTracksRemoved(queue_tracks_removed) => {
                     tracing::info!("Queue tracks removed: {:?}", queue_tracks_removed);

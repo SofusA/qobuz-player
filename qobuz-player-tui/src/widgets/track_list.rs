@@ -1,5 +1,8 @@
 use qobuz_player_controls::{
-    AppResult, client::Client, controls::Controls, notification::Notification,
+    AppResult,
+    client::Client,
+    controls::{Controls, NewQueueItem},
+    notification::Notification,
 };
 use qobuz_player_models::Track;
 use ratatui::{
@@ -106,7 +109,10 @@ impl TrackList {
                 let selected = index.and_then(|index| self.items.filter().get(index));
 
                 if let Some(selected) = selected {
-                    controls.add_tracks_to_queue(vec![selected.id]);
+                    controls.add_tracks_to_queue(vec![NewQueueItem {
+                        track_id: selected.id,
+                        queue_id: None,
+                    }]);
                 };
                 Ok(Output::Consumed)
             }

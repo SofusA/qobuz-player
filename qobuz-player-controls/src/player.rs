@@ -301,6 +301,14 @@ impl Player {
         Ok(())
     }
 
+    async fn skip_to_queue_item(&mut self, new_position: usize) -> AppResult<()> {
+        let mut tracklist = self.tracklist_rx.borrow().clone();
+        tracklist.skip_to_queue_item(new_position);
+        self.broadcast_tracklist(tracklist).await?;
+
+        Ok(())
+    }
+
     async fn next(&mut self) -> AppResult<()> {
         let current_position = self.tracklist_rx.borrow().current_position();
         self.skip_to_position((current_position + 1) as i32, true)
@@ -338,7 +346,10 @@ impl Player {
             let track = self.client.track(item.track_id).await?;
             let queue_item = QueueItem {
                 track,
-                id: item.queue_id,
+                id: match item.queue_id {
+                    Some(id) => id,
+                    None => 0,
+                },
             };
             queue_items.push(queue_item);
         }
@@ -476,18 +487,48 @@ impl Player {
         Ok(())
     }
 
-    async fn add_tracks_to_queue(&mut self, ids: Vec<u32>) -> AppResult<()> {
+    async fn add_tracks_to_queue(&mut self, tracks: Vec<NewQueueItem>) -> AppResult<()> {
+        let tracklist = self.tracklist_rx.borrow().clone();
+        let last_track_id = tracklist.queue().last().map(|x| x.id as usize);
+
+        if let Some(last_track_id) = last_track_id {
+            return self.insert_tracks_to_queue(tracks, last_track_id).await;
+        }
+
+        self.insert_tracks_to_queue(tracks, 0).await
+    }
+
+    async fn insert_tracks_to_queue(
+        &mut self,
+        tracks: Vec<NewQueueItem>,
+        after: usize,
+    ) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         tracklist.set_list_type(TracklistType::Tracks);
 
-        let tracks = self.client.tracks(ids).await?;
-        let track_titles: Vec<_> = tracks.iter().map(|x| x.title.clone()).collect();
+        let client_tracks = self
+            .client
+            .tracks(tracks.clone().into_iter().map(|t| t.track_id).collect())
+            .await?;
+        let track_titles: Vec<_> = client_tracks.iter().map(|x| x.title.clone()).collect();
         let track_titles = track_titles.join(", ");
 
         let notification = Notification::Info(format!("{} added to queue", track_titles));
 
-        for track in tracks {
-            tracklist.push_track(track);
+        let queue_index = tracklist
+            .queue_ids()
+            .into_iter()
+            .enumerate()
+            .find(|(_i, t)| *t == after as u64)
+            .map(|(i, _track)| i + 1)
+            .unwrap_or(0);
+
+        for (i, (track, client_track)) in tracks.into_iter().zip(client_tracks).enumerate() {
+            tracklist.insert_track(
+                queue_index + i,
+                client_track,
+                track.queue_id,
+            );
         }
 
         self.update_queue(tracklist).await?;
@@ -509,7 +550,7 @@ impl Player {
 
         tracks.reverse();
         for track in tracks {
-            tracklist.insert_track(current_index + 1, track);
+            tracklist.insert_track(current_index + 1, track, None);
         }
 
         self.update_queue(tracklist).await?;
@@ -597,6 +638,9 @@ impl Player {
             } => {
                 self.skip_to_position(new_position as i32, force).await?;
             }
+            ControlCommand::SkipToQueueItem { new_position } => {
+                self.skip_to_queue_item(new_position).await?;
+            }
             ControlCommand::JumpForward => {
                 self.jump_forward()?;
             }
@@ -609,7 +653,10 @@ impl Player {
             ControlCommand::SetVolume { volume } => {
                 self.set_volume(volume).await?;
             }
-            ControlCommand::AddTracksToQueue { ids } => self.add_tracks_to_queue(ids).await?,
+            ControlCommand::AddTracksToQueue { tracks } => self.add_tracks_to_queue(tracks).await?,
+            ControlCommand::InsertTracksToQueue { tracks, after } => {
+                self.insert_tracks_to_queue(tracks, after).await?
+            }
             ControlCommand::RemoveIndexFromQueue { index } => {
                 self.remove_index_from_queue(index).await?
             }

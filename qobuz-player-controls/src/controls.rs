@@ -22,6 +22,9 @@ pub enum ControlCommand {
         new_position: usize,
         force: bool,
     },
+    SkipToQueueItem {
+        new_position: usize,
+    },
     Next,
     Previous,
     PlayPause,
@@ -36,7 +39,11 @@ pub enum ControlCommand {
         volume: f32,
     },
     AddTracksToQueue {
-        ids: Vec<u32>,
+        tracks: Vec<NewQueueItem>,
+    },
+    InsertTracksToQueue {
+        tracks: Vec<NewQueueItem>,
+        after: usize,
     },
     RemoveIndexFromQueue {
         index: usize,
@@ -105,9 +112,15 @@ impl Controls {
             .expect("infallible");
     }
 
-    pub fn add_tracks_to_queue(&self, ids: Vec<u32>) {
+    pub fn add_tracks_to_queue(&self, tracks: Vec<NewQueueItem>) {
         self.tx
-            .send(ControlCommand::AddTracksToQueue { ids })
+            .send(ControlCommand::AddTracksToQueue { tracks })
+            .expect("infallible");
+    }
+
+    pub fn insert_tracks_to_queue(&self, tracks: Vec<NewQueueItem>, after: usize) {
+        self.tx
+            .send(ControlCommand::InsertTracksToQueue { tracks, after })
             .expect("infallible");
     }
 
@@ -134,6 +147,14 @@ impl Controls {
             .send(ControlCommand::SkipToPosition {
                 new_position: index,
                 force,
+            })
+            .expect("infallible");
+    }
+
+    pub fn skip_to_queue_item(&self, index: usize) {
+        self.tx
+            .send(ControlCommand::SkipToQueueItem {
+                new_position: index,
             })
             .expect("infallible");
     }
@@ -184,5 +205,5 @@ impl Controls {
 #[derive(Debug, Copy, Clone)]
 pub struct NewQueueItem {
     pub track_id: u32,
-    pub queue_id: u64,
+    pub queue_id: Option<u64>,
 }
