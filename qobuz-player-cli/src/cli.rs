@@ -440,8 +440,9 @@ pub async fn run() -> Result<(), Error> {
             }
 
             if gtk {
+                let client = client.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = qobuz_player_gtk::init().await {
+                    if let Err(e) = qobuz_player_gtk::init(client).await {
                         error_exit(e.into());
                     }
                 });

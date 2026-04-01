@@ -1,7 +1,11 @@
-use libadwaita::{Application, ApplicationWindow, prelude::*};
-use qobuz_player_controls::AppResult;
+use std::sync::Arc;
 
-pub async fn init() -> AppResult<()> {
+use libadwaita::{Application, ApplicationWindow, prelude::*};
+use qobuz_player_controls::{AppResult, client::Client};
+
+mod ui;
+
+pub async fn init(_client: Arc<Client>) -> AppResult<()> {
     libadwaita::init().unwrap();
 
     let application = libadwaita::Application::builder()
