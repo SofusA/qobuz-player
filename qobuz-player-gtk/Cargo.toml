@@ -1,0 +1,28 @@
+[package]
+name = "qobuz-player-gtk"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[[bin]]
+name = "qobuz-player-gtk"
+path = "src/main.rs"
+
+[dependencies]
+qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
+qobuz-player-mpris = { version = "*", path = "../qobuz-player-mpris" }
+qobuz-player-connect = { version = "*", path = "../qobuz-player-connect" }
+qobuz-player-cli = { version = "*", path = "../qobuz-player-cli" }
+
+gtk4 = {version = "0.11", features = ["v4_8"] }
+libadwaita = "0.9" 
+glib = "0.22"
+async-channel = "2.5"
+
+tokio.workspace = true
+futures.workspace = true
+snafu.workspace = true 
+clap.workspace = true
+tracing.workspace = true

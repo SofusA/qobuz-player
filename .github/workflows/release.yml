@@ -75,3 +75,11 @@ jobs:
           target: ${{ matrix.target }}
           features: ${{ matrix.features || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and upload qobuz-player-gtk
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: qobuz-player-gtk
+          target: ${{ matrix.target }}
+          features: ${{ matrix.features || '' }}
+          token: ${{ secrets.GITHUB_TOKEN }}
