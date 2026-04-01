@@ -17,6 +17,7 @@ qobuz-player-tui = { version = "*", path = "../qobuz-player-tui" }
 qobuz-player-rfid = { version = "*", path = "../qobuz-player-rfid" }
 qobuz-player-connect = { version = "*", path = "../qobuz-player-connect" }
 qobuz-player-gpio = { version = "*", path = "../qobuz-player-gpio", optional = true }
+qobuz-player-gtk = { version = "*", path = "../qobuz-player-gtk" }
 
 clap.workspace = true
 snafu.workspace = true

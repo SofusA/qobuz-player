@@ -32,16 +32,16 @@ pub enum TracklistType {
     Tracks,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-pub struct Tracklist {
-    queue: Vec<QueueItem>,
-    list_type: TracklistType,
-}
-
 pub struct Entity {
     pub title: Option<String>,
     pub link: Option<String>,
     pub cover_link: Option<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct Tracklist {
+    queue: Vec<QueueItem>,
+    list_type: TracklistType,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]

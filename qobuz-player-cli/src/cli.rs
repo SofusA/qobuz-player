@@ -95,6 +95,10 @@ enum Commands {
         /// Specify port for the web server
         port: u16,
 
+        #[clap(short, long, default_value_t = false)]
+        /// Start gtk app and ui
+        gtk: bool,
+
         #[clap(long, default_value_t = false)]
         /// Enable rfid interface
         rfid: bool,
@@ -242,6 +246,7 @@ pub async fn run() -> Result<(), Error> {
         connect_name: Default::default(),
         web: Default::default(),
         web_secret: Default::default(),
+        gtk: Default::default(),
         rfid: Default::default(),
         rfid_server_base_address: Default::default(),
         rfid_server_secret: Default::default(),
@@ -268,6 +273,7 @@ pub async fn run() -> Result<(), Error> {
             connect_name,
             web,
             web_secret,
+            gtk,
             rfid,
             rfid_server_base_address,
             rfid_server_secret,
@@ -428,6 +434,14 @@ pub async fn run() -> Result<(), Error> {
                 let status_receiver = player.status();
                 tokio::spawn(async move {
                     if let Err(e) = qobuz_player_gpio::init(status_receiver).await {
+                        error_exit(e.into());
+                    }
+                });
+            }
+
+            if gtk {
+                tokio::spawn(async move {
+                    if let Err(e) = qobuz_player_gtk::init().await {
                         error_exit(e.into());
                     }
                 });

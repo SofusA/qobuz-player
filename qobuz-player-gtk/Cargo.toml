@@ -1,0 +1,18 @@
+[package]
+name = "qobuz-player-gtk"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
+qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
+
+gtk4 = "0.11"
+libadwaita = "0.9" 
+
+tokio.workspace = true
+futures.workspace = true
+snafu.workspace = true 

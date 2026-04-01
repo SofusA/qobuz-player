@@ -9,7 +9,7 @@ members = [
   "qobuz-player-gpio",
   "qobuz-player-rfid",
   "qobuz-player-models",
-  "qobuz-player-connect",
+  "qobuz-player-connect", "qobuz-player-gtk",
 ]
 resolver = "2"
 
