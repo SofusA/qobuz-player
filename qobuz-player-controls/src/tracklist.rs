@@ -186,23 +186,23 @@ impl Tracklist {
 
     pub fn entity_playing(&self) -> Entity {
         let current_track = self.current_track();
-        let cover_link = current_track.as_ref().and_then(|track| track.image.clone());
+        let track_image = current_track.as_ref().and_then(|track| track.image.clone());
 
         match self.list_type() {
             TracklistType::Album(tracklist) => Entity {
                 title: Some(tracklist.title.clone()),
                 link: Some(format!("/album/{}", tracklist.id)),
-                cover_link,
+                cover_link: tracklist.image.clone().or(track_image),
             },
             TracklistType::Playlist(tracklist) => Entity {
                 title: Some(tracklist.title.clone()),
                 link: Some(format!("/playlist/{}", tracklist.id)),
-                cover_link,
+                cover_link: tracklist.image.clone().or(track_image),
             },
             TracklistType::TopTracks(tracklist) => Entity {
                 title: Some(tracklist.artist_name.clone()),
                 link: Some(format!("/artist/{}", tracklist.id)),
-                cover_link,
+                cover_link: tracklist.image.clone().or(track_image),
             },
             TracklistType::Tracks => Entity {
                 title: current_track
@@ -211,7 +211,7 @@ impl Tracklist {
                 link: current_track
                     .as_ref()
                     .and_then(|track| track.album_id.as_ref().map(|id| format!("/album/{id}"))),
-                cover_link,
+                cover_link: track_image,
             },
         }
     }

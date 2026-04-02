@@ -68,6 +68,7 @@ pub struct App {
     pub notifications: NotificationList,
     pub full_screen: bool,
     pub disable_tui_album_cover: bool,
+    pub current_image_url: Option<String>,
 }
 
 #[derive(Default)]
@@ -163,6 +164,8 @@ impl App {
         let mut tick_interval = time::interval(Duration::from_millis(100));
         let mut receiver = self.broadcast.subscribe();
         let mut event_stream = EventStream::new();
+        let (image_tx, mut image_rx) =
+            tokio::sync::mpsc::channel::<Option<(StatefulProtocol, f32)>>(1);
 
         while !self.exit {
             tokio::select! {
@@ -184,9 +187,29 @@ impl App {
                     let tracklist = self.tracklist.borrow_and_update().clone();
                     self.queue.set_items(tracklist.queue().into_iter().cloned().collect());
                     let status = self.now_playing.status;
-                    self.now_playing = get_current_state(tracklist, status).await;
+                    let (mut new_state, image_url) = get_current_state_without_image(&tracklist, status);
+
+                    if image_url == self.current_image_url {
+                        new_state.image = self.now_playing.image.take();
+                    } else if !self.disable_tui_album_cover {
+                        if let Some(url) = image_url.clone() {
+                            let tx = image_tx.clone();
+                            tokio::spawn(async move {
+                                let result = fetch_image(&url).await;
+                                let _ = tx.send(result).await;
+                            });
+                        }
+                        self.current_image_url = image_url;
+                    }
+
+                    self.now_playing = new_state;
                     self.should_draw = true;
                 },
+
+                Some(image) = image_rx.recv() => {
+                    self.now_playing.image = image;
+                    self.should_draw = true;
+                }
 
                 Ok(_) = self.status.changed() => {
                     let status = self.status.borrow_and_update();
@@ -509,32 +532,33 @@ async fn fetch_image(image_url: &str) -> Option<(StatefulProtocol, f32)> {
     let response = client.get(image_url).send().await.ok()?;
     let img_bytes = response.bytes().await.ok()?;
 
-    let image = load_from_memory(&img_bytes).ok()?;
-    let ratio = image.width() as f32 / image.height() as f32;
-
-    let picker = Picker::from_query_stdio().ok()?;
-    Some((picker.new_resize_protocol(image), ratio))
+    tokio::task::spawn_blocking(move || {
+        let image = load_from_memory(&img_bytes).ok()?;
+        let ratio = image.width() as f32 / image.height() as f32;
+        let picker = Picker::from_query_stdio().ok()?;
+        Some((picker.new_resize_protocol(image), ratio))
+    })
+    .await
+    .ok()?
 }
 
-pub async fn get_current_state(tracklist: Tracklist, status: Status) -> NowPlayingState {
+pub fn get_current_state_without_image(
+    tracklist: &Tracklist,
+    status: Status,
+) -> (NowPlayingState, Option<String>) {
     let entity = tracklist.entity_playing();
     let track = tracklist.current_track().cloned();
-    let image = if let Some(image_url) = entity.cover_link {
-        Some(fetch_image(&image_url).await)
-    } else {
-        None
-    }
-    .flatten();
+    let image_url = entity.cover_link.clone();
 
-    let tracklist_length = tracklist.total();
-
-    NowPlayingState {
-        image,
+    let state = NowPlayingState {
+        image: None,
         entity_title: entity.title,
         playing_track: track,
-        tracklist_length,
+        tracklist_length: tracklist.total(),
         status,
         tracklist_position: tracklist.current_position(),
         duration_ms: 0,
-    }
+    };
+
+    (state, image_url)
 }

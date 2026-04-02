@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use app::{App, get_current_state};
+use app::{App, get_current_state_without_image};
 use favorites::FavoritesState;
 use qobuz_player_controls::{
     AppResult, ExitSender, PositionReceiver, StatusReceiver, TracklistReceiver, client::Client,
@@ -40,7 +40,8 @@ pub async fn init(
     let tracklist_value = tracklist_receiver.borrow().clone();
     let status_value = *status_receiver.borrow();
     let queue = tracklist_value.queue().into_iter().cloned().collect();
-    let now_playing = get_current_state(tracklist_value, status_value).await;
+    let (now_playing, current_image_url) =
+        get_current_state_without_image(&tracklist_value, status_value);
 
     let mut app = App {
         broadcast,
@@ -56,6 +57,7 @@ pub async fn init(
         should_draw: true,
         app_state: Default::default(),
         disable_tui_album_cover,
+        current_image_url,
         favorites: FavoritesState::new(&client).await?,
         search: Default::default(),
         queue: QueueState::new(queue),
