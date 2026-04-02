@@ -1,5 +1,6 @@
 use qobuz_player_controls::notification::Notification;
 use ratatui::{layout::Flex, prelude::*, widgets::*};
+use ratatui_image::protocol::StatefulProtocol;
 use tui_input::Input;
 
 use crate::{
@@ -21,11 +22,19 @@ impl App {
             render_help(frame);
         }
 
+        if let AppState::AlbumInfo(album) = &self.app_state {
+            let album = album.clone();
+            render_album_info(frame, &album, &mut self.now_playing.image);
+        }
+
         self.render_notifications(frame, area);
     }
 
     fn render_inner(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        let hide_album_cover =
+            self.disable_tui_album_cover || matches!(self.app_state, AppState::AlbumInfo(_));
+
         if self.full_screen {
             let area = center(area, Constraint::Percentage(80), Constraint::Length(10));
             now_playing::render(
@@ -33,7 +42,7 @@ impl App {
                 area,
                 &mut self.now_playing,
                 self.full_screen,
-                self.disable_tui_album_cover,
+                hide_album_cover,
             );
             return;
         }
@@ -72,7 +81,7 @@ impl App {
                 chunks[2],
                 &mut self.now_playing,
                 self.full_screen,
-                self.disable_tui_album_cover,
+                hide_album_cover,
             );
         }
 
@@ -211,6 +220,7 @@ fn render_help(frame: &mut Frame) {
         ["Add track to playlist", "a"],
         ["Move playlist track up", "u"],
         ["Move playlist track down", "d"],
+        ["Album info", "i"],
         ["Exit", "q"],
     ];
 
@@ -233,6 +243,91 @@ fn render_help(frame: &mut Frame) {
 
     frame.render_widget(Clear, area);
     frame.render_widget(table, area);
+}
+
+fn render_album_info(
+    frame: &mut Frame,
+    album: &qobuz_player_models::Album,
+    image: &mut Option<(StatefulProtocol, f32)>,
+) {
+    use ratatui_image::StatefulImage;
+
+    let mut info_lines: Vec<Line> = Vec::new();
+
+    info_lines.push(Line::from(album.title.clone()).style(Style::new().bold()));
+    info_lines.push(Line::from(album.artist.name.clone()));
+    info_lines.push(Line::from(""));
+
+    if album.release_year > 0 {
+        info_lines.push(Line::from(format!("Year:     {}", album.release_year)));
+    }
+
+    info_lines.push(Line::from(format!("Tracks:   {}", album.total_tracks)));
+    info_lines.push(Line::from(format!(
+        "Duration: {}",
+        now_playing::format_seconds(album.duration_seconds)
+    )));
+
+    if album.hires_available {
+        info_lines.push(Line::from("Quality:  Hi-Res"));
+    }
+
+    if album.explicit {
+        info_lines.push(Line::from("Explicit: Yes"));
+    }
+
+    let info_height = info_lines.len() as u16;
+
+    let box_width = frame.area().width / 2;
+    let inner_width = box_width.saturating_sub(2);
+
+    let desc_height = if let Some(description) = &album.description {
+        let char_count = description.len() as u16;
+        let lines_needed = char_count.div_ceil(inner_width.max(1));
+        1 + lines_needed // 1 for blank separator line
+    } else {
+        0
+    };
+
+    let total_height = info_height + desc_height + 2;
+
+    let width = Constraint::Length(box_width);
+    let height = Constraint::Length(total_height);
+    let area = center(frame.area(), width, height);
+    let outer_block = block(Some("Album Info"));
+    let inner = outer_block.inner(area);
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(outer_block, area);
+
+    let vertical =
+        Layout::vertical([Constraint::Length(info_height), Constraint::Min(0)]).split(inner);
+
+    let top_area = vertical[0];
+    let desc_area = vertical[1];
+
+    let image_width = if let Some((_, ratio)) = image {
+        (*ratio * (top_area.height * 2) as f32) as u16
+    } else {
+        0
+    };
+
+    let horizontal =
+        Layout::horizontal([Constraint::Min(1), Constraint::Length(image_width)]).split(top_area);
+
+    let info_paragraph = Paragraph::new(Text::from(info_lines));
+    frame.render_widget(info_paragraph, horizontal[0]);
+
+    if let Some((protocol, _)) = image {
+        let stateful_image = StatefulImage::default();
+        frame.render_stateful_widget(stateful_image, horizontal[1], protocol);
+    }
+
+    if let Some(description) = &album.description {
+        let desc_lines = vec![Line::from(""), Line::from(description.clone())];
+        let desc_paragraph = Paragraph::new(Text::from(desc_lines)).wrap(Wrap { trim: false });
+        frame.render_widget(desc_paragraph, desc_area);
+    }
 }
 
 pub fn render_input(input: &Input, editing: bool, area: Rect, frame: &mut Frame, title: &str) {

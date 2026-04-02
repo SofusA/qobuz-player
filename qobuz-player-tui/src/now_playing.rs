@@ -116,7 +116,7 @@ fn format_mseconds(mseconds: u32) -> String {
     format_seconds(seconds)
 }
 
-fn format_seconds(seconds: u32) -> String {
+pub fn format_seconds(seconds: u32) -> String {
     let minutes = seconds / 60;
     let seconds = seconds % 60;
     format!("{minutes:02}:{seconds:02}")

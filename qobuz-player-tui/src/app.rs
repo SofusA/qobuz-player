@@ -18,7 +18,7 @@ use qobuz_player_controls::{
     notification::{Notification, NotificationBroadcast},
     tracklist::Tracklist,
 };
-use qobuz_player_models::Track;
+use qobuz_player_models::{Album, Track};
 use ratatui::{DefaultTerminal, widgets::*};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::{io, sync::Arc, time::Instant};
@@ -77,6 +77,7 @@ pub enum AppState {
     Normal,
     Popup(Vec<Popup>),
     Help,
+    AlbumInfo(Box<Album>),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -280,6 +281,19 @@ impl App {
                     self.app_state = AppState::Help;
                     self.should_draw = true;
                 }
+                KeyCode::Char('i') => {
+                    if let Some(album_id) = self
+                        .now_playing
+                        .playing_track
+                        .as_ref()
+                        .and_then(|t| t.album_id.clone())
+                    {
+                        if let Ok(album) = self.client.album(&album_id).await {
+                            self.app_state = AppState::AlbumInfo(Box::new(album));
+                            self.should_draw = true;
+                        }
+                    }
+                }
                 KeyCode::Char('q') => {
                     self.should_draw = true;
                     self.exit()
@@ -406,7 +420,7 @@ impl App {
         match event {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match &mut self.app_state {
-                    AppState::Help => {
+                    AppState::Help | AppState::AlbumInfo(_) => {
                         self.app_state = AppState::Normal;
                         self.should_draw = true;
                         return Ok(());
