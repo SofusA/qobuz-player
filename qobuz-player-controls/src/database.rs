@@ -411,24 +411,20 @@ mod tests {
             .format(&time::format_description::well_known::Rfc3339)
             .unwrap();
 
-        sqlx::query!(
-            "UPDATE cache_entries SET last_opened = ? WHERE path = ?",
-            old_time,
-            old_path_str
-        )
-        .execute(&db.pool)
-        .await
-        .unwrap();
+        sqlx::query("UPDATE cache_entries SET last_opened = ? WHERE path = ?")
+            .bind(&old_time)
+            .bind(old_path_str)
+            .execute(&db.pool)
+            .await
+            .unwrap();
 
         let deleted = db.clean_up_cache_entries(Duration::days(5)).await.unwrap();
 
-        let remaining: Vec<_> = sqlx::query!("SELECT path FROM cache_entries")
-            .fetch_all(&db.pool)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|row| row.path)
-            .collect();
+        let remaining: Vec<_> =
+            sqlx::query_scalar::<_, String>("SELECT path FROM cache_entries")
+                .fetch_all(&db.pool)
+                .await
+                .unwrap();
 
         assert_eq!(remaining, vec![new_path_str]);
         assert_eq!(deleted, vec![old_path]);
