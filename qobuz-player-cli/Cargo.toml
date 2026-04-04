@@ -10,6 +10,7 @@ description.workspace = true
 gpio = ["qobuz-player-gpio/gpio"]
 
 [dependencies]
+qobuz-player-client = { version = "*", path = "../qobuz-player-client" }
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
 qobuz-player-mpris = { version = "*", path = "../qobuz-player-mpris" }
 qobuz-player-web = { version = "*", path = "../qobuz-player-web" }
@@ -27,6 +28,8 @@ tokio_schedule.workspace = true
 time.workspace = true
 futures.workspace = true
 rodio.workspace = true
+axum.workspace = true
+open = "5"
 
 [target.'cfg(any(windows, target_os = "linux", target_os = "macos"))'.dependencies]
 keepawake = { workspace = true }

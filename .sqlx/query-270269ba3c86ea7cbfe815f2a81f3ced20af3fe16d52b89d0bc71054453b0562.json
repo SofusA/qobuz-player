@@ -12,12 +12,18 @@
         "name": "password",
         "ordinal": 1,
         "type_info": "Text"
+      },
+      {
+        "name": "user_auth_token",
+        "ordinal": 2,
+        "type_info": "Text"
       }
     ],
     "parameters": {
       "Right": 0
     },
     "nullable": [
+      true,
       true,
       true
     ]

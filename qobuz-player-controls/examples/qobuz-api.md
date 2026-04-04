@@ -72,41 +72,37 @@ The bundle function is named `sha256` but actually computes MD5. This is intenti
 **Note**: Both `appSecret` and `rng_init` could change when Qobuz updates their bundle.
 They are currently the same value but are derived differently and could diverge.
 
-### Login
+### Login (OAuth)
 
-```
-POST /user/login
-Content-Type: application/x-www-form-urlencoded
-```
+The old `POST /user/login` endpoint with email+password is **deprecated** (returns 401).
+Authentication now requires an OAuth flow through the Qobuz web signin:
 
-| Parameter | Description |
-|-----------|-------------|
-| `email` | User email |
-| `password` | User password |
-| `app_id` | Application ID |
+1. **Redirect user** to:
+   ```
+   https://www.qobuz.com/signin/oauth?ext_app_id={app_id}&redirect_url={callback_url}
+   ```
+   The user logs in on the Qobuz website (includes reCAPTCHA).
 
-**Response**:
-```json
-{
-  "user_auth_token": "...",
-  "user": {
-    "id": 12345,
-    "credential": {
-      "parameters": {
-        "lossy_streaming": true,
-        "lossless_streaming": true,
-        "hires_streaming": true,
-        "hires_purchases_streaming": true,
-        "mobile_streaming": true,
-        "offline_streaming": true
-      }
-    },
-    ...
-  }
-}
-```
+2. **Receive redirect** to `{callback_url}?code_autorisation={code}`
 
-The `user_auth_token` is used as the `X-User-Auth-Token` header for subsequent requests.
+3. **Exchange code** for token:
+   ```
+   GET /oauth/callback?code={code}&private_key=6lz8C03UDIC7
+   Headers: X-App-Id
+   ```
+
+   **Response**:
+   ```json
+   {
+     "token": "qyinRoBk-...",
+     "user_id": "1408119"
+   }
+   ```
+
+4. Use `token` as the `X-User-Auth-Token` header for all subsequent requests.
+
+The `private_key` (`6lz8C03UDIC7`) is a static value from the web player bundle.
+The token is long-lived (weeks/months) and should be stored for reuse.
 
 ---
 
@@ -863,7 +859,7 @@ Typical sequence when loading the web player and playing a track:
 ```
 1.  GET  play.qobuz.com              → HTML shell
 2.  GET  bundle.js                    → Application JavaScript (~7MB)
-3.  POST user/login                   → Auth token
+3.  OAuth flow (browser redirect)     → Auth token (via /oauth/callback)
 4.  POST qws/createToken              → WebSocket token
 5.  GET  user/tracking                → Analytics (signed)
 6.  POST session/start                → Session ID + encryption infos

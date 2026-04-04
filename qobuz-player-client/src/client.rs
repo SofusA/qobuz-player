@@ -101,7 +101,6 @@ enum Endpoint {
     ArtistPage,
     SimilarArtists,
     ArtistReleases,
-    Login,
     UserPlaylist,
     Track,
     TrackURL,
@@ -134,7 +133,6 @@ impl Display for Endpoint {
             Endpoint::ArtistPage => "artist/page",
             Endpoint::ArtistReleases => "artist/getReleasesList",
             Endpoint::SimilarArtists => "artist/getSimilarArtists",
-            Endpoint::Login => "user/login",
             Endpoint::Playlist => "playlist/get",
             Endpoint::PlaylistCreate => "playlist/create",
             Endpoint::PlaylistDelete => "playlist/delete",
@@ -165,11 +163,7 @@ impl Display for Endpoint {
 }
 
 impl Client {
-    pub async fn new(
-        username: &str,
-        password: &str,
-        max_audio_quality: AudioQuality,
-    ) -> Result<Client> {
+    pub async fn new(user_auth_token: &str, max_audio_quality: AudioQuality) -> Result<Client> {
         let http_client = reqwest::Client::builder()
             .cookie_store(true)
             .build()
@@ -177,18 +171,15 @@ impl Client {
 
         let Secrets { app_id } = get_secrets(&http_client).await?;
 
-        tracing::debug!("Got login secrets");
+        tracing::debug!("Got login secrets, app_id: {}", app_id);
 
         let base_url = "https://www.qobuz.com/api.json/0.2/".to_string();
-
-        let login = login(username, password, &app_id, &base_url, &http_client).await?;
-        tracing::debug!("Logged in");
 
         let client = Client {
             http_client,
             session: None,
-            user_token: login.user_token,
-            user_id: login.user_id,
+            user_token: user_auth_token.to_string(),
+            user_id: 0,
             app_id,
             base_url,
             max_audio_quality,
@@ -1008,59 +999,66 @@ fn client_headers(app_id: &str, user_token: Option<&str>) -> HeaderMap {
     headers
 }
 
-struct LoginResult {
-    user_token: String,
-    user_id: i64,
+const OAUTH_PRIVATE_KEY: &str = "6lz8C03UDIC7";
+
+pub struct OAuthResult {
+    pub user_auth_token: String,
+    pub user_id: i64,
 }
 
-async fn login(
-    username: &str,
-    password: &str,
-    app_id: &str,
-    base_url: &str,
-    client: &reqwest::Client,
-) -> Result<LoginResult> {
-    let endpoint = format!("{}{}", base_url, Endpoint::Login);
+/// Fetch the app_id from the Qobuz web player bundle.
+pub async fn get_app_id() -> Result<String> {
+    let http_client = reqwest::Client::new();
+    let Secrets { app_id } = get_secrets(&http_client).await?;
+    Ok(app_id)
+}
+
+/// Exchange an OAuth authorization code for a user_auth_token.
+pub async fn exchange_oauth_code(code: &str, app_id: &str) -> Result<OAuthResult> {
+    let http_client = reqwest::Client::new();
+    let base_url = "https://www.qobuz.com/api.json/0.2/";
+    let endpoint = format!("{base_url}oauth/callback");
+    let params = vec![("code", code), ("private_key", OAUTH_PRIVATE_KEY)];
+
+    let response = make_get_call(&endpoint, Some(&params), &http_client, app_id, None, None).await;
+
+    let response = match response {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!("oauth/callback API error: {e}");
+            return Err(e);
+        }
+    };
 
     tracing::debug!(
-        "logging in with email ({}) and password **HIDDEN** for app_id {}",
-        username,
-        app_id
+        "oauth/callback response: {}",
+        &response[..response.len().min(200)]
     );
 
-    let params = vec![
-        ("email", username),
-        ("password", password),
-        ("app_id", app_id),
-    ];
+    let json: Value = serde_json::from_str(response.as_str())
+        .or(Err(Error::DeserializeJSON { message: response }))?;
 
-    match make_get_call(&endpoint, Some(&params), client, app_id, None, None).await {
-        Ok(response) => {
-            let json: Value = serde_json::from_str(response.as_str())
-                .or(Err(Error::DeserializeJSON { message: response }))?;
-            tracing::info!("Successfully logged in");
-            tracing::debug!("{}", json);
-            let mut user_token = json["user_auth_token"].to_string();
-            user_token = user_token[1..user_token.len() - 1].to_string();
+    let user_auth_token = json["token"]
+        .as_str()
+        .or_else(|| json["user_auth_token"].as_str())
+        .ok_or(Error::Login)?
+        .to_string();
 
-            let user_id =
-                json["user"]["id"]
-                    .to_string()
-                    .parse::<i64>()
-                    .or(Err(Error::DeserializeJSON {
-                        message: json["user"].to_string(),
-                    }))?;
+    let user_id = json["user_id"]
+        .as_i64()
+        .or_else(|| json["user_id"].as_str().and_then(|s| s.parse().ok()))
+        .ok_or(Error::Login)?;
 
-            Ok(LoginResult {
-                user_token,
-                user_id,
-            })
-        }
-        Err(err) => {
-            tracing::error!("error logging into qobuz: {}", err);
-            Err(Error::Login)
-        }
-    }
+    Ok(OAuthResult {
+        user_auth_token,
+        user_id,
+    })
+}
+
+/// Build the OAuth URL that the user should open in their browser.
+pub fn build_oauth_url(app_id: &str, redirect_port: u16) -> String {
+    let redirect = format!("http://localhost:{redirect_port}");
+    format!("https://www.qobuz.com/signin/oauth?ext_app_id={app_id}&redirect_url={redirect}",)
 }
 
 struct Secrets {

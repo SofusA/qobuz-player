@@ -16,8 +16,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug)]
 pub struct Client {
     qobuz_client: OnceCell<RwLock<QobuzClient>>,
-    username: String,
-    password: String,
+    user_auth_token: String,
     max_audio_quality: AudioQuality,
     favorites_cache: SimpleCache<Favorites>,
     featured_albums_cache: SimpleCache<Vec<(String, Vec<AlbumSimple>)>>,
@@ -38,7 +37,7 @@ impl Client {
         Ok(client.app_id().to_string())
     }
 
-    pub fn new(username: String, password: String, max_audio_quality: AudioQuality) -> Self {
+    pub fn new(user_auth_token: String, max_audio_quality: AudioQuality) -> Self {
         let album_cache = moka::future::CacheBuilder::new(1000)
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24 * 7))
             .build();
@@ -69,8 +68,7 @@ impl Client {
 
         Self {
             qobuz_client: Default::default(),
-            username,
-            password,
+            user_auth_token,
             max_audio_quality,
             favorites_cache: SimpleCache::new(Duration::days(1)),
             featured_albums_cache: SimpleCache::new(Duration::days(1)),
@@ -87,12 +85,8 @@ impl Client {
     }
 
     async fn init_client(&self) -> Result<QobuzClient> {
-        let client = QobuzClient::new(
-            &self.username,
-            &self.password,
-            self.max_audio_quality.clone(),
-        )
-        .await?;
+        let client =
+            QobuzClient::new(&self.user_auth_token, self.max_audio_quality.clone()).await?;
 
         Ok(client)
     }

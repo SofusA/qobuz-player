@@ -63,18 +63,34 @@ impl Database {
     }
 
     pub async fn set_password(&self, password: String) -> AppResult<()> {
-        let md5_pw = format!("{:x}", md5::compute(password));
         sqlx::query!(
             r#"
             UPDATE credentials
             SET password=?1
             WHERE ROWID = 1
             "#,
-            md5_pw
+            password
         )
         .execute(&self.pool)
         .await?;
 
+        Ok(())
+    }
+
+    pub async fn set_user_auth_token(&self, token: String) -> AppResult<()> {
+        sqlx::query!(
+            "UPDATE credentials SET user_auth_token = ? WHERE ROWID = 1",
+            token
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn clear_user_auth_token(&self) -> AppResult<()> {
+        sqlx::query!("UPDATE credentials SET user_auth_token = NULL WHERE ROWID = 1")
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
@@ -330,6 +346,7 @@ impl From<i64> for ReferenceTypeDatabase {
 pub struct DatabaseCredentials {
     pub username: Option<String>,
     pub password: Option<String>,
+    pub user_auth_token: Option<String>,
 }
 
 pub struct DatabaseConfiguration {
