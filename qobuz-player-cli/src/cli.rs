@@ -562,6 +562,10 @@ async fn browser_oauth_login(database: &Database) -> Result<String, Error> {
 
     let oauth_url = qobuz_api::build_oauth_url(&app_id, port);
 
+    let manual_oauth_url = format!(
+        "https://www.qobuz.com/signin/oauth?ext_app_id={app_id}&redirect_url=http%3A%2F%2Flocalhost"
+    );
+
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(1);
 
     let app = axum::Router::new().route(
@@ -588,16 +592,34 @@ async fn browser_oauth_login(database: &Database) -> Result<String, Error> {
     });
 
     println!("Opening browser for Qobuz login...");
-    println!("If the browser doesn't open, visit: {oauth_url}");
+    println!();
+    println!("  {oauth_url}");
+    println!();
+    println!("Headless? Open this URL on another device instead:");
+    println!();
+    println!("  {manual_oauth_url}");
+    println!();
+    println!("After login, copy the code_autorisation value from the URL bar and paste it here.");
+    println!("Or if on the same network, the redirect will be captured automatically.");
+    println!();
     let _ = open::that(&oauth_url);
 
-    let code = tokio::time::timeout(Duration::from_secs(300), rx.recv())
-        .await
-        .map_err(|_| {
-            eprintln!("Login timed out after 5 minutes.");
-            Error::LoginFailed
-        })?
-        .ok_or(Error::LoginFailed)?;
+    let code = tokio::select! {
+        result = async {
+            tokio::time::timeout(Duration::from_secs(300), rx.recv())
+                .await
+                .ok()
+                .flatten()
+        } => {
+            match result {
+                Some(code) => code,
+                None => return Err(Error::LoginFailed),
+            }
+        }
+        result = read_code_from_stdin() => {
+            result?
+        }
+    };
 
     server.abort();
 
@@ -616,6 +638,28 @@ async fn browser_oauth_login(database: &Database) -> Result<String, Error> {
 
     tracing::info!("Auth token saved.");
     Ok(result.user_auth_token)
+}
+
+async fn read_code_from_stdin() -> Result<String, Error> {
+    tokio::task::spawn_blocking(|| {
+        print!("Paste code: ");
+        stdout().flush().ok();
+        let mut input = String::new();
+        stdin()
+            .read_line(&mut input)
+            .map_err(|_| Error::LoginFailed)?;
+        let input = input.trim();
+        // Accept either raw code or full URL containing code_autorisation=
+        if let Some(pos) = input.find("code_autorisation=") {
+            let code = &input[pos + "code_autorisation=".len()..];
+            let code = code.split(['&', ' ', '#']).next().unwrap_or(code);
+            Ok(code.to_string())
+        } else {
+            Ok(input.to_string())
+        }
+    })
+    .await
+    .map_err(|_| Error::LoginFailed)?
 }
 
 fn error_exit(error: Error) {
