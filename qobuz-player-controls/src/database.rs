@@ -420,11 +420,10 @@ mod tests {
 
         let deleted = db.clean_up_cache_entries(Duration::days(5)).await.unwrap();
 
-        let remaining: Vec<_> =
-            sqlx::query_scalar::<_, String>("SELECT path FROM cache_entries")
-                .fetch_all(&db.pool)
-                .await
-                .unwrap();
+        let remaining: Vec<_> = sqlx::query_scalar::<_, String>("SELECT path FROM cache_entries")
+            .fetch_all(&db.pool)
+            .await
+            .unwrap();
 
         assert_eq!(remaining, vec![new_path_str]);
         assert_eq!(deleted, vec![old_path]);
