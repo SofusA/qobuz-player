@@ -1,4 +1,4 @@
-use crate::ui::{HIGHLIGHT_TEXT_STYLE, block};
+use crate::ui::{HIGHLIGHT_TEXT_STYLE, block, format_mseconds, format_seconds};
 use qobuz_player_controls::Status;
 use qobuz_player_models::Track;
 use ratatui::{prelude::*, widgets::*};
@@ -108,16 +108,4 @@ fn get_status(state: Status) -> String {
         Status::Paused => "Paused ⏸ ".to_string(),
         Status::Buffering => "Buffering".to_string(),
     }
-}
-
-fn format_mseconds(mseconds: u32) -> String {
-    let seconds = mseconds / 1000;
-
-    format_seconds(seconds)
-}
-
-pub fn format_seconds(seconds: u32) -> String {
-    let minutes = seconds / 60;
-    let seconds = seconds % 60;
-    format!("{minutes:02}:{seconds:02}")
 }

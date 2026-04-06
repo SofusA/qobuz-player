@@ -77,7 +77,7 @@ pub enum AppState {
     Normal,
     Popup(Vec<Popup>),
     Help,
-    AlbumInfo(Box<Album>),
+    AlbumInfo(Album),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -287,11 +287,10 @@ impl App {
                         .playing_track
                         .as_ref()
                         .and_then(|t| t.album_id.clone())
+                        && let Ok(album) = self.client.album(&album_id).await
                     {
-                        if let Ok(album) = self.client.album(&album_id).await {
-                            self.app_state = AppState::AlbumInfo(Box::new(album));
-                            self.should_draw = true;
-                        }
+                        self.app_state = AppState::AlbumInfo(album);
+                        self.should_draw = true;
                     }
                 }
                 KeyCode::Char('q') => {

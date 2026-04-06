@@ -1,6 +1,6 @@
 use qobuz_player_controls::notification::Notification;
 use ratatui::{layout::Flex, prelude::*, widgets::*};
-use ratatui_image::protocol::StatefulProtocol;
+use ratatui_image::{StatefulImage, protocol::StatefulProtocol};
 use tui_input::Input;
 
 use crate::{
@@ -250,8 +250,6 @@ fn render_album_info(
     album: &qobuz_player_models::Album,
     image: &mut Option<(StatefulProtocol, f32)>,
 ) {
-    use ratatui_image::StatefulImage;
-
     let mut info_lines: Vec<Line> = Vec::new();
 
     info_lines.push(Line::from(album.title.clone()).style(Style::new().bold()));
@@ -265,7 +263,7 @@ fn render_album_info(
     info_lines.push(Line::from(format!("Tracks:   {}", album.total_tracks)));
     info_lines.push(Line::from(format!(
         "Duration: {}",
-        now_playing::format_seconds(album.duration_seconds)
+        format_seconds(album.duration_seconds)
     )));
 
     if album.hires_available {
@@ -431,4 +429,16 @@ pub fn format_duration(secs: u32) -> String {
     } else {
         format!("{minutes:02}:{seconds:02}")
     }
+}
+
+pub fn format_mseconds(mseconds: u32) -> String {
+    let seconds = mseconds / 1000;
+
+    format_seconds(seconds)
+}
+
+pub fn format_seconds(seconds: u32) -> String {
+    let minutes = seconds / 60;
+    let seconds = seconds % 60;
+    format!("{minutes:02}:{seconds:02}")
 }
