@@ -13,9 +13,9 @@ use qobuz_player_controls::{
     controls::Controls,
     database::Database,
     error::Error,
+    models::{Album, AlbumSimple, Playlist},
     notification::{Notification, NotificationBroadcast},
 };
-use qobuz_player_models::{Album, AlbumSimple, Playlist};
 use qobuz_player_rfid::RfidState;
 use serde_json::json;
 use skabelon::Templates;

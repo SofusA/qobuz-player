@@ -1,3 +1,5 @@
+pub mod mapper;
+
 #[derive(Debug, Default, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum TrackStatus {
     Played,

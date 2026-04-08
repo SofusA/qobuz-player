@@ -12,10 +12,11 @@ use crate::{
     flac_source_stream::{
         FlacSourceParams, FlacSourceStream, SeekableStreamReader, SegmentByteInfo,
     },
+    models::Track,
     notification::NotificationBroadcast,
 };
+
 use qobuz_player_client::qobuz_models::TrackURL;
-use qobuz_player_models::Track;
 
 pub enum DownloadResult {
     Cached(PathBuf),

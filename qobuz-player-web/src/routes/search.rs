@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, Query, State},
     routing::get,
 };
-use qobuz_player_models::SearchResults;
+use qobuz_player_controls::models::SearchResults;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 

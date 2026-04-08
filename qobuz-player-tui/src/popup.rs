@@ -1,5 +1,9 @@
-use qobuz_player_controls::{AppResult, client::Client, controls::Controls};
-use qobuz_player_models::{Album, Artist, Playlist, PlaylistSimple, Track};
+use qobuz_player_controls::{
+    AppResult,
+    client::Client,
+    controls::Controls,
+    models::{Album, Artist, Playlist, PlaylistSimple, Track},
+};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,

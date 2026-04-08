@@ -1,6 +1,5 @@
 use crate::ui::{HIGHLIGHT_TEXT_STYLE, block, format_mseconds, format_seconds};
-use qobuz_player_controls::Status;
-use qobuz_player_models::Track;
+use qobuz_player_controls::{Status, models::Track};
 use ratatui::{prelude::*, widgets::*};
 use ratatui_image::{StatefulImage, protocol::StatefulProtocol};
 

@@ -1,4 +1,4 @@
-use qobuz_player_models::{Album, Track, TrackStatus};
+use crate::models::{Album, Track, TrackStatus};
 use rand::seq::SliceRandom;
 use tokio::{
     select,

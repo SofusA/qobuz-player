@@ -1,5 +1,6 @@
-use qobuz_player_controls::{AppResult, client::Client, notification::Notification};
-use qobuz_player_models::Artist;
+use qobuz_player_controls::{
+    AppResult, client::Client, models::Artist, notification::Notification,
+};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::KeyCode,

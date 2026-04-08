@@ -288,8 +288,7 @@ pub async fn run() -> Result<(), Error> {
                 Some(token) => token,
                 None => {
                     tracing::info!("No auth token found, starting browser login...");
-                    let token = browser_oauth_login(&database).await?;
-                    token
+                    browser_oauth_login(&database).await?
                 }
             };
 

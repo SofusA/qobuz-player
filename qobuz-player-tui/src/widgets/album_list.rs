@@ -1,7 +1,6 @@
 use qobuz_player_controls::{
-    AppResult, client::Client, controls::Controls, notification::Notification,
+    AppResult, client::Client, controls::Controls, models::AlbumSimple, notification::Notification,
 };
-use qobuz_player_models::AlbumSimple;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::KeyCode,

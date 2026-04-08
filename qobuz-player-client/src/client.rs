@@ -2,17 +2,16 @@ use crate::{
     Error, Result,
     qobuz_models::{
         TrackURL,
-        album_suggestion::{
-            AlbumOfTheWeekQuery, AlbumSuggestion, AlbumSuggestionResponse, ReleaseQuery,
-        },
-        artist::{self, ArtistsResponse},
-        artist_page,
+        album::Album,
+        album_suggestion::{AlbumOfTheWeekQuery, AlbumSuggestionResponse, ReleaseQuery},
+        artist::{Artist, ArtistsResponse},
+        artist_page::ArtistPage,
         favorites::Favorites,
         featured::{FeaturedAlbumsResponse, FeaturedPlaylistsResponse},
-        genre::{self, GenreFeaturedPlaylists, GenreResponse},
-        playlist::{self, UserPlaylistsResult},
+        genre::{GenreFeaturedPlaylists, GenreResponse},
+        playlist::{Playlist, UserPlaylistsResult},
         search_results::SearchAllResults,
-        track,
+        track::Track,
     },
 };
 use regex::Regex;
@@ -27,8 +26,6 @@ use std::{
     fmt::Display,
     time::{SystemTime, UNIX_EPOCH},
 };
-use time::macros::format_description;
-use tokio::try_join;
 
 const RNG_INIT: &str = "abb21364945c0583309667d13ca3d93a";
 
@@ -76,7 +73,7 @@ impl TryFrom<i64> for AudioQuality {
     }
 }
 
-enum ReleaseType {
+pub enum ReleaseType {
     Albums,
     EPsAndSingles,
     Live,
@@ -94,6 +91,65 @@ impl ReleaseType {
             // ReleaseType::Other => "other",
         }
     }
+}
+
+pub enum FeaturedAlbumType {
+    PressAwards,
+    MostStreamed,
+    NewReleases,
+    Qobuzissims,
+    IdealDiscography,
+}
+
+impl FeaturedAlbumType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            FeaturedAlbumType::PressAwards => "press-awards",
+            FeaturedAlbumType::MostStreamed => "most-streamed",
+            FeaturedAlbumType::NewReleases => "new-releases-full",
+            FeaturedAlbumType::Qobuzissims => "qobuzissims",
+            FeaturedAlbumType::IdealDiscography => "ideal-discography",
+        }
+    }
+}
+
+pub enum FeaturedPlaylistType {
+    EditorsPick,
+}
+
+impl FeaturedPlaylistType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            FeaturedPlaylistType::EditorsPick => "editor-picks",
+        }
+    }
+}
+
+pub enum FeaturedGenreAlbumType {
+    PressAwards,
+    MostStreamed,
+    NewReleases,
+    Qobuzissims,
+    BestSellers,
+}
+
+impl FeaturedGenreAlbumType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            FeaturedGenreAlbumType::PressAwards => "press-awards",
+            FeaturedGenreAlbumType::MostStreamed => "most-streamed",
+            FeaturedGenreAlbumType::NewReleases => "new-releases-full",
+            FeaturedGenreAlbumType::Qobuzissims => "qobuzissims",
+            FeaturedGenreAlbumType::BestSellers => "best-sellers",
+        }
+    }
+}
+
+pub struct FavoriteCollection {
+    pub albums: Vec<Album>,
+    pub artists: Vec<Artist>,
+    pub playlists: Vec<Playlist>,
+    pub tracks: Vec<Track>,
 }
 
 enum Endpoint {
@@ -192,125 +248,63 @@ impl Client {
         &self.app_id
     }
 
+    pub fn user_id(&self) -> i64 {
+        self.user_id
+    }
+
     pub async fn featured_albums(
         &self,
-    ) -> Result<Vec<(String, Vec<qobuz_player_models::AlbumSimple>)>> {
+        featured_type: FeaturedAlbumType,
+    ) -> Result<FeaturedAlbumsResponse> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::AlbumFeatured);
+        let type_string = featured_type.as_str();
+        let params = vec![("type", type_string), ("offset", "0"), ("limit", "20")];
+        self.get(&endpoint, Some(&params)).await
+    }
 
-        let make_call = |type_string| {
-            let params = vec![("type", type_string), ("offset", "0"), ("limit", "20")];
-            let endpoint = endpoint.clone();
-            async move { self.get(&endpoint, Some(&params)).await }
-        };
-
-        let album_of_the_week: AlbumOfTheWeekQuery = self
-            .get(
-                &format!("{}{}", self.base_url, Endpoint::AlbumOfTheWeek),
-                None,
-            )
-            .await?;
-
-        let album_of_the_week = album_of_the_week
-            .items
-            .into_iter()
-            .map(|a| parse_album_simple(a, &self.max_audio_quality))
-            .collect();
-
-        let mut albums = vec![("Album of the week".to_string(), album_of_the_week)];
-
-        let (a, b, c, d, e) = try_join!(
-            make_call("press-awards"),
-            make_call("most-streamed"),
-            make_call("new-releases-full"),
-            make_call("qobuzissims"),
-            make_call("ideal-discography"),
-        )?;
-
-        let mut other = parse_featured_albums(vec![
-            ("Press awards".to_string(), a),
-            ("Most streamed".to_string(), b),
-            ("New releases".to_string(), c),
-            ("Qobuzissims".to_string(), d),
-            ("Ideal discography".to_string(), e),
-        ]);
-
-        albums.append(&mut other);
-
-        Ok(albums)
+    pub async fn album_of_the_week(&self) -> Result<AlbumOfTheWeekQuery> {
+        self.get(
+            &format!("{}{}", self.base_url, Endpoint::AlbumOfTheWeek),
+            None,
+        )
+        .await
     }
 
     pub async fn featured_playlists(
         &self,
-    ) -> Result<Vec<(String, Vec<qobuz_player_models::Playlist>)>> {
+        featured_type: FeaturedPlaylistType,
+    ) -> Result<FeaturedPlaylistsResponse> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistFeatured);
-
-        let type_string = "editor-picks";
-
+        let type_string = featured_type.as_str();
         let params = vec![("type", type_string), ("offset", "0"), ("limit", "20")];
-
-        let response = self
-            .get(&endpoint, Some(&params))
-            .await
-            .map(|x| vec![("Editor picks".to_string(), x)])?;
-
-        Ok(parse_featured_playlists_response(
-            response,
-            self.user_id,
-            &self.max_audio_quality,
-        ))
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn genres(&self) -> Result<Vec<qobuz_player_models::Genre>> {
+    pub async fn genres(&self) -> Result<GenreResponse> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::GenreList);
-        let response: GenreResponse = self.get(&endpoint, None).await?;
-        let genres: Vec<_> = response.genres.items.into_iter().map(parse_genre).collect();
-
-        Ok(genres)
+        self.get(&endpoint, None).await
     }
 
     pub async fn genre_albums(
         &self,
         genre_id: u32,
-    ) -> Result<Vec<(String, Vec<qobuz_player_models::AlbumSimple>)>> {
+        featured_type: FeaturedGenreAlbumType,
+    ) -> Result<FeaturedAlbumsResponse> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::GenreFeatured);
         let genre_id_str = genre_id.to_string();
+        let type_string = featured_type.as_str();
 
-        let make_call = |type_string| {
-            let params = vec![
-                ("type", type_string),
-                ("genre_id", genre_id_str.as_str()),
-                ("offset", "0"),
-                ("limit", "20"),
-            ];
-            let endpoint = endpoint.clone();
-            async move { self.get(&endpoint, Some(&params)).await }
-        };
-
-        let (a, b, c, d, e) = try_join!(
-            make_call("press-awards"),
-            make_call("most-streamed"),
-            make_call("best-sellers"),
-            make_call("qobuzissims"),
-            make_call("new-releases-full"),
-        )?;
-
-        let albums = parse_featured_albums(vec![
-            ("Press awards".to_string(), a),
-            ("Most streamed".to_string(), b),
-            ("Best sellers".to_string(), c),
-            ("Qobuzissims".to_string(), d),
-            ("New releases".to_string(), e),
-        ]);
-
-        Ok(albums)
+        let params = vec![
+            ("type", type_string),
+            ("genre_id", genre_id_str.as_str()),
+            ("offset", "0"),
+            ("limit", "20"),
+        ];
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn genre_playlists(
-        &self,
-        genre_id: u32,
-    ) -> Result<Vec<qobuz_player_models::PlaylistSimple>> {
+    pub async fn genre_playlists(&self, genre_id: u32) -> Result<GenreFeaturedPlaylists> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::GenrePlaylists);
-
         let genre_id = genre_id.to_string();
 
         let params = vec![
@@ -319,26 +313,17 @@ impl Client {
             ("limit", "20"),
         ];
 
-        let response = self.get(&endpoint, Some(&params)).await?;
-
-        Ok(parse_genre_featured_playlists(response, self.user_id))
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn user_playlists(&self) -> Result<Vec<qobuz_player_models::Playlist>> {
+    pub async fn user_playlists(&self) -> Result<UserPlaylistsResult> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::UserPlaylist);
         let params = vec![("limit", "500"), ("extra", "tracks"), ("offset", "0")];
 
-        let response: UserPlaylistsResult = self.get(&endpoint, Some(&params)).await?;
-
-        Ok(response
-            .playlists
-            .items
-            .into_iter()
-            .map(|playlist| parse_playlist(playlist, self.user_id, &self.max_audio_quality))
-            .collect())
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn playlist(&self, playlist_id: u32) -> Result<qobuz_player_models::Playlist> {
+    pub async fn playlist(&self, playlist_id: u32) -> Result<Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::Playlist);
         let id_string = playlist_id.to_string();
         let params = vec![
@@ -347,13 +332,8 @@ impl Client {
             ("playlist_id", id_string.as_str()),
             ("offset", "0"),
         ];
-        let response = self.get(&endpoint, Some(&params)).await?;
 
-        Ok(parse_playlist(
-            response,
-            self.user_id,
-            &self.max_audio_quality,
-        ))
+        self.get(&endpoint, Some(&params)).await
     }
 
     pub async fn create_playlist(
@@ -362,7 +342,7 @@ impl Client {
         is_public: bool,
         description: String,
         is_collaborative: Option<bool>,
-    ) -> Result<qobuz_player_models::Playlist> {
+    ) -> Result<Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistCreate);
 
         let mut form_data = HashMap::new();
@@ -382,12 +362,7 @@ impl Client {
         form_data.insert("is_public", is_public.as_str());
         form_data.insert("description", description.as_str());
 
-        let response = self.post(&endpoint, form_data).await?;
-        Ok(parse_playlist(
-            response,
-            self.user_id,
-            &self.max_audio_quality,
-        ))
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn delete_playlist(&self, playlist_id: u32) -> Result<SuccessfulResponse> {
@@ -404,7 +379,7 @@ impl Client {
         &self,
         playlist_id: u32,
         playlist_track_ids: &[u32],
-    ) -> Result<qobuz_player_models::Playlist> {
+    ) -> Result<Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistAddTracks);
 
         let track_ids = playlist_track_ids
@@ -420,19 +395,14 @@ impl Client {
         form_data.insert("track_ids", track_ids.as_str());
         // form_data.insert("no_duplicate", "true");
 
-        let response = self.post(&endpoint, form_data).await?;
-        Ok(parse_playlist(
-            response,
-            self.user_id,
-            &self.max_audio_quality,
-        ))
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn playlist_delete_track(
         &self,
         playlist_id: u32,
         playlist_track_ids: &[u64],
-    ) -> Result<qobuz_player_models::Playlist> {
+    ) -> Result<Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistDeleteTracks);
 
         let track_ids = playlist_track_ids
@@ -446,12 +416,7 @@ impl Client {
         form_data.insert("playlist_id", playlist_id.as_str());
         form_data.insert("playlist_track_ids", track_ids.as_str());
 
-        let response = self.post(&endpoint, form_data).await?;
-        Ok(parse_playlist(
-            response,
-            self.user_id,
-            &self.max_audio_quality,
-        ))
+        self.post(&endpoint, form_data).await
     }
 
     pub async fn update_playlist_track_position(
@@ -459,7 +424,7 @@ impl Client {
         index: usize,
         playlist_id: u32,
         playlist_track_id: u64,
-    ) -> Result<qobuz_player_models::Playlist> {
+    ) -> Result<Playlist> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::PlaylistUpdatePosition);
 
         let index = index.to_string();
@@ -471,12 +436,7 @@ impl Client {
         form_data.insert("playlist_track_ids", track_id.as_str());
         form_data.insert("insert_before", index.as_str());
 
-        let response = self.post(&endpoint, form_data).await?;
-        Ok(parse_playlist(
-            response,
-            self.user_id,
-            &self.max_audio_quality,
-        ))
+        self.post(&endpoint, form_data).await
     }
 
     async fn renew_session(&mut self) -> Result<()> {
@@ -579,48 +539,13 @@ impl Client {
         }
     }
 
-    pub async fn favorites(&self, limit: i32) -> Result<qobuz_player_models::Favorites> {
-        let mut favorite_playlists = self.user_playlists().await?;
-
+    pub async fn favorites(&self, limit: i32) -> Result<Favorites> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::Favorites);
 
         let limit = limit.to_string();
         let params = vec![("limit", limit.as_str())];
 
-        let response: Favorites = self.get(&endpoint, Some(&params)).await?;
-
-        let Favorites {
-            albums,
-            tracks,
-            artists,
-        } = response;
-
-        let mut albums = albums.items;
-        albums.sort_by(|a, b| {
-            a.artist
-                .name
-                .to_lowercase()
-                .cmp(&b.artist.name.to_lowercase())
-        });
-
-        let mut artists = artists.items;
-        artists.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-
-        favorite_playlists.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
-
-        Ok(qobuz_player_models::Favorites {
-            albums: albums
-                .into_iter()
-                .map(|x| parse_album(x, &self.max_audio_quality).into())
-                .collect(),
-            artists: artists.into_iter().map(parse_artist).collect(),
-            playlists: favorite_playlists,
-            tracks: tracks
-                .items
-                .into_iter()
-                .map(|track| parse_track(track, &self.max_audio_quality))
-                .collect(),
-        })
+        self.get(&endpoint, Some(&params)).await
     }
 
     pub async fn add_favorite_track(&self, id: u32) -> Result<SuccessfulResponse> {
@@ -693,25 +618,15 @@ impl Client {
         self.post(&endpoint, form_data).await
     }
 
-    pub async fn search_all(
-        &self,
-        query: &str,
-        limit: i32,
-    ) -> Result<qobuz_player_models::SearchResults> {
+    pub async fn search_all(&self, query: &str, limit: i32) -> Result<SearchAllResults> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::Search);
         let limit = limit.to_string();
         let params = vec![("query", query), ("limit", &limit)];
 
-        let response = self.get(&endpoint, Some(&params)).await?;
-
-        Ok(parse_search_results(
-            response,
-            self.user_id,
-            &self.max_audio_quality,
-        ))
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn album(&self, album_id: &str) -> Result<qobuz_player_models::Album> {
+    pub async fn album(&self, album_id: &str) -> Result<Album> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::Album);
         let params = vec![
             ("album_id", album_id),
@@ -720,38 +635,25 @@ impl Client {
             ("limit", "500"),
         ];
 
-        let response = self.get(&endpoint, Some(&params)).await?;
-
-        Ok(parse_album(response, &self.max_audio_quality))
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn track(&self, track_id: u32) -> Result<qobuz_player_models::Track> {
+    pub async fn track(&self, track_id: u32) -> Result<Track> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::Track);
         let track_id_string = track_id.to_string();
         let params = vec![("track_id", track_id_string.as_str())];
 
-        let response = self.get(&endpoint, Some(&params)).await?;
-        Ok(parse_track(response, &self.max_audio_quality))
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn suggested_albums(
-        &self,
-        album_id: &str,
-    ) -> Result<Vec<qobuz_player_models::AlbumSimple>> {
+    pub async fn suggested_albums(&self, album_id: &str) -> Result<AlbumSuggestionResponse> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::AlbumSuggest);
         let params = vec![("album_id", album_id)];
 
-        let response: AlbumSuggestionResponse = self.get(&endpoint, Some(&params)).await?;
-
-        Ok(response
-            .albums
-            .items
-            .into_iter()
-            .map(|x| parse_album_simple(x, &self.max_audio_quality))
-            .collect())
+        self.get(&endpoint, Some(&params)).await
     }
 
-    pub async fn artist(&self, artist_id: u32) -> Result<qobuz_player_models::ArtistPage> {
+    pub async fn artist(&self, artist_id: u32) -> Result<ArtistPage> {
         let app_id = &self.app_id;
 
         let endpoint = format!("{}{}", self.base_url, Endpoint::ArtistPage);
@@ -764,23 +666,7 @@ impl Client {
             ("sort", "relevant"),
         ];
 
-        let (artist_page, albums, singles, live, compilations, similar_artists) = try_join!(
-            self.get(&endpoint, Some(&params)),
-            self.artist_releases(artist_id, ReleaseType::Albums, None),
-            self.artist_releases(artist_id, ReleaseType::EPsAndSingles, None),
-            self.artist_releases(artist_id, ReleaseType::Live, None),
-            self.artist_releases(artist_id, ReleaseType::Compilations, None),
-            self.similar_artists(artist_id, None),
-        )?;
-
-        Ok(parse_artist_page(
-            artist_page,
-            albums,
-            singles,
-            live,
-            compilations,
-            similar_artists,
-        ))
+        self.get(&endpoint, Some(&params)).await
     }
 
     async fn get<T>(&self, endpoint: &str, params: Option<&[(&str, &str)]>) -> Result<T>
@@ -827,7 +713,7 @@ impl Client {
         &self,
         artist_id: u32,
         limit: Option<i32>,
-    ) -> Result<Vec<qobuz_player_models::Artist>> {
+    ) -> Result<ArtistsResponse> {
         let limit = limit.unwrap_or(10).to_string();
 
         let endpoint = format!("{}{}", self.base_url, Endpoint::SimilarArtists);
@@ -839,22 +725,15 @@ impl Client {
             ("offset", "0"),
         ];
 
-        let response: Result<ArtistsResponse> = self.get(&endpoint, Some(&params)).await;
-
-        Ok(response
-            .map(|res| res.artists)?
-            .items
-            .into_iter()
-            .map(parse_artist)
-            .collect())
+        self.get(&endpoint, Some(&params)).await
     }
 
-    async fn artist_releases(
+    pub async fn artist_releases(
         &self,
         artist_id: u32,
         release_type: ReleaseType,
         limit: Option<i32>,
-    ) -> Result<Vec<qobuz_player_models::AlbumSimple>> {
+    ) -> Result<ReleaseQuery> {
         let endpoint = format!("{}{}", self.base_url, Endpoint::ArtistReleases);
         let limit = limit.unwrap_or(100).to_string();
 
@@ -869,13 +748,7 @@ impl Client {
             ("track_size", "1"),
         ];
 
-        let response: ReleaseQuery = self.get(&endpoint, Some(&params)).await?;
-        let response = response.items;
-
-        Ok(response
-            .into_iter()
-            .map(|s| parse_album_simple(s, &self.max_audio_quality))
-            .collect())
+        self.get(&endpoint, Some(&params)).await
     }
 
     async fn make_get_call(
@@ -1115,375 +988,4 @@ async fn get_secrets(client: &reqwest::Client) -> Result<Secrets> {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct SuccessfulResponse {
     status: String,
-}
-
-fn parse_featured_albums(
-    response: Vec<(String, FeaturedAlbumsResponse)>,
-) -> Vec<(String, Vec<qobuz_player_models::AlbumSimple>)> {
-    response
-        .into_iter()
-        .map(|featured| {
-            let featured_type = featured.0;
-
-            let albums = featured
-                .1
-                .albums
-                .items
-                .into_iter()
-                .map(|value| qobuz_player_models::AlbumSimple {
-                    id: value.id,
-                    title: value.title,
-                    artist: parse_artist(value.artist),
-                    hires_available: value.hires_streamable,
-                    explicit: value.parental_warning,
-                    available: value.streamable,
-                    image: value.image.large,
-                    duration_seconds: value.duration,
-                    release_year: extract_year(&value.release_date_original),
-                })
-                .collect::<Vec<_>>();
-
-            (featured_type, albums)
-        })
-        .collect()
-}
-
-pub fn parse_featured_playlists_response(
-    response: Vec<(String, FeaturedPlaylistsResponse)>,
-    user_id: i64,
-    max_audio_quality: &AudioQuality,
-) -> Vec<(String, Vec<qobuz_player_models::Playlist>)> {
-    response
-        .into_iter()
-        .map(|featured| {
-            let featured_type = featured.0;
-            let playlists = featured
-                .1
-                .playlists
-                .items
-                .into_iter()
-                .map(|playlist| parse_playlist(playlist, user_id, max_audio_quality))
-                .collect();
-
-            (featured_type, playlists)
-        })
-        .collect()
-}
-
-pub fn parse_genre_featured_playlists(
-    response: GenreFeaturedPlaylists,
-    user_id: i64,
-) -> Vec<qobuz_player_models::PlaylistSimple> {
-    response
-        .items
-        .into_iter()
-        .map(|playlist| parse_playlist_simple(playlist, user_id))
-        .collect()
-}
-
-fn parse_search_results(
-    search_results: SearchAllResults,
-    user_id: i64,
-    max_audio_quality: &AudioQuality,
-) -> qobuz_player_models::SearchResults {
-    qobuz_player_models::SearchResults {
-        query: search_results.query,
-        albums: search_results
-            .albums
-            .items
-            .into_iter()
-            .map(|a| parse_album(a, max_audio_quality))
-            .collect(),
-        artists: search_results
-            .artists
-            .items
-            .into_iter()
-            .map(parse_artist)
-            .collect(),
-        playlists: search_results
-            .playlists
-            .items
-            .into_iter()
-            .map(|p| parse_playlist(p, user_id, max_audio_quality))
-            .collect(),
-        tracks: search_results
-            .tracks
-            .items
-            .into_iter()
-            .map(|t| parse_track(t, max_audio_quality))
-            .collect(),
-    }
-}
-
-fn parse_album_simple(
-    s: AlbumSuggestion,
-    max_audio_quality: &AudioQuality,
-) -> qobuz_player_models::AlbumSimple {
-    let artist = s.artists.and_then(|vec| vec.into_iter().next());
-    let (artist_id, artist_name) = artist.map_or((0, "Unknown".into()), |artist| {
-        (artist.id as u32, artist.name)
-    });
-
-    qobuz_player_models::AlbumSimple {
-        id: s.id,
-        title: s.title,
-        artist: qobuz_player_models::Artist {
-            id: artist_id,
-            name: artist_name,
-            ..Default::default()
-        },
-        hires_available: hifi_available(s.rights.hires_streamable, max_audio_quality),
-        explicit: s.parental_warning,
-        available: s.rights.streamable,
-        image: s.image.large,
-        duration_seconds: s.duration,
-        release_year: extract_year(&s.dates.original),
-    }
-}
-
-fn extract_year(date_str: &str) -> u32 {
-    let format = format_description!("[year]-[month]-[day]");
-    let date = time::Date::parse(date_str, &format).expect("failed to parse date");
-    date.year() as u32
-}
-
-fn parse_album(
-    value: crate::qobuz_models::album::Album,
-    max_audio_quality: &AudioQuality,
-) -> qobuz_player_models::Album {
-    let year = extract_year(&value.release_date_original);
-
-    let tracks = value.tracks.map_or(Default::default(), |tracks| {
-        tracks
-            .items
-            .into_iter()
-            .map(|t| qobuz_player_models::Track {
-                id: t.id,
-                title: t.title,
-                number: t.track_number,
-                explicit: t.parental_warning,
-                hires_available: t.hires_streamable,
-                available: t.streamable,
-                status: Default::default(),
-                image: Some(value.image.large.clone()),
-                image_thumbnail: Some(value.image.small.clone()),
-                duration_seconds: t.duration,
-                artist_name: Some(value.artist.name.clone()),
-                artist_id: Some(value.artist.id),
-                album_title: Some(value.title.clone()),
-                album_id: Some(value.id.clone()),
-                playlist_track_id: None,
-            })
-            .collect()
-    });
-
-    qobuz_player_models::Album {
-        id: value.id,
-        title: value.title,
-        artist: parse_artist(value.artist),
-        total_tracks: value.tracks_count as u32,
-        release_year: year
-            .to_string()
-            .parse::<u32>()
-            .expect("error converting year"),
-        hires_available: hifi_available(value.hires_streamable, max_audio_quality),
-        explicit: value.parental_warning,
-        available: value.streamable,
-        tracks,
-        image: value.image.large,
-        image_thumbnail: value.image.small,
-        duration_seconds: value.duration.map_or(0, |duration| duration as u32),
-        description: sanitize_html(value.description),
-    }
-}
-
-fn sanitize_html(source: Option<String>) -> Option<String> {
-    let source = source?;
-    if source.trim() == "" {
-        return None;
-    }
-
-    let mut data = String::new();
-    let mut inside = false;
-
-    for c in source.chars() {
-        if c == '<' {
-            inside = true;
-            continue;
-        }
-        if c == '>' {
-            inside = false;
-            continue;
-        }
-
-        if !inside {
-            data.push(c);
-        }
-    }
-
-    Some(data.replace("&copy", "©"))
-}
-
-fn image_to_string(value: artist_page::Image) -> String {
-    format!(
-        "https://static.qobuz.com/images/artists/covers/large/{}.{}",
-        value.hash, value.format
-    )
-}
-
-fn parse_artist_page(
-    artist: artist_page::ArtistPage,
-    albums: Vec<qobuz_player_models::AlbumSimple>,
-    singles: Vec<qobuz_player_models::AlbumSimple>,
-    live: Vec<qobuz_player_models::AlbumSimple>,
-    compilations: Vec<qobuz_player_models::AlbumSimple>,
-    similar_artists: Vec<qobuz_player_models::Artist>,
-) -> qobuz_player_models::ArtistPage {
-    let artist_image_url = artist.images.portrait.map(image_to_string);
-
-    qobuz_player_models::ArtistPage {
-        id: artist.id,
-        name: artist.name.display.clone(),
-        image: artist_image_url.clone(),
-        albums,
-        singles,
-        live,
-        compilations,
-        similar_artists,
-        top_tracks: artist
-            .top_tracks
-            .into_iter()
-            .map(|t| {
-                let album_image_url = t.album.image.large;
-                let album_image_url_small = t.album.image.small;
-                qobuz_player_models::Track {
-                    id: t.id,
-                    number: t.physical_support.track_number,
-                    title: t.title,
-                    explicit: t.parental_warning,
-                    hires_available: t.rights.hires_streamable,
-                    available: t.rights.streamable,
-                    status: Default::default(),
-                    image: Some(album_image_url),
-                    image_thumbnail: Some(album_image_url_small),
-                    duration_seconds: t.duration,
-                    artist_name: Some(artist.name.display.clone()),
-                    artist_id: Some(artist.id),
-                    album_title: Some(t.album.title),
-                    album_id: Some(t.album.id),
-                    playlist_track_id: None,
-                }
-            })
-            .collect(),
-        description: sanitize_html(artist.biography.map(|bio| bio.content)),
-    }
-}
-
-fn parse_artist(value: artist::Artist) -> qobuz_player_models::Artist {
-    qobuz_player_models::Artist {
-        id: value.id,
-        name: value.name,
-        image: value.image.map(|i| i.large),
-    }
-}
-
-fn parse_genre(value: genre::Genre) -> qobuz_player_models::Genre {
-    qobuz_player_models::Genre {
-        name: value.name,
-        id: value.id,
-    }
-}
-
-fn parse_playlist(
-    playlist: playlist::Playlist,
-    user_id: i64,
-    max_audio_quality: &AudioQuality,
-) -> qobuz_player_models::Playlist {
-    let tracks = playlist.tracks.map_or(Default::default(), |tracks| {
-        tracks
-            .items
-            .into_iter()
-            .map(|t| parse_track(t, max_audio_quality))
-            .collect()
-    });
-
-    let image = if let Some(image) = playlist.image_rectangle.first() {
-        Some(image.clone())
-    } else if let Some(images) = playlist.images300 {
-        images.first().cloned()
-    } else {
-        None
-    };
-
-    qobuz_player_models::Playlist {
-        id: playlist.id as u32,
-        is_owned: user_id == playlist.owner.id,
-        title: playlist.name,
-        duration_seconds: playlist.duration as u32,
-        tracks_count: playlist.tracks_count as u32,
-        image,
-        tracks,
-    }
-}
-fn parse_playlist_simple(
-    playlist: playlist::PlaylistSimple,
-    user_id: i64,
-) -> qobuz_player_models::PlaylistSimple {
-    qobuz_player_models::PlaylistSimple {
-        id: playlist.id as u32,
-        is_owned: user_id == playlist.owner.id,
-        title: playlist.name,
-        duration_seconds: playlist.duration as u32,
-        tracks_count: playlist.tracks_count as u32,
-        image: Some(playlist.image.rectangle),
-    }
-}
-
-fn parse_track(
-    value: track::Track,
-    max_audio_quality: &AudioQuality,
-) -> qobuz_player_models::Track {
-    let artist = if let Some(p) = &value.performer {
-        Some(qobuz_player_models::Artist {
-            id: p.id as u32,
-            name: p.name.clone(),
-            image: None,
-        })
-    } else {
-        value.album.as_ref().map(|a| parse_artist(a.clone().artist))
-    };
-
-    let image = value.album.as_ref().map(|a| a.image.large.clone());
-    let image_thumbnail = value.album.as_ref().map(|a| a.image.small.clone());
-
-    qobuz_player_models::Track {
-        id: value.id,
-        number: value.track_number,
-        title: value.title,
-        duration_seconds: value.duration,
-        explicit: value.parental_warning,
-        hires_available: hifi_available(value.hires_streamable, max_audio_quality),
-        available: value.streamable,
-        status: Default::default(),
-        image,
-        image_thumbnail,
-        artist_name: artist.as_ref().map(move |a| a.name.clone()),
-        artist_id: artist.as_ref().map(move |a| a.id),
-        album_title: value.album.as_ref().map(|a| a.title.clone()),
-        album_id: value.album.as_ref().map(|a| a.id.clone()),
-        playlist_track_id: value.playlist_track_id,
-    }
-}
-
-fn hifi_available(track_has_hires_available: bool, max_audio_quality: &AudioQuality) -> bool {
-    if !track_has_hires_available {
-        return false;
-    }
-
-    match max_audio_quality {
-        AudioQuality::Mp3 => false,
-        AudioQuality::CD => false,
-        AudioQuality::HIFI96 => true,
-        AudioQuality::HIFI192 => true,
-    }
 }

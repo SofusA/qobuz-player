@@ -1,4 +1,4 @@
-use qobuz_player_controls::notification::Notification;
+use qobuz_player_controls::{models::Album, notification::Notification};
 use ratatui::{layout::Flex, prelude::*, widgets::*};
 use ratatui_image::{StatefulImage, protocol::StatefulProtocol};
 use tui_input::Input;
@@ -247,7 +247,7 @@ fn render_help(frame: &mut Frame) {
 
 fn render_album_info(
     frame: &mut Frame,
-    album: &qobuz_player_models::Album,
+    album: &Album,
     image: &mut Option<(StatefulProtocol, f32)>,
 ) {
     let mut info_lines: Vec<Line> = Vec::new();

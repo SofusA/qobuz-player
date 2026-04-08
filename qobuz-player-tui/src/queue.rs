@@ -1,5 +1,7 @@
-use qobuz_player_controls::controls::Controls;
-use qobuz_player_models::{Track, TrackStatus};
+use qobuz_player_controls::{
+    controls::Controls,
+    models::{Track, TrackStatus},
+};
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,

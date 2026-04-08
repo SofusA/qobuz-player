@@ -15,10 +15,10 @@ use qobuz_player_controls::{
     AppResult, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
     client::Client,
     controls::Controls,
+    models::{Album, Track},
     notification::{Notification, NotificationBroadcast},
     tracklist::Tracklist,
 };
-use qobuz_player_models::{Album, Track};
 use ratatui::{DefaultTerminal, widgets::*};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use std::{io, sync::Arc, time::Instant};

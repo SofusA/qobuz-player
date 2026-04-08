@@ -3710,10 +3710,9 @@ dependencies = [
 name = "qobuz-player-client"
 version = "0.9.0"
 dependencies = [
- "base64",
  "clap",
  "md5",
- "qobuz-player-models",
+ "qobuz-player-controls",
  "regex",
  "reqwest 0.12.28",
  "serde",
@@ -3730,7 +3729,6 @@ name = "qobuz-player-connect"
 version = "0.9.0"
 dependencies = [
  "qobuz-player-controls",
- "qobuz-player-models",
  "qonductor",
  "tokio",
  "tracing",
@@ -3749,11 +3747,9 @@ dependencies = [
  "futures",
  "hkdf",
  "libc",
- "md5",
  "moka",
  "parking_lot",
  "qobuz-player-client",
- "qobuz-player-models",
  "rand 0.10.0",
  "reqwest 0.12.28",
  "rodio",
@@ -3778,19 +3774,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "qobuz-player-models"
-version = "0.9.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "qobuz-player-mpris"
 version = "0.9.0"
 dependencies = [
  "mpris-server",
  "qobuz-player-controls",
- "qobuz-player-models",
  "tokio",
 ]
 
@@ -3814,7 +3802,6 @@ dependencies = [
  "futures",
  "image",
  "qobuz-player-controls",
- "qobuz-player-models",
  "ratatui",
  "ratatui-image",
  "reqwest 0.12.28",
@@ -3833,7 +3820,6 @@ dependencies = [
  "mime",
  "mime_guess",
  "qobuz-player-controls",
- "qobuz-player-models",
  "qobuz-player-rfid",
  "rust-embed",
  "serde",

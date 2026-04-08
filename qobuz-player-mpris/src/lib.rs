@@ -7,9 +7,8 @@ use mpris_server::{
 };
 use qobuz_player_controls::{
     AppResult, ExitSender, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
-    VolumeReceiver, controls::Controls, error::Error,
+    VolumeReceiver, controls::Controls, error::Error, models::Track,
 };
-use qobuz_player_models::Track;
 
 struct MprisPlayer {
     controls: Controls,

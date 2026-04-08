@@ -8,7 +8,6 @@ description.workspace = true
 
 [dependencies]
 qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }
-qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
 qonductor.workspace = true
 tokio.workspace = true

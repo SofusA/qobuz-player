@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use qobuz_player_models::{Track, TrackStatus};
+use crate::models::{Track, TrackStatus};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct AlbumTracklist {

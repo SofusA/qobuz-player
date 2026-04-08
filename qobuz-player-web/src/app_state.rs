@@ -5,9 +5,9 @@ use qobuz_player_controls::{
     client::Client,
     controls::Controls,
     database::Database,
+    models::Favorites,
     notification::{Notification, NotificationBroadcast},
 };
-use qobuz_player_models::Favorites;
 use qobuz_player_rfid::RfidState;
 use serde_json::json;
 use skabelon::Templates;

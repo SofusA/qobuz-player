@@ -6,9 +6,6 @@ license-file.workspace = true
 repository.workspace = true
 
 [dependencies]
-qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
-
-base64.workspace = true
 time.workspace = true
 md5.workspace = true
 regex.workspace = true
@@ -19,4 +16,7 @@ snafu.workspace = true
 tracing.workspace = true
 url.workspace = true
 clap.workspace = true
+
+[dev-dependencies]
 tokio.workspace = true
+qobuz-player-controls = { version = "*", path = "../qobuz-player-controls" }

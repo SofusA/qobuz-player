@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 qobuz-player-client = { version = "*", path = "../qobuz-player-client" }
-qobuz-player-models = { version = "*", path = "../qobuz-player-models" }
 
 tokio.workspace = true
 rand.workspace = true
@@ -22,7 +21,6 @@ reqwest.workspace = true
 sqlx.workspace = true
 serde_json.workspace = true
 dirs.workspace = true
-md5.workspace = true
 parking_lot.workspace = true
 libc.workspace = true
 futures.workspace = true
