@@ -7,7 +7,7 @@ use axum::{
     routing::{get, put},
 };
 use axum_extra::extract::Form;
-use qobuz_player_controls::notification::Notification;
+use qobuz_player_controls::{notification::Notification};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -44,7 +44,12 @@ async fn action(
     match req.action {
         Action::AddToQueue => {
             let album_data = ok_or_send_error_toast(&state, state.get_album(&req.id).await)?;
-            let track_ids = album_data.album.tracks.into_iter().map(|x| x.id).collect();
+            let track_ids = album_data
+                .album
+                .tracks
+                .into_iter()
+                .map(|x| x.id)
+                .collect();
 
             state.controls.add_tracks_to_queue(track_ids);
             Ok(state.send_toast(Notification::Success(format!(

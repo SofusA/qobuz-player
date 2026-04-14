@@ -297,6 +297,14 @@ impl Player {
         Ok(())
     }
 
+    async fn skip_to_queue_item(&mut self, new_position: usize) -> AppResult<()> {
+        let mut tracklist = self.tracklist_rx.borrow().clone();
+        tracklist.skip_to_queue_item(new_position);
+        self.broadcast_tracklist(tracklist).await?;
+
+        Ok(())
+    }
+
     async fn next(&mut self) -> AppResult<()> {
         let current_position = self.tracklist_rx.borrow().current_position();
         self.skip_to_position((current_position + 1) as i32, true)
@@ -492,6 +500,21 @@ impl Player {
     }
 
     async fn add_tracks_to_queue(&mut self, ids: Vec<u32>) -> AppResult<()> {
+        let tracklist = self.tracklist_rx.borrow().clone();
+        let last_track_id = tracklist.queue().last().map(|x| x.id as usize);
+
+        if let Some(last_track_id) = last_track_id {
+            return self.insert_tracks_to_queue(ids, last_track_id).await;
+        }
+
+        self.insert_tracks_to_queue(ids, 0).await
+    }
+
+    async fn insert_tracks_to_queue(
+        &mut self,
+        ids: Vec<u32>,
+        _after: usize,
+    ) -> AppResult<()> {
         let mut tracklist = self.tracklist_rx.borrow().clone();
         tracklist.set_list_type(TracklistType::Tracks);
 
@@ -615,6 +638,9 @@ impl Player {
             } => {
                 self.skip_to_position(new_position as i32, force).await?;
             }
+            ControlCommand::SkipToQueueItem { new_position } => {
+                self.skip_to_queue_item(new_position).await?;
+            }
             ControlCommand::JumpForward => {
                 self.jump_forward()?;
             }
@@ -628,6 +654,9 @@ impl Player {
                 self.set_volume(volume).await?;
             }
             ControlCommand::AddTracksToQueue { ids } => self.add_tracks_to_queue(ids).await?,
+            ControlCommand::InsertTracksToQueue { ids, after } => {
+                self.insert_tracks_to_queue(ids, after).await?
+            }
             ControlCommand::RemoveIndexFromQueue { index } => {
                 self.remove_index_from_queue(index).await?
             }

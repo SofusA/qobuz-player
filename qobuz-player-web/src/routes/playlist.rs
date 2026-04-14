@@ -54,7 +54,11 @@ async fn action(
     match req.action {
         Action::AddToQueue => {
             let playlist = ok_or_send_error_toast(&state, state.client.playlist(req.id).await)?;
-            let track_ids = playlist.tracks.into_iter().map(|x| x.id).collect();
+            let track_ids = playlist
+                .tracks
+                .into_iter()
+                .map(|x| x.id)
+                .collect();
 
             state.controls.add_tracks_to_queue(track_ids);
 

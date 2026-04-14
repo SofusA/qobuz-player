@@ -79,6 +79,10 @@ impl Tracklist {
         self.queue.iter().map(|x| &x.track).collect()
     }
 
+    pub fn queue_ids(&self) -> Vec<u64> {
+        self.queue.iter().map(|x| x.id).collect()
+    }
+
     pub fn total(&self) -> usize {
         self.queue.len()
     }
@@ -105,8 +109,10 @@ impl Tracklist {
     }
 
     pub fn insert_track(&mut self, index: usize, track: Track) {
-        let id = (self.total() + 1) as u64;
-        let item = QueueItem { track, id };
+        let item = QueueItem {
+            track,
+            id: (self.total() + 1) as u64,
+        };
         self.queue.insert(index, item);
     }
 
@@ -239,6 +245,40 @@ impl Tracklist {
 
                 std::cmp::Ordering::Greater => {
                     queue_item.1.status = TrackStatus::Unplayed;
+                }
+            }
+        }
+
+        new_track
+    }
+
+    pub fn skip_to_queue_item(&mut self, new_position: usize) -> Option<&Track> {
+        let mut new_track: Option<&Track> = None;
+
+        let queue_index = self
+            .queue
+            .iter()
+            .enumerate()
+            .find(|(_i, queue_item)| queue_item.id == new_position as u64)
+            .map(|x| x.0)
+            .unwrap_or(0);
+
+        for queue_item in self.queue.iter_mut().enumerate() {
+            let queue_item_position = queue_item.0;
+
+            match queue_item_position.cmp(&queue_index) {
+                std::cmp::Ordering::Less => {
+                    queue_item.1.track.status = TrackStatus::Played;
+                }
+
+                std::cmp::Ordering::Equal => {
+                    queue_item.1.track.status = TrackStatus::Playing;
+
+                    new_track = Some(&queue_item.1.track)
+                }
+
+                std::cmp::Ordering::Greater => {
+                    queue_item.1.track.status = TrackStatus::Unplayed;
                 }
             }
         }

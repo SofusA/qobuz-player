@@ -196,11 +196,10 @@ pub async fn run() -> Result<(), Error> {
 
     let filter = match verbosity {
         Some(_) => {
-            format!("{level_str},stream_download=warn,hyper=warn,reqwest=warn,rustls=warn")
+            format!("{level_str},mdns_sd=off,stream_download=warn,hyper=warn,reqwest=warn,rustls=warn")
         }
         None => level_str.to_string(),
     };
-
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_target(false)
