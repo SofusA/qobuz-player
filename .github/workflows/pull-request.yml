@@ -78,11 +78,16 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libasound2-dev
+          sudo apt-get install -y pkg-config libasound2-dev librust-gtk4-dev librust-libadwaita-dev
 
       - name: Test 
-        run: cargo test --workspace --exclude qobuz-player-client
+        run: cargo test --workspace --exclude qobuz-player-client --exclude qobuz-player-gtk
+
+      - name: Test gtk app
+        if: startsWith(matrix.os, 'ubuntu')
+        run: cargo test -p qobuz-player-gtk
 
       - name: Build gpio 
         if: startsWith(matrix.os, 'ubuntu')
         run: cargo build --features gpio
+

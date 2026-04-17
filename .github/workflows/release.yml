@@ -77,6 +77,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and upload qobuz-player-gtk
+        if: startsWith(matrix.os, 'ubuntu')
         uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: qobuz-player-gtk

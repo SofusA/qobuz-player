@@ -2,7 +2,7 @@ use qobuz_player_cli::{
     ConnectArgs, SharedArgs, SharedCommands, create_player, default_audio_quality, get_client,
     handle_shared_commands, spawn_clean_up,
 };
-use std::sync::Arc;
+use std::{fs, io, path::PathBuf, sync::Arc};
 use tokio::sync::broadcast;
 
 use clap::Parser;
@@ -21,6 +21,14 @@ struct Arguments {
 
     #[clap(subcommand)]
     command: Option<SharedCommands>,
+
+    /// Install a user-level desktop entry
+    #[arg(long)]
+    install: bool,
+
+    /// Uninstall the user-level desktop entry
+    #[arg(long)]
+    uninstall: bool,
 }
 
 #[tokio::main]
@@ -35,6 +43,17 @@ async fn main() {
 
 pub async fn run() -> AppResult<()> {
     let args = Arguments::parse();
+
+    if args.install {
+        install_desktop_entry().expect("Failed to install desktop entry");
+        return Ok(());
+    }
+
+    if args.uninstall {
+        uninstall_desktop_entry().expect("Failed to uninstall desktop entry");
+        return Ok(());
+    }
+
     let database = Arc::new(Database::new().await?);
 
     if let Some(command) = args.command {
@@ -136,4 +155,74 @@ pub async fn run() -> AppResult<()> {
 fn error_exit(error: Error) {
     eprintln!("{error}");
     std::process::exit(1);
+}
+
+const APP_ID: &str = "qobuz-player-gtk";
+const DESKTOP_FILE: &str = "qobuz-player.desktop";
+const ICON: &[u8] = include_bytes!("../../qobuz-player-web/assets/favicon.svg");
+
+fn data_local_dir() -> PathBuf {
+    dirs::data_local_dir().expect("Could not determine XDG data-local directory")
+}
+
+fn applications_dir() -> PathBuf {
+    data_local_dir().join("applications")
+}
+
+fn icon_dir() -> PathBuf {
+    data_local_dir().join("icons/qobuz-player")
+}
+
+fn icon_path() -> PathBuf {
+    icon_dir().join("icon.svg")
+}
+
+fn desktop_entry_contents() -> String {
+    format!(
+        r#"[Desktop Entry]
+Type=Application
+Name=Qobuz Player
+Comment=Qobuz desktop music player
+Exec={app}
+Icon={icon_path}
+Terminal=false
+Categories=Audio;Music;Player;
+StartupNotify=true
+"#,
+        app = APP_ID,
+        icon_path = icon_path().display()
+    )
+}
+
+fn install_desktop_entry() -> io::Result<()> {
+    let apps_dir = applications_dir();
+    fs::create_dir_all(&apps_dir)?;
+
+    let desktop_path = apps_dir.join(DESKTOP_FILE);
+    fs::write(&desktop_path, desktop_entry_contents())?;
+
+    let icons_dir = icon_dir();
+    fs::create_dir_all(&icons_dir)?;
+
+    let icon_path = icon_path();
+    fs::write(&icon_path, ICON)?;
+
+    println!("Desktop entry installed:");
+    println!("{}", desktop_path.display());
+    println!("Icon installed:");
+    println!("{}", icon_path.display());
+
+    Ok(())
+}
+
+fn uninstall_desktop_entry() -> io::Result<()> {
+    let desktop_path = applications_dir().join(DESKTOP_FILE);
+    let icon_path = icon_dir().join("icons.png");
+
+    let _ = fs::remove_file(desktop_path);
+    let _ = fs::remove_file(icon_path);
+
+    println!("Desktop entry and icon removed");
+
+    Ok(())
 }
