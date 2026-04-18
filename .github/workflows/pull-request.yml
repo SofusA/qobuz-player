@@ -87,5 +87,25 @@ jobs:
 
       - name: Build gpio 
         if: startsWith(matrix.os, 'ubuntu')
-        run: cargo build --features gpio
+        run: cargo build --workspace --features gpio --exclude qobuz-player-gtk
 
+  test-gtk:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:rawhide
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: dnf -y install rust-alsa-devel SDL2-devel rust-libadwaita-devel rust-openssl-devel
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build qobuz-player-gtk
+        run: cargo build -p qobuz-player-gtk
+
+      - name: Run tests
+        run: cargo test -p qobuz-player-gtk
