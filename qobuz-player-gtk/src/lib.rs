@@ -2,11 +2,14 @@ use std::{cell::RefCell, rc::Rc, sync::Arc, time::Duration};
 
 use adw::{Application, prelude::*};
 use async_channel::{Receiver, Sender};
-use libadwaita as adw;
+use libadwaita::{self as adw, ApplicationWindow};
 use qobuz_player_controls::{
-    ExitSender, PositionReceiver, Status, StatusReceiver, TracklistReceiver, client::Client,
-    controls::Controls, tracklist::Tracklist,
+    ExitSender, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
+    client::{Client, exchange_oauth_code, get_app_id},
+    controls::Controls,
+    tracklist::Tracklist,
 };
+use webkit6::{WebView, prelude::*};
 
 use crate::{
     callbacks::{CallbackHandles, build_callbacks},
@@ -23,6 +26,50 @@ use crate::{
 mod callbacks;
 mod ui;
 
+fn oauth_login_window(
+    app: &Application,
+    oauth_url: &str,
+    sender: tokio::sync::mpsc::UnboundedSender<String>,
+) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Sign in to Qobuz")
+        .default_width(480)
+        .default_height(720)
+        .build();
+
+    let webview = WebView::new();
+
+    webview.load_uri(oauth_url);
+
+    webview.connect_load_changed(move |webview, event| {
+        tracing::info!("load changed: {:?}", event);
+
+        if event == webkit6::LoadEvent::Committed
+            && let Some(uri) = webview.uri()
+        {
+            tracing::info!("uri: {:?}", uri);
+
+            if uri.starts_with("http://localhost/")
+                && let Some(code) = extract_code_from_uri(&uri)
+            {
+                tracing::info!("sending code: {code}");
+                let _ = sender.send(code); // TODO: Close the window
+            }
+        }
+    });
+
+    window.set_content(Some(&webview));
+    window.present();
+}
+
+fn extract_code_from_uri(uri: &str) -> Option<String> {
+    let url = url::Url::parse(uri).ok()?;
+    url.query_pairs()
+        .find(|(k, _)| k == "code_autorisation")
+        .map(|(_, v)| v.to_string())
+}
+
 pub fn init(
     client: Arc<Client>,
     tracklist_receiver: TracklistReceiver,
@@ -33,26 +80,54 @@ pub fn init(
 ) {
     libadwaita::init().unwrap();
 
+    let app_id = futures::executor::block_on(get_app_id()).unwrap();
+
+    let (login_sender, mut login_receiver) = tokio::sync::mpsc::unbounded_channel::<String>();
+
     let application = libadwaita::Application::builder()
         .application_id("com.github.sofusa.qobuz-player")
         .build();
 
-    let exit_sender_clone = exit_sender.clone();
-    application.connect_activate(move |app| {
-        build_ui(
-            app,
-            tracklist_receiver.clone(),
-            status_receiver.clone(),
-            position_receiver.clone(),
-            controls.clone(),
-            client.clone(),
-            exit_sender_clone.clone(),
-        );
+    let app_id_clone = app_id.clone();
+    application.connect_activate({
+        let login_sender = login_sender.clone();
+        move |app| {
+            let oauth_url = format!("https://www.qobuz.com/signin/oauth?ext_app_id={app_id_clone}&redirect_url=http://localhost");
+
+            tracing::info!("oauth_url: {oauth_url}");
+
+            oauth_login_window(app, &oauth_url, login_sender.clone());
+        }
     });
 
-    let args: &[&str] = &[];
-    application.run_with_args(args);
-    exit_sender.send(true).unwrap();
+    let application_clone = application.clone();
+    let app_id = app_id.clone();
+    glib::MainContext::default().spawn_local(async move {
+        tracing::info!("Waiting for login");
+
+        if let Some(code) = login_receiver.recv().await {
+            tracing::info!("Got login code");
+
+            let oauth = exchange_oauth_code(&code, &app_id).await.unwrap();
+
+            tracing::info!("{:?}", oauth);
+            // TODO: Handle oauth
+
+            let client = client.clone();
+
+            build_ui(
+                &application_clone,
+                tracklist_receiver,
+                status_receiver,
+                position_receiver,
+                controls,
+                client,
+                exit_sender,
+            );
+        }
+    });
+
+    application.run();
 }
 
 fn build_ui(

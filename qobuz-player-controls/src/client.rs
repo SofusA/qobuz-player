@@ -26,6 +26,9 @@ use tokio::{
 
 use crate::{AppResult, error::Error, simple_cache::SimpleCache};
 
+pub use qobuz_player_client::client::exchange_oauth_code;
+pub use qobuz_player_client::client::get_app_id;
+
 type QobuzClient = qobuz_player_client::client::Client;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
