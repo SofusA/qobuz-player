@@ -59,8 +59,9 @@ impl Client {
 
     pub async fn new_with_oauth_login(
         max_audio_quality: AudioQuality,
+        headless: bool,
     ) -> Result<(Self, OAuthResult)> {
-        let oauth_result = browser_oauth_login().await?;
+        let oauth_result = browser_oauth_login(headless).await?;
         let client = Self::new(
             oauth_result.user_auth_token.clone(),
             oauth_result.user_id,

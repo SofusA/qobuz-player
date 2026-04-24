@@ -232,8 +232,7 @@ impl Display for Endpoint {
     }
 }
 
-// TODO: Add option to skip headless
-pub async fn browser_oauth_login() -> Result<OAuthResult> {
+pub async fn browser_oauth_login(headless: bool) -> Result<OAuthResult> {
     let app_id = get_app_id().await.map_err(|_| Error::Login)?;
 
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|_| Error::Login)?;
@@ -241,10 +240,6 @@ pub async fn browser_oauth_login() -> Result<OAuthResult> {
     drop(listener);
 
     let oauth_url = build_oauth_url(&app_id, port);
-
-    let manual_oauth_url = format!(
-        "https://www.qobuz.com/signin/oauth?ext_app_id={app_id}&redirect_url=http%3A%2F%2Flocalhost"
-    );
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(1);
 
@@ -272,38 +267,53 @@ pub async fn browser_oauth_login() -> Result<OAuthResult> {
     });
 
     println!("Opening browser for Qobuz login...");
-    println!();
-    println!("  {oauth_url}");
-    println!();
-    println!("Headless? Open this URL on another device instead:");
-    println!();
-    println!("  {manual_oauth_url}");
-    println!();
-    println!("After login, copy the code_autorisation value from the URL bar and paste it here.");
-    println!("Or if on the same network, the redirect will be captured automatically.");
-    println!();
+    if headless {
+        let manual_oauth_url = format!(
+            "https://www.qobuz.com/signin/oauth?ext_app_id={app_id}&redirect_url=http%3A%2F%2Flocalhost"
+        );
+
+        println!("Headless? Open this URL on another device instead:");
+        println!();
+        println!("  {manual_oauth_url}");
+        println!();
+        println!(
+            "After login, copy the code_autorisation value from the URL bar and paste it here."
+        );
+        println!("Or if on the same network, the redirect will be captured automatically.");
+        println!();
+    }
     let _ = open::that(&oauth_url);
 
-    let mut stdin_task = Some(tokio::spawn(read_code_from_stdin()));
+    let code: String = if headless {
+        let mut stdin_task = Some(tokio::spawn(read_code_from_stdin()));
 
-    let code = tokio::select! {
-        result = async {
-            tokio::time::timeout(Duration::from_secs(300), rx.recv())
-                .await
-                .ok()
-                .flatten()
-        } => {
-            if let Some(task) = stdin_task.take() {
-                task.abort();
+        tokio::select! {
+            result = async {
+                tokio::time::timeout(Duration::from_secs(300), rx.recv())
+                    .await
+                    .ok()
+                    .flatten()
+            } => {
+                if let Some(task) = stdin_task.take() {
+                    task.abort();
+                }
+                result.ok_or(Error::Login)?
             }
-            result.ok_or(Error::Login)?
-        }
 
-        result = stdin_task.as_mut().unwrap() => {
-            // stdin path won → task already completed
-            result.map_err(|_| Error::Login)??
+            result = stdin_task.as_mut().unwrap() => {
+                // stdin path won → task already completed
+                result.map_err(|_| Error::Login)??
+            }
         }
+    } else {
+        tokio::time::timeout(Duration::from_secs(300), rx.recv())
+            .await
+            .ok()
+            .flatten()
+            .ok_or(Error::Login)?
     };
+
+    server.abort();
 
     server.abort();
 

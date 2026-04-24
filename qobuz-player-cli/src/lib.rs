@@ -83,10 +83,15 @@ pub enum SharedCommands {
     },
 }
 
-pub async fn handle_shared_commands(command: SharedCommands, database: &Database) -> AppResult<()> {
+pub async fn handle_shared_commands(
+    command: SharedCommands,
+    database: &Database,
+    headless: bool,
+) -> AppResult<()> {
     match command {
         SharedCommands::Login => {
-            let (_client, oauth_result) = Client::new_with_oauth_login(AudioQuality::Mp3).await?;
+            let (_client, oauth_result) =
+                Client::new_with_oauth_login(AudioQuality::Mp3, headless).await?;
 
             database
                 .set_user_auth_token(oauth_result.user_auth_token, oauth_result.user_id)
@@ -108,7 +113,11 @@ pub async fn handle_shared_commands(command: SharedCommands, database: &Database
     }
 }
 
-pub async fn get_client(database: &Database, max_audio_quality: AudioQuality) -> AppResult<Client> {
+pub async fn get_client(
+    database: &Database,
+    max_audio_quality: AudioQuality,
+    headless: bool,
+) -> AppResult<Client> {
     let database_credentials = database.get_credentials().await?;
 
     let client = match (
@@ -117,7 +126,8 @@ pub async fn get_client(database: &Database, max_audio_quality: AudioQuality) ->
     ) {
         (Some(token), Some(user_id)) => Client::new(token, user_id, max_audio_quality),
         _ => {
-            let (client, oauth_result) = Client::new_with_oauth_login(max_audio_quality).await?;
+            let (client, oauth_result) =
+                Client::new_with_oauth_login(max_audio_quality, headless).await?;
 
             database
                 .set_user_auth_token(oauth_result.user_auth_token, oauth_result.user_id)
