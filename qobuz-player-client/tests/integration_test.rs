@@ -1,23 +1,19 @@
 use qobuz_player_client::client::{
     Client, FeaturedAlbumType, FeaturedGenreAlbumType, FeaturedPlaylistType, ReleaseType,
 };
-use qobuz_player_controls::database::Database;
+use qobuz_player_controls::database::{Credentials, Database};
 
-async fn get_token() -> Option<(String, i64)> {
-    let database = Database::new().await.unwrap();
-    let credentials = database.get_credentials().await.unwrap();
-    let token = credentials.user_auth_token?;
-    let user_id = credentials.user_id?;
-
-    Some((token, user_id))
+async fn get_token() -> Option<Credentials> {
+    let database = Database::new().await.ok()?;
+    database.get_credentials().await.ok()?
 }
 
 async fn get_client() -> Option<Client> {
-    let (token, user_id) = get_token().await?;
+    let credentials = get_token().await?;
 
     qobuz_player_client::client::Client::new(
-        &token,
-        user_id,
+        &credentials.user_auth_token,
+        credentials.user_id,
         qobuz_player_client::client::AudioQuality::Mp3,
     )
     .await

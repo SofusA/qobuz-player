@@ -232,14 +232,12 @@ impl Display for Endpoint {
     }
 }
 
-pub async fn browser_oauth_login(headless: bool) -> Result<OAuthResult> {
-    let app_id = get_app_id().await.map_err(|_| Error::Login)?;
-
+pub async fn browser_oauth_login(headless: bool, app_id: &str) -> Result<OAuthResult> {
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|_| Error::Login)?;
     let port = listener.local_addr().map_err(|_| Error::Login)?.port();
     drop(listener);
 
-    let oauth_url = build_oauth_url(&app_id, port);
+    let oauth_url = build_oauth_url(app_id, port);
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(1);
 
@@ -266,7 +264,7 @@ pub async fn browser_oauth_login(headless: bool) -> Result<OAuthResult> {
         axum::serve(listener, app).await.ok();
     });
 
-    println!("Opening browser for Qobuz login...");
+    println!("Login to Qobuz in browser...");
     if headless {
         let manual_oauth_url = format!(
             "https://www.qobuz.com/signin/oauth?ext_app_id={app_id}&redirect_url=http%3A%2F%2Flocalhost"
@@ -319,7 +317,7 @@ pub async fn browser_oauth_login(headless: bool) -> Result<OAuthResult> {
 
     tracing::debug!("Received authorization code: {}", code);
 
-    let result = exchange_oauth_code(&code, &app_id).await.map_err(|e| {
+    let result = exchange_oauth_code(&code, app_id).await.map_err(|e| {
         tracing::error!("OAuth code exchange failed: {:?}", e);
         Error::Login
     })?;

@@ -1,4 +1,5 @@
 use crate::{AppResult, AudioQuality, Error, Tracklist};
+use qobuz_player_client::client::OAuthResult;
 use serde_json::to_string;
 use sqlx::types::Json;
 use sqlx::{Pool, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
@@ -48,7 +49,10 @@ impl Database {
         Ok(Self { pool })
     }
 
-    pub async fn set_user_auth_token(&self, token: String, user_id: i64) -> AppResult<()> {
+    pub async fn set_credentials(&self, credentials: Credentials) -> AppResult<()> {
+        let token = credentials.user_auth_token;
+        let user_id = credentials.user_id;
+
         sqlx::query!(
             "update credentials set user_auth_token = ?, user_id = ? where rowid = 1",
             token,
@@ -128,13 +132,23 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_credentials(&self) -> AppResult<DatabaseCredentials> {
-        Ok(sqlx::query_as!(
+    pub async fn get_credentials(&self) -> AppResult<Option<Credentials>> {
+        let credentials = sqlx::query_as!(
             DatabaseCredentials,
             "select user_auth_token, user_id from credentials where rowid = 1"
         )
         .fetch_one(&self.pool)
-        .await?)
+        .await?;
+
+        let credentials = match (credentials.user_auth_token, credentials.user_id) {
+            (Some(token), Some(user_id)) => Some(Credentials {
+                user_auth_token: token,
+                user_id,
+            }),
+            _ => None,
+        };
+
+        Ok(credentials)
     }
 
     pub async fn get_configuration(&self) -> AppResult<DatabaseConfiguration> {
@@ -284,9 +298,24 @@ impl From<i64> for ReferenceTypeDatabase {
     }
 }
 
-pub struct DatabaseCredentials {
-    pub user_auth_token: Option<String>,
-    pub user_id: Option<i64>,
+struct DatabaseCredentials {
+    user_auth_token: Option<String>,
+    user_id: Option<i64>,
+}
+
+#[derive(Clone)]
+pub struct Credentials {
+    pub user_auth_token: String,
+    pub user_id: i64,
+}
+
+impl From<OAuthResult> for Credentials {
+    fn from(value: OAuthResult) -> Self {
+        Self {
+            user_auth_token: value.user_auth_token,
+            user_id: value.user_id,
+        }
+    }
 }
 
 pub struct DatabaseConfiguration {

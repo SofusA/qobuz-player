@@ -22,6 +22,7 @@ pub struct LibraryPage {
     root: gtk4::Box,
     client: Arc<Client>,
     spinner: Spinner,
+    waiting_label: gtk4::Label,
     albums_page: Rc<RefCell<AlbumsPage>>,
     artists_page: Rc<RefCell<ArtistsPage>>,
     playlists_page: Rc<RefCell<PlaylistsPage>>,
@@ -84,10 +85,19 @@ impl LibraryPage {
         spinner.set_visible(true);
 
         let spinner_box = gtk4::Box::builder()
+            .orientation(gtk4::Orientation::Vertical)
             .halign(gtk4::Align::Center)
             .valign(gtk4::Align::Center)
             .build();
         spinner_box.append(&spinner);
+
+        let waiting_label = gtk4::Label::builder()
+            .label("Waiting for login...")
+            .halign(gtk4::Align::Center)
+            .valign(gtk4::Align::Center)
+            .visible(true)
+            .build();
+        spinner_box.append(&waiting_label);
 
         let overlay = gtk4::Overlay::new();
         overlay.set_vexpand(true);
@@ -105,18 +115,11 @@ impl LibraryPage {
         root.append(&top_box);
         root.append(&overlay);
 
-        reload(
-            client.clone(),
-            &spinner,
-            &albums_page,
-            &artists_page,
-            &playlists_page,
-        );
-
         Self {
             root,
             client,
             spinner,
+            waiting_label,
             albums_page,
             artists_page,
             playlists_page,
@@ -127,6 +130,7 @@ impl LibraryPage {
         reload(
             self.client.clone(),
             &self.spinner,
+            &self.waiting_label,
             &self.albums_page,
             &self.artists_page,
             &self.playlists_page,
@@ -141,6 +145,7 @@ impl LibraryPage {
 pub fn reload(
     client: Arc<Client>,
     spinner: &Spinner,
+    waiting_label: &gtk4::Label,
     albums_page: &Rc<RefCell<AlbumsPage>>,
     artists_page: &Rc<RefCell<ArtistsPage>>,
     playlists_page: &Rc<RefCell<PlaylistsPage>>,
@@ -149,6 +154,11 @@ pub fn reload(
     let artists_page = artists_page.clone();
     let playlists_page = playlists_page.clone();
     let spinner = spinner.clone();
+    let waiting_label = waiting_label.clone();
+
+    waiting_label.set_visible(false);
+    spinner.set_visible(true);
+    spinner.start();
 
     glib::MainContext::default().spawn_local({
         async move {

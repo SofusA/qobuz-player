@@ -89,23 +89,26 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         run: cargo build --workspace --features gpio --exclude qobuz-player-gtk
 
-  test-gtk:
-    runs-on: ubuntu-latest
+  build-flatpak:
+    name: "Flatpak ${{ matrix.variant.arch }}"
+    runs-on: ${{ matrix.variant.runner }}
+
     container:
-      image: fedora:rawhide
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-49
+      options: --privileged
+
+    strategy:
+      matrix:
+        variant:
+          - arch: x86_64
+            runner: ubuntu-24.04
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: dnf -y install rust-alsa-devel rust-libadwaita-devel rust-openssl-devel
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build qobuz-player-gtk
-        run: cargo build -p qobuz-player-gtk
-
-      - name: Run tests
-        run: cargo test -p qobuz-player-gtk
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: qobuz-player-${{ matrix.variant.arch }}.flatpak
+          manifest-path: qobuz-player-gtk/flatpak/manifest.json
+          cache-key: flatpak-builder-${{ matrix.variant.arch }}-${{ github.sha }}
+          arch: ${{ matrix.variant.arch }}

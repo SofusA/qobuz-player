@@ -4,9 +4,11 @@ use adw::{Application, prelude::*};
 use async_channel::{Receiver, Sender};
 use libadwaita::{self as adw, ApplicationWindow};
 use qobuz_player_controls::{
-    ExitSender, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
-    client::{Client, exchange_oauth_code, get_app_id},
+    AppResult, ExitSender, PositionReceiver, Status, StatusReceiver, TracklistReceiver,
+    client::{Client, exchange_oauth_code},
     controls::Controls,
+    database::{Credentials, Database},
+    error::Error,
     tracklist::Tracklist,
 };
 use webkit6::{WebView, prelude::*};
@@ -39,22 +41,20 @@ fn oauth_login_window(
         .build();
 
     let webview = WebView::new();
-
     webview.load_uri(oauth_url);
 
-    webview.connect_load_changed(move |webview, event| {
-        tracing::info!("load changed: {:?}", event);
+    let window_weak = window.downgrade();
 
+    webview.connect_load_changed(move |webview, event| {
         if event == webkit6::LoadEvent::Committed
             && let Some(uri) = webview.uri()
+            && uri.starts_with("http://localhost/")
+            && let Some(code) = extract_code_from_uri(&uri)
         {
-            tracing::info!("uri: {:?}", uri);
+            sender.send(code).unwrap();
 
-            if uri.starts_with("http://localhost/")
-                && let Some(code) = extract_code_from_uri(&uri)
-            {
-                tracing::info!("sending code: {code}");
-                let _ = sender.send(code); // TODO: Close the window
+            if let Some(window) = window_weak.upgrade() {
+                window.close();
             }
         }
     });
@@ -70,66 +70,107 @@ fn extract_code_from_uri(uri: &str) -> Option<String> {
         .map(|(_, v)| v.to_string())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn init(
     client: Arc<Client>,
+    app_id: String,
     tracklist_receiver: TracklistReceiver,
     status_receiver: StatusReceiver,
     position_receiver: PositionReceiver,
     controls: Controls,
+    database: Arc<Database>,
     exit_sender: ExitSender,
-) {
+) -> AppResult<()> {
     libadwaita::init().unwrap();
-
-    let app_id = futures::executor::block_on(get_app_id()).unwrap();
-
-    let (login_sender, mut login_receiver) = tokio::sync::mpsc::unbounded_channel::<String>();
 
     let application = libadwaita::Application::builder()
         .application_id("com.github.sofusa.qobuz-player")
         .build();
 
-    let app_id_clone = app_id.clone();
+    let is_logged_in = client.credentials_is_set()?;
+
+    let (login_sender, mut login_receiver) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let (ui_sender, ui_receiver) = async_channel::unbounded::<UiEvent>();
+
+    let app_id_for_window = app_id.clone();
+
     application.connect_activate({
+        let client = client.clone();
+        let tracklist_receiver = tracklist_receiver.clone();
+        let status_receiver = status_receiver.clone();
+        let position_receiver = position_receiver.clone();
+        let controls = controls.clone();
+        let exit_sender = exit_sender.clone();
         let login_sender = login_sender.clone();
+        let ui_sender = ui_sender.clone();
+
         move |app| {
-            let oauth_url = format!("https://www.qobuz.com/signin/oauth?ext_app_id={app_id_clone}&redirect_url=http://localhost");
+            if app.active_window().is_some() {
+                return;
+            }
 
-            tracing::info!("oauth_url: {oauth_url}");
+            build_ui(
+                app,
+                tracklist_receiver.clone(),
+                status_receiver.clone(),
+                position_receiver.clone(),
+                controls.clone(),
+                client.clone(),
+                exit_sender.clone(),
+                ui_sender.clone(),
+                ui_receiver.clone()
+            );
 
-            oauth_login_window(app, &oauth_url, login_sender.clone());
+            if !is_logged_in {
+                let oauth_url = format!(
+                    "https://www.qobuz.com/signin/oauth?ext_app_id={app_id_for_window}&redirect_url=http://localhost"
+                );
+
+                oauth_login_window(app, &oauth_url, login_sender.clone());
+            }
         }
     });
 
-    let application_clone = application.clone();
-    let app_id = app_id.clone();
+    let client_clone = client.clone();
+    let database_clone = database.clone();
+    let app_id_for_exchange = app_id.clone();
+    let ui_sender = ui_sender.clone();
+
     glib::MainContext::default().spawn_local(async move {
-        tracing::info!("Waiting for login");
+        if is_logged_in {
+            ui_sender.send(UiEvent::FavoritesChanged).await.unwrap();
+            return;
+        }
 
-        if let Some(code) = login_receiver.recv().await {
-            tracing::info!("Got login code");
+        let result: AppResult<()> = async {
+            let Some(code) = login_receiver.recv().await else {
+                return Err(Error::Login {
+                    message: "Error receiving login token".to_string(),
+                });
+            };
 
-            let oauth = exchange_oauth_code(&code, &app_id).await.unwrap();
+            let oauth = exchange_oauth_code(&code, &app_id_for_exchange).await?;
+            let credentials: Credentials = oauth.into();
+            client_clone.set_credentials(credentials.clone())?;
+            database_clone.set_credentials(credentials).await?;
+            ui_sender.send(UiEvent::FavoritesChanged).await.unwrap();
 
-            tracing::info!("{:?}", oauth);
-            // TODO: Handle oauth
+            Ok(())
+        }
+        .await;
 
-            let client = client.clone();
-
-            build_ui(
-                &application_clone,
-                tracklist_receiver,
-                status_receiver,
-                position_receiver,
-                controls,
-                client,
-                exit_sender,
-            );
+        if let Err(err) = result {
+            tracing::error!("login flow failed: {:?}", err);
         }
     });
 
     application.run();
+
+    exit_sender.send(true).unwrap();
+    Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_ui(
     app: &Application,
     tracklist_receiver: TracklistReceiver,
@@ -138,6 +179,8 @@ fn build_ui(
     controls: Controls,
     client: Arc<Client>,
     exit_sender: ExitSender,
+    ui_sender: Sender<UiEvent>,
+    ui_receiver: Receiver<UiEvent>,
 ) {
     let window = adw::ApplicationWindow::builder()
         .application(app)
@@ -183,15 +226,13 @@ fn build_ui(
         });
     }
 
-    let (sender, receiver) = async_channel::unbounded::<UiEvent>();
-
     let callback_handles = Rc::new(build_callbacks(
         app_nav.clone(),
         controls.clone(),
         client.clone(),
         detail_pages.clone(),
         tracklist_receiver.clone(),
-        sender.clone(),
+        ui_sender.clone(),
     ));
 
     let on_open_album = callback_handles.open_album.clone();
@@ -239,8 +280,8 @@ fn build_ui(
     update_now_playing(&now_playing, &tracklist_value);
 
     setup_tracklist_listener(
-        sender,
-        receiver,
+        ui_sender,
+        ui_receiver,
         tracklist_receiver,
         status_receiver,
         position_receiver,

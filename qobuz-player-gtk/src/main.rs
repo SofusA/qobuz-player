@@ -1,6 +1,5 @@
 use qobuz_player_cli::{
-    ConnectArgs, SharedArgs, SharedCommands, create_player, default_audio_quality, get_client,
-    handle_shared_commands, spawn_clean_up,
+    ConnectArgs, SharedArgs, create_player, default_audio_quality, spawn_clean_up,
 };
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 use qobuz_player_controls::StatusReceiver;
@@ -9,7 +8,11 @@ use tokio::sync::broadcast;
 
 use clap::Parser;
 use qobuz_player_controls::{
-    AppResult, database::Database, error::Error, notification::NotificationBroadcast,
+    AppResult,
+    client::{Client, get_app_id},
+    database::Database,
+    error::Error,
+    notification::NotificationBroadcast,
 };
 
 #[derive(Parser)]
@@ -20,9 +23,6 @@ struct Arguments {
 
     #[clap(flatten)]
     connect: ConnectArgs,
-
-    #[clap(subcommand)]
-    command: Option<SharedCommands>,
 }
 
 #[tokio::main]
@@ -42,16 +42,13 @@ pub async fn run() -> AppResult<()> {
 
     let database = Arc::new(Database::new().await?);
 
-    if let Some(command) = args.command {
-        handle_shared_commands(command, &database).await?;
-        return Ok(());
-    }
-
     let (exit_sender, exit_receiver) = broadcast::channel(5);
 
     let max_audio_quality = default_audio_quality(&database, args.shared.max_audio_quality).await?;
-    let client = get_client(&database, max_audio_quality).await?;
-    let client = Arc::new(client);
+    let credentials = database.get_credentials().await?;
+
+    let app_id = get_app_id().await?;
+    let client = Arc::new(Client::new(credentials, max_audio_quality));
 
     let broadcast = Arc::new(NotificationBroadcast::new());
 
@@ -99,12 +96,12 @@ pub async fn run() -> AppResult<()> {
     let client = client.clone();
 
     if args.connect.connect {
-        let app_id = client.app_id().await?;
         let position_receiver = player.position();
         let tracklist_receiver = player.tracklist();
         let volume_receiver = player.volume();
         let status_receiver = player.status();
         let controls = player.controls();
+        let app_id = app_id.clone();
 
         tokio::spawn(async move {
             if let Err(e) = qobuz_player_connect::init(
@@ -128,15 +125,20 @@ pub async fn run() -> AppResult<()> {
     let tracklist_receiver = player.tracklist();
     let status_receiver = player.status();
     let position_receiver = player.position();
+    let database_clone = database.clone();
     tokio::task::spawn_blocking(move || {
-        qobuz_player_gtk::init(
+        if let Err(e) = qobuz_player_gtk::init(
             client,
+            app_id,
             tracklist_receiver,
             status_receiver,
             position_receiver,
             controls,
+            database_clone,
             exit_sender,
-        );
+        ) {
+            error_exit(e);
+        };
     });
 
     spawn_clean_up(database, args.shared.audio_cache_time_to_live);

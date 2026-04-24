@@ -1,11 +1,14 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Mutex};
 
-use crate::models::{
-    Album, AlbumSimple, ArtistPage, Favorites, Genre, Playlist, PlaylistSimple, SearchResults,
-    Track,
-    mapper::{
-        parse_album, parse_album_simple, parse_artist, parse_artist_page, parse_featured_album,
-        parse_genre, parse_playlist, parse_playlist_simple, parse_search_results, parse_track,
+use crate::{
+    database::Credentials,
+    models::{
+        Album, AlbumSimple, ArtistPage, Favorites, Genre, Playlist, PlaylistSimple, SearchResults,
+        Track,
+        mapper::{
+            parse_album, parse_album_simple, parse_artist, parse_artist_page, parse_featured_album,
+            parse_genre, parse_playlist, parse_playlist_simple, parse_search_results, parse_track,
+        },
     },
 };
 use futures::future::join_all;
@@ -32,11 +35,9 @@ pub use qobuz_player_client::client::get_app_id;
 type QobuzClient = qobuz_player_client::client::Client;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Debug)]
 pub struct Client {
     qobuz_client: OnceCell<RwLock<QobuzClient>>,
-    user_auth_token: String,
-    user_id: i64,
+    credentials: Mutex<Option<Credentials>>,
     max_audio_quality: AudioQuality,
     favorites_cache: SimpleCache<Favorites>,
     featured_albums_cache: SimpleCache<Vec<(String, Vec<AlbumSimple>)>>,
@@ -52,6 +53,16 @@ pub struct Client {
 }
 
 impl Client {
+    pub fn credentials_is_set(&self) -> AppResult<bool> {
+        Ok(self.credentials.lock()?.is_some())
+    }
+
+    pub fn set_credentials(&self, credentials: Credentials) -> AppResult<()> {
+        let mut lock = self.credentials.lock()?;
+        *lock = Some(credentials);
+        Ok(())
+    }
+
     pub async fn app_id(&self) -> AppResult<String> {
         let client = self.get_client().await?;
         Ok(client.app_id().to_string())
@@ -61,17 +72,20 @@ impl Client {
         max_audio_quality: AudioQuality,
         headless: bool,
     ) -> Result<(Self, OAuthResult)> {
-        let oauth_result = browser_oauth_login(headless).await?;
+        let app_id = get_app_id().await?;
+        let oauth_result = browser_oauth_login(headless, &app_id).await?;
         let client = Self::new(
-            oauth_result.user_auth_token.clone(),
-            oauth_result.user_id,
+            Some(Credentials {
+                user_auth_token: oauth_result.user_auth_token.clone(),
+                user_id: oauth_result.user_id,
+            }),
             max_audio_quality,
         );
 
         Ok((client, oauth_result))
     }
 
-    pub fn new(user_auth_token: String, user_id: i64, max_audio_quality: AudioQuality) -> Self {
+    pub fn new(credentials: Option<Credentials>, max_audio_quality: AudioQuality) -> Self {
         let album_cache = moka::future::CacheBuilder::new(1000)
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24 * 7))
             .build();
@@ -100,10 +114,11 @@ impl Client {
             .time_to_live(std::time::Duration::from_secs(60 * 60 * 24))
             .build();
 
+        let credentials = Mutex::new(credentials);
+
         Self {
             qobuz_client: Default::default(),
-            user_auth_token,
-            user_id,
+            credentials,
             max_audio_quality,
             favorites_cache: SimpleCache::new(Duration::days(1)),
             featured_albums_cache: SimpleCache::new(Duration::days(1)),
@@ -120,8 +135,20 @@ impl Client {
     }
 
     async fn init_client(&self) -> Result<QobuzClient> {
-        let client =
-            QobuzClient::new(&self.user_auth_token, self.user_id, self.max_audio_quality).await?;
+        let credentials = self.credentials.lock()?.clone();
+
+        let Some(credentials) = credentials else {
+            return Err(Error::Login {
+                message: "Login credentials not set before logging in".to_string(),
+            });
+        };
+
+        let client = QobuzClient::new(
+            &credentials.user_auth_token,
+            credentials.user_id,
+            self.max_audio_quality,
+        )
+        .await?;
 
         Ok(client)
     }
