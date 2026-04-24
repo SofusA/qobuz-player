@@ -232,6 +232,7 @@ impl Display for Endpoint {
     }
 }
 
+// TODO: Add option to skip headless
 pub async fn browser_oauth_login() -> Result<OAuthResult> {
     let app_id = get_app_id().await.map_err(|_| Error::Login)?;
 

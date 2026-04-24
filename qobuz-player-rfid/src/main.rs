@@ -93,7 +93,6 @@ pub async fn run() -> AppResult<()> {
         tokio::spawn(async move {
             if let Err(e) = qobuz_player_rfid::init(
                 rfid_state,
-                tracklist_receiver,
                 controls,
                 database,
                 broadcast,

@@ -279,7 +279,6 @@ async fn play_rfid_reference(State(state): State<Arc<AppState>>, Path(reference)
         &state.controls,
         &state.broadcast,
         &reference,
-        &state.tracklist_receiver,
         None,
         None,
     )
